@@ -180,6 +180,8 @@ Yalnızca aşağıdaki JSON yapısını döndür (bilinmeyen alanlar için null 
           }
 
           const cartSubtotal = ctx.cart.reduce((sum, item) => sum + (item.unitPrice * item.quantity), 0);
+          const shippingFeeEstimate = cartSubtotal >= 1500 ? 0 : 49;
+          const totalEstimate = cartSubtotal + shippingFeeEstimate;
 
           return JSON.stringify({
             success: true,
@@ -187,6 +189,9 @@ Yalnızca aşağıdaki JSON yapısını döndür (bilinmeyen alanlar için null 
             cartItemCount: ctx.cart.length,
             cartTotalItems: ctx.cart.reduce((sum, i) => sum + i.quantity, 0),
             cartSubtotal: cartSubtotal,
+            shippingFeeEstimate: shippingFeeEstimate,
+            totalEstimate: totalEstimate,
+            priceMessage: `Ara Toplam: ${cartSubtotal.toFixed(2)} TL | Kargo: ${shippingFeeEstimate === 0 ? 'ÜCRETSİZ' : shippingFeeEstimate + ' TL'} | Tahmini Toplam: ${totalEstimate.toFixed(2)} TL`,
             cart: ctx.cart
           });
         } catch (e: any) {
