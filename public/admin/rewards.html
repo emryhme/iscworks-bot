@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VIP Sadakat Ödülleri - BARON'S SILLAGE</title>
+  
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="app-container">
+    <header class="navbar">
+      <div class="logo-area">
+        <div class="logo-icon"><i class="fa-solid fa-crown"></i></div>
+        <div>
+          <h1 class="logo-title">BARON'S SILLAGE</h1>
+          <span class="logo-subtitle">Enterprise Admin & Inventory Panel</span>
+        </div>
+      </div>
+
+      <div class="sync-badge-container">
+        <div class="sync-badge" id="syncStatusBadge">
+          <span class="pulse-dot"></span>
+          <i class="fa-brands fa-google"></i>
+          <span>Live SQLite & Sheet Sync</span>
+        </div>
+        <button class="btn btn-secondary btn-icon" id="btnToggleSound" title="Bildirim Seslerini Aç/Kapat"><i class="fa-solid fa-bell"></i></button>
+        <button class="btn btn-secondary btn-icon" id="btnRefreshData" title="Verileri Yenile"><i class="fa-solid fa-arrows-rotate"></i></button>
+      </div>
+    </header>
+
+    <main class="main-content">
+      <section class="controls-bar glass-card">
+        <div class="tabs">
+          <a href="index.html" class="tab-btn"><i class="fa-solid fa-tags"></i> Ürün & Stok Listesi</a>
+          <a href="orders.html" class="tab-btn"><i class="fa-solid fa-receipt"></i> Siparişler <span class="badge" id="ordersBadgeCount">0</span></a>
+          <a href="new-product.html" class="tab-btn"><i class="fa-solid fa-plus-circle"></i> Yeni Ürün Girişi</a>
+          <a href="campaigns.html" class="tab-btn"><i class="fa-solid fa-bullhorn"></i> 🎉 Kampanyalar</a>
+          <a href="rewards.html" class="tab-btn active"><i class="fa-solid fa-gift"></i> 💎 VIP Sadakat Ödülleri</a>
+          <a href="settings.html" class="tab-btn"><i class="fa-solid fa-truck"></i> 🚚 Fiyat & Kargo Ayarları</a>
+          <a href="ai-product.html" class="tab-btn btn-ai-tab"><i class="fa-solid fa-wand-magic-sparkles"></i> ✨ Gemini AI ile Ürün Ekle</a>
+        </div>
+      </section>
+
+      <section class="tab-content active" id="rewardsTab">
+        <div class="card glass-card">
+          <div class="card-header">
+            <h3><i class="fa-solid fa-gift"></i> 💎 Kişiye Özel VIP Sadakat ve İndirim Ödülleri</h3>
+            <span class="table-count" id="rewardsTableCount">0 Ödül Listelendi</span>
+          </div>
+          <p style="padding:0 1.5rem; color:#94a3b8; font-size:0.9rem;">
+            Müşterileriniz <strong>2000 TL ve üzeri</strong> alışveriş yaptığında Instagram ID'lerine otomatik olarak <strong>bir sonraki siparişlerinde geçerli %20 VIP İndirim Hakkı</strong> tanımlanır. Müşteri tekrar alışveriş yaptığında bu indirim otomatik olarak sepete uygulanır.
+          </p>
+          <div class="table-responsive" style="margin-top:1rem;">
+            <table class="data-table" id="rewardsTable">
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>INSTAGRAM ID</th>
+                  <th>ÖDÜL KODU</th>
+                  <th>KAZANILAN İNDİRİM</th>
+                  <th>MİN. SİPARİŞ TUTARI</th>
+                  <th>DURUM</th>
+                  <th>KAZANILMA TARİHİ</th>
+                  <th>KULLANILMA TARİHİ</th>
+                </tr>
+              </thead>
+              <tbody id="rewardsTableBody">
+                <tr>
+                  <td colspan="8" class="loading-cell">
+                    <i class="fa-solid fa-spinner fa-spin"></i> Ödül listesi yükleniyor...
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <div class="toast-container" id="toastContainer"></div>
+  <script src="app.js"></script>
+</body>
+</html>

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>BARON'S SILLAGE - Enterprise Kontrol Paneli</title>
+  <title>Ürünler & Stok Yönetimi - BARON'S SILLAGE</title>
   
   <!-- Google Fonts: Plus Jakarta Sans & Inter -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -17,7 +17,7 @@
 </head>
 <body>
   <div class="app-container">
-    <!-- Sidebar / Header Layout -->
+    <!-- Navbar Layout -->
     <header class="navbar">
       <div class="logo-area">
         <div class="logo-icon">
@@ -88,38 +88,38 @@
           </div>
           <div class="metric-info">
             <span class="metric-label">Yapay Zeka İşlemi</span>
-            <button class="btn btn-primary btn-sm btn-glow mt-1" id="openAiTabBtn">
+            <a href="ai-product.html" class="btn btn-primary btn-sm btn-glow mt-1">
               <i class="fa-solid fa-wand-magic-sparkles"></i> Gemini AI ile Ekle
-            </button>
+            </a>
           </div>
         </div>
       </section>
 
-      <!-- Navigation Tabs & Search Controls -->
+      <!-- Navigation Bar Links -->
       <section class="controls-bar glass-card">
         <div class="tabs">
-          <button class="tab-btn active" data-tab="productsTab">
+          <a href="index.html" class="tab-btn active">
             <i class="fa-solid fa-tags"></i> Ürün & Stok Listesi
-          </button>
-          <button class="tab-btn" data-tab="ordersTab">
+          </a>
+          <a href="orders.html" class="tab-btn">
             <i class="fa-solid fa-receipt"></i> Siparişler
             <span class="badge" id="ordersBadgeCount">0</span>
-          </button>
-          <button class="tab-btn" data-tab="newProductTab">
+          </a>
+          <a href="new-product.html" class="tab-btn">
             <i class="fa-solid fa-plus-circle"></i> Yeni Ürün Girişi
-          </button>
-          <button class="tab-btn" data-tab="campaignsTab">
+          </a>
+          <a href="campaigns.html" class="tab-btn">
             <i class="fa-solid fa-bullhorn"></i> 🎉 Kampanyalar
-          </button>
-          <button class="tab-btn" data-tab="rewardsTab">
+          </a>
+          <a href="rewards.html" class="tab-btn">
             <i class="fa-solid fa-gift"></i> 💎 VIP Sadakat Ödülleri
-          </button>
-          <button class="tab-btn" data-tab="settingsTab">
+          </a>
+          <a href="settings.html" class="tab-btn">
             <i class="fa-solid fa-truck"></i> 🚚 Fiyat & Kargo Ayarları
-          </button>
-          <button class="tab-btn btn-ai-tab" data-tab="aiProductTab">
+          </a>
+          <a href="ai-product.html" class="tab-btn btn-ai-tab">
             <i class="fa-solid fa-wand-magic-sparkles"></i> ✨ Gemini AI ile Ürün Ekle
-          </button>
+          </a>
         </div>
 
         <div class="search-box">
@@ -128,7 +128,7 @@
         </div>
       </section>
 
-      <!-- Tab Content: Ürün & Stok Listesi -->
+      <!-- Content: Ürün & Stok Listesi -->
       <section class="tab-content active" id="productsTab">
         <div class="card glass-card">
           <div class="card-header" style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:1rem;">
@@ -157,296 +157,12 @@
               </thead>
               <tbody id="productsTableBody">
                 <tr>
-                  <td colspan="8" class="loading-cell">
-                    <i class="fa-solid fa-spinner fa-spin"></i> Stok verileri yükleniyor...
+                  <td colspan="9" class="loading-cell">
+                    <i class="fa-solid fa-spinner fa-spin"></i> Stok verileri SQLite ve Google Sheet ile senkronize ediliyor...
                   </td>
                 </tr>
               </tbody>
             </table>
-          </div>
-        </div>
-      </section>
-
-      <!-- Tab Content: Siparişler -->
-      <section class="tab-content" id="ordersTab">
-        <div class="card glass-card">
-          <div class="card-header">
-            <h3><i class="fa-solid fa-truck-fast"></i> Sipariş Takip Paneli</h3>
-            <span class="table-count" id="ordersTableCount">0 sipariş listelendi</span>
-          </div>
-          <div class="table-responsive">
-            <table class="data-table" id="ordersTable">
-              <thead>
-                <tr>
-                  <th>Sipariş No</th>
-                  <th>Sender ID</th>
-                  <th>Tarih</th>
-                  <th>Müşteri Adı</th>
-                  <th>Telefon</th>
-                  <th>Ürün Kodu</th>
-                  <th>Adet</th>
-                  <th>Adres</th>
-                  <th>DURUM</th>
-                  <th>İşlemler</th>
-                </tr>
-              </thead>
-              <tbody id="ordersTableBody">
-                <tr>
-                  <td colspan="10" class="loading-cell">
-                    <i class="fa-solid fa-spinner fa-spin"></i> Sipariş verileri yükleniyor...
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </section>
-
-      <!-- Tab Content: Manuel Yeni Ürün Girişi Formu -->
-      <section class="tab-content" id="newProductTab">
-        <div class="card glass-card form-container">
-          <div class="card-header">
-            <div>
-              <h3><i class="fa-solid fa-cloud-arrow-up"></i> Google Sheet'e Yeni Ürün Ekle</h3>
-              <p class="card-desc">Girdiğiniz veriler doğrudan Google Sheets stok tablosuna [KISA KOD, ÜRÜN KODU, ÜRÜN İSMİ, RENK, NUMARA, STOK, KATEGORİ] sırasında kaydedilir.</p>
-            </div>
-          </div>
-          
-          <form id="newProductForm" class="product-form">
-            <div class="form-grid">
-              
-              <!-- 1. KISA KOD -->
-              <div class="form-group">
-                <label for="shortCode">KISA KOD <span class="required">*</span></label>
-                <div class="input-with-icon">
-                  <i class="fa-solid fa-barcode"></i>
-                  <input type="text" id="shortCode" placeholder="Örn: KGMLW" required autocomplete="off">
-                </div>
-                <small class="form-hint">Ürün modelinin kısaltma kodu (Örn: KGMLW)</small>
-              </div>
-
-              <!-- 2. ÜRÜN KODU -->
-              <div class="form-group">
-                <label for="productCode">ÜRÜN KODU (Opsiyonel)</label>
-                <div class="input-with-icon">
-                  <i class="fa-solid fa-hashtag"></i>
-                  <input type="text" id="productCode" placeholder="Örn: KGMLW-M (Boş ise otomatik)" autocomplete="off">
-                </div>
-                <small class="form-hint" id="autoCodePreview">Önizleme: KGMLW-M</small>
-              </div>
-
-              <!-- 3. ÜRÜN İSMİ -->
-              <div class="form-group full-width">
-                <label for="productName">ÜRÜN İSMİ <span class="required">*</span></label>
-                <div class="input-with-icon">
-                  <i class="fa-solid fa-shirt"></i>
-                  <input type="text" id="productName" placeholder="Örn: Kumaş Keten Gömlek" required autocomplete="off">
-                </div>
-              </div>
-
-              <!-- 4. RENK -->
-              <div class="form-group">
-                <label for="colorInput">RENK</label>
-                <div class="input-with-icon">
-                  <i class="fa-solid fa-palette"></i>
-                  <input type="text" id="colorInput" placeholder="Örn: Siyah, Mavi, Siyah-Beyaz" autocomplete="off">
-                </div>
-              </div>
-
-              <!-- 5. NUMARA -->
-              <div class="form-group">
-                <label for="sizeInput">NUMARA / BEDEN <span class="required">*</span></label>
-                <div class="input-with-icon">
-                  <i class="fa-solid fa-ruler-combined"></i>
-                  <input type="text" id="sizeInput" placeholder="Örn: M, L, XL veya 42" required autocomplete="off" value="M">
-                </div>
-              </div>
-
-              <!-- 6. STOK -->
-              <div class="form-group">
-                <label for="stockQuantity">STOK <span class="required">*</span></label>
-                <div class="input-with-icon">
-                  <i class="fa-solid fa-cubes"></i>
-                  <input type="number" id="stockQuantity" min="0" value="50" required>
-                </div>
-              </div>
-
-              <!-- 7. KATEGORİ -->
-              <div class="form-group">
-                <label for="categoryInput">KATEGORİ</label>
-                <div class="input-with-icon">
-                  <i class="fa-solid fa-folder-tree"></i>
-                  <input type="text" id="categoryInput" placeholder="Örn: Gömlek, Pantolon, Ayakkabı" autocomplete="off" value="Gömlek">
-                </div>
-              </div>
-
-            </div>
-
-            <div class="form-actions">
-              <button type="reset" class="btn btn-secondary">
-                <i class="fa-solid fa-rotate-left"></i> Temizle
-              </button>
-              <button type="submit" class="btn btn-primary btn-glow" id="btnSubmitProduct">
-                <i class="fa-brands fa-google"></i> Google Sheet'e Kaydet & Senkronize Et
-              </button>
-            </div>
-          </form>
-        </div>
-      </section>
-
-      <!-- Tab Content: Gemini AI İle Akıllı Ürün Ekleme -->
-      <section class="tab-content" id="aiProductTab">
-        <div class="card glass-card form-container">
-          <div class="card-header">
-            <div>
-              <h3><i class="fa-solid fa-wand-magic-sparkles text-purple"></i> Google Gemini AI Akıllı Ürün Asistanı</h3>
-              <p class="card-desc">İstediğiniz ürünü doğal Türkçe cümlelerle tarif edin. Gemini AI tüm 7 alanı otomatik çıkarıp Google Sheets'e kaydeder.</p>
-            </div>
-          </div>
-          
-          <div class="ai-form">
-            <div class="form-group full-width">
-              <label for="aiPromptInput">Ürün Tanımı (Doğal Dil) <span class="required">*</span></label>
-              <div class="input-with-icon">
-                <i class="fa-solid fa-robot"></i>
-                <textarea id="aiPromptInput" rows="4" placeholder="Örn: Siyah Keten Gömlek L Beden 75 Adet Stok Kategori Gömlek Kısa Kod KGMLW"></textarea>
-              </div>
-            </div>
-
-            <div class="quick-prompts">
-              <span class="quick-title"><i class="fa-solid fa-bolt"></i> Hızlı Örnek Komutlar:</span>
-              <div class="prompt-pills">
-                <button type="button" class="prompt-pill" onclick="setAiPrompt('SİYAH KOT GÖMLEK GELDİ HER BEDENDEN 50 TANE VAR XS S M L XL BEDENLERİ VAR ÜRÜN KODU SKG')">🔥 Siyah Kot Gömlek (XS-XL 5 Beden Batch)</button>
-                <button type="button" class="prompt-pill" onclick="setAiPrompt('Siyah Keten Gömlek XL beden 100 stok kisa kod KGMLW renk Siyah kategori Gömlek')">⚡ Siyah Keten Gömlek XL (100 Stok)</button>
-                <button type="button" class="prompt-pill" onclick="setAiPrompt('Mavi Kumaş Pantolon 38 Beden 50 Adet Stok Kısa Kod PNTLN Kategori Pantolon')">⚡ Mavi Pantolon 38 (50 Stok)</button>
-              </div>
-            </div>
-
-            <div class="form-actions">
-              <button type="button" class="btn btn-primary btn-glow btn-ai" id="btnSubmitAiProduct">
-                <i class="fa-solid fa-wand-magic-sparkles"></i> Gemini AI İle Oluştur & Google Sheet'e Kaydet
-              </button>
-            </div>
-
-            <div id="aiResultCard" class="ai-result-card" style="display: none;">
-              <div class="ai-result-header">
-                <i class="fa-solid fa-circle-check text-green"></i>
-                <span id="aiResultTitle">Ürün Başarıyla Oluşturuldu!</span>
-              </div>
-              <p id="aiResultMessage" class="ai-result-msg"></p>
-              <div class="ai-parsed-grid" id="aiParsedGrid"></div>
-            </div>
-
-          </div>
-        </div>
-      </section>
-
-      <!-- Tab Content: Kampanyalar -->
-      <section class="tab-content" id="campaignsTab">
-        <div class="card glass-card">
-          <div class="card-header">
-            <h3><i class="fa-solid fa-bullhorn"></i> 🎉 Mağaza Kampanya Yönetimi</h3>
-          </div>
-          <div class="card-body">
-            <form id="newCampaignForm" style="margin-bottom: 2rem;">
-              <div class="form-grid">
-                <div class="form-group">
-                  <label>Kampanya Başlığı</label>
-                  <input type="text" id="campTitle" placeholder="Örn: 1500 TL Üzeri Ücretsiz Kargo" required>
-                </div>
-                <div class="form-group">
-                  <label>Açıklama (Yapay Zeka Okur)</label>
-                  <input type="text" id="campDesc" placeholder="Örn: 1500 TL üzeri kargo bedava" required>
-                </div>
-                <div class="form-group">
-                  <label>İndirim Kodu (Varsa)</label>
-                  <input type="text" id="campCode" placeholder="Örn: BARONS10">
-                </div>
-                <div class="form-group">
-                  <label>İndirim Yüzdesi (%)</label>
-                  <input type="number" id="campPercent" placeholder="Örn: 10" min="0" max="100">
-                </div>
-              </div>
-              <button type="submit" class="btn btn-primary mt-1"><i class="fa-solid fa-plus"></i> Kampanya Oluştur & Yapay Zekaya Tanıt</button>
-            </form>
-
-            <div class="table-responsive">
-              <table class="data-table">
-                <thead>
-                  <tr>
-                    <th>ID</th>
-                    <th>Başlık</th>
-                    <th>Açıklama</th>
-                    <th>Kod</th>
-                    <th>İndirim</th>
-                    <th>İşlem</th>
-                  </tr>
-                </thead>
-                <tbody id="campaignsTableBody">
-                  <tr><td colspan="6" style="text-align:center;">Kampanyalar yükleniyor...</td></tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <!-- Tab Content: VIP Sadakat Ödülleri (%20 İndirim) -->
-      <section class="tab-content" id="rewardsTab">
-        <div class="card glass-card">
-          <div class="card-header">
-            <h3><i class="fa-solid fa-gift"></i> 💎 Kişiye Özel VIP Sadakat ve İndirim Ödülleri</h3>
-            <span class="table-count" id="rewardsTableCount">0 Ödül Listelendi</span>
-          </div>
-          <p style="padding:0 1.5rem; color:#94a3b8; font-size:0.9rem;">
-            Müşterileriniz <strong>2000 TL ve üzeri</strong> alışveriş yaptığında Instagram ID'lerine otomatik olarak <strong>bir sonraki siparişlerinde geçerli %20 VIP İndirim Hakkı</strong> tanımlanır. Müşteri tekrar alışveriş yaptığında bu indirim otomatik olarak sepete uygulanır.
-          </p>
-          <div class="table-responsive" style="margin-top:1rem;">
-            <table class="data-table" id="rewardsTable">
-              <thead>
-                <tr>
-                  <th>ID</th>
-                  <th>INSTAGRAM ID</th>
-                  <th>ÖDÜL KODU</th>
-                  <th>KAZANILAN İNDİRİM</th>
-                  <th>MİN. SİPARİŞ TUTARI</th>
-                  <th>DURUM</th>
-                  <th>KAZANILMA TARİHİ</th>
-                  <th>KULLANILMA TARİHİ</th>
-                </tr>
-              </thead>
-              <tbody id="rewardsTableBody">
-                <tr>
-                  <td colspan="8" class="loading-cell">
-                    <i class="fa-solid fa-spinner fa-spin"></i> Ödül listesi yükleniyor...
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </section>
-
-      <!-- Tab Content: Fiyat & Kargo Ayarları -->
-      <section class="tab-content" id="settingsTab">
-        <div class="card glass-card">
-          <div class="card-header">
-            <h3><i class="fa-solid fa-truck-fast"></i> 🚚 Kargo ve Fiyatlandırma Ayarları</h3>
-          </div>
-          <div class="card-body">
-            <form id="settingsForm">
-              <div class="form-grid">
-                <div class="form-group">
-                  <label>Standart Kargo Ücreti (TL)</label>
-                  <input type="number" id="settingShippingFee" placeholder="49" required>
-                </div>
-                <div class="form-group">
-                  <label>Ücretsiz Kargo Limiti (TL)</label>
-                  <input type="number" id="settingFreeThreshold" placeholder="1500" required>
-                </div>
-              </div>
-              <button type="submit" class="btn btn-success mt-1"><i class="fa-solid fa-floppy-disk"></i> Kargo Ayarlarını Kaydet</button>
-            </form>
           </div>
         </div>
       </section>
@@ -454,38 +170,8 @@
     </main>
   </div>
 
-  <!-- Toast Notification System -->
-  <div id="toastContainer" class="toast-container"></div>
-
-  <!-- Sipariş Onay Onaylama Modalı (Emin misin?) -->
-  <div id="confirmModal" class="modal-overlay" style="display: none;">
-    <div class="modal-card glass-card">
-      <div class="modal-header">
-        <div class="modal-icon green">
-          <i class="fa-solid fa-circle-question"></i>
-        </div>
-        <div>
-          <h3>Siparişi Onaylamak İstiyor musunuz?</h3>
-          <p class="modal-subtitle">Lütfen aşağıdaki sipariş bilgilerini kontrol edip onaylayınız.</p>
-        </div>
-      </div>
-      <div class="modal-body" id="confirmModalBody">
-        <!-- Dinamik Sipariş İçeriği -->
-      </div>
-      <div class="modal-notice">
-        <i class="fa-solid fa-paper-plane text-purple"></i>
-        <span>"Evet, Onayla" butonuna bastığınızda alıcıya <strong>"Siparişiniz Onaylandı"</strong> mesajı gönderilecektir.</span>
-      </div>
-      <div class="modal-actions">
-        <button type="button" class="btn btn-secondary" id="btnCancelConfirm">
-          <i class="fa-solid fa-xmark"></i> Vazgeç
-        </button>
-        <button type="button" class="btn btn-success btn-glow" id="btnAcceptConfirm">
-          <i class="fa-solid fa-check"></i> Evet, Onayla ve Mesaj Gönder
-        </button>
-      </div>
-    </div>
-  </div>
+  <!-- Toast Notification Container -->
+  <div class="toast-container" id="toastContainer"></div>
 
   <script src="app.js"></script>
 </body>

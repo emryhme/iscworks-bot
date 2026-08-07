@@ -137,21 +137,25 @@ function setupEventListeners() {
   }
 
   // Auto Product Code Preview Listener
-  const updateCodePreview = () => {
-    const sc = (elements.shortCode.value || 'KGMLW').toUpperCase().trim();
-    const sz = (elements.sizeInput.value || 'M').toUpperCase().trim();
-    const computedCode = `${sc}-${sz}`;
-    elements.autoCodePreview.textContent = `Önizleme: ${computedCode}`;
-    if (!elements.productCode.value) {
-      elements.productCode.placeholder = `Örn: ${computedCode}`;
-    }
-  };
+  if (elements.shortCode && elements.sizeInput && elements.autoCodePreview) {
+    const updateCodePreview = () => {
+      const sc = (elements.shortCode.value || 'KGMLW').toUpperCase().trim();
+      const sz = (elements.sizeInput.value || 'M').toUpperCase().trim();
+      const computedCode = `${sc}-${sz}`;
+      elements.autoCodePreview.textContent = `Önizleme: ${computedCode}`;
+      if (elements.productCode && !elements.productCode.value) {
+        elements.productCode.placeholder = `Örn: ${computedCode}`;
+      }
+    };
 
-  elements.shortCode.addEventListener('input', updateCodePreview);
-  elements.sizeInput.addEventListener('input', updateCodePreview);
+    elements.shortCode.addEventListener('input', updateCodePreview);
+    elements.sizeInput.addEventListener('input', updateCodePreview);
+  }
 
   // New Product Form Submission (Google Sheet Sync)
-  elements.newProductForm.addEventListener('submit', handleNewProductSubmit);
+  if (elements.newProductForm) {
+    elements.newProductForm.addEventListener('submit', handleNewProductSubmit);
+  }
 
   // Gemini AI Submission
   if (elements.btnSubmitAiProduct) {

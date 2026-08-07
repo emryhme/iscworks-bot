@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Kampanyalar - BARON'S SILLAGE</title>
+  
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="app-container">
+    <header class="navbar">
+      <div class="logo-area">
+        <div class="logo-icon"><i class="fa-solid fa-crown"></i></div>
+        <div>
+          <h1 class="logo-title">BARON'S SILLAGE</h1>
+          <span class="logo-subtitle">Enterprise Admin & Inventory Panel</span>
+        </div>
+      </div>
+
+      <div class="sync-badge-container">
+        <div class="sync-badge" id="syncStatusBadge">
+          <span class="pulse-dot"></span>
+          <i class="fa-brands fa-google"></i>
+          <span>Live SQLite & Sheet Sync</span>
+        </div>
+        <button class="btn btn-secondary btn-icon" id="btnToggleSound" title="Bildirim Seslerini Aç/Kapat"><i class="fa-solid fa-bell"></i></button>
+        <button class="btn btn-secondary btn-icon" id="btnRefreshData" title="Verileri Yenile"><i class="fa-solid fa-arrows-rotate"></i></button>
+      </div>
+    </header>
+
+    <main class="main-content">
+      <section class="controls-bar glass-card">
+        <div class="tabs">
+          <a href="index.html" class="tab-btn"><i class="fa-solid fa-tags"></i> Ürün & Stok Listesi</a>
+          <a href="orders.html" class="tab-btn"><i class="fa-solid fa-receipt"></i> Siparişler <span class="badge" id="ordersBadgeCount">0</span></a>
+          <a href="new-product.html" class="tab-btn"><i class="fa-solid fa-plus-circle"></i> Yeni Ürün Girişi</a>
+          <a href="campaigns.html" class="tab-btn active"><i class="fa-solid fa-bullhorn"></i> 🎉 Kampanyalar</a>
+          <a href="rewards.html" class="tab-btn"><i class="fa-solid fa-gift"></i> 💎 VIP Sadakat Ödülleri</a>
+          <a href="settings.html" class="tab-btn"><i class="fa-solid fa-truck"></i> 🚚 Fiyat & Kargo Ayarları</a>
+          <a href="ai-product.html" class="tab-btn btn-ai-tab"><i class="fa-solid fa-wand-magic-sparkles"></i> ✨ Gemini AI ile Ürün Ekle</a>
+        </div>
+      </section>
+
+      <section class="tab-content active" id="campaignsTab">
+        <div class="card glass-card">
+          <div class="card-header">
+            <h3><i class="fa-solid fa-bullhorn"></i> 🎉 Mağaza Kampanya Yönetimi</h3>
+          </div>
+          <div class="card-body">
+            <form id="campaignForm">
+              <div class="form-grid">
+                <div class="form-group">
+                  <label>Kampanya Başlığı</label>
+                  <input type="text" id="campTitle" placeholder="Örn: %10 Hoş Geldin İndirimi" required>
+                </div>
+                <div class="form-group">
+                  <label>Kampanya Kodu (İsteğe Bağlı)</label>
+                  <input type="text" id="campCode" placeholder="Örn: BARONS10" style="text-transform:uppercase;">
+                </div>
+                <div class="form-group">
+                  <label>İndirim Yüzdesi (%)</label>
+                  <input type="number" id="campPercent" placeholder="10" min="0" max="100">
+                </div>
+                <div class="form-group">
+                  <label>Açıklama / Bot Notu</label>
+                  <input type="text" id="campDesc" placeholder="Müşteriye uygulanacak indirim açıklaması" required>
+                </div>
+              </div>
+              <div class="form-actions">
+                <button type="submit" class="btn btn-primary btn-glow">🎉 Kampanyayı Başlat</button>
+              </div>
+            </form>
+
+            <h4 style="margin-top:2rem; margin-bottom:1rem; color:#f8fafc;"><i class="fa-solid fa-list-check"></i> Aktif Kampanyalar</h4>
+            <div class="table-responsive">
+              <table class="data-table" id="campaignsTable">
+                <thead>
+                  <tr>
+                    <th>ID</th>
+                    <th>Başlık</th>
+                    <th>Açıklama</th>
+                    <th>Kod</th>
+                    <th>İndirim</th>
+                    <th>İşlem</th>
+                  </tr>
+                </thead>
+                <tbody id="campaignsTableBody">
+                  <tr><td colspan="6" style="text-align:center;">Kampanyalar yükleniyor...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <div class="toast-container" id="toastContainer"></div>
+  <script src="app.js"></script>
+</body>
+</html>
