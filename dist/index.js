@@ -237,128 +237,153 @@ app.post('/api/products/price', (req, res) => {
         }
         else {
             res.status(404).json({ success: false, error: 'Ürün bulunamadı.' });
-        }
-    }
-    catch (e) {
-        res.status(500).json({ success: false, error: e.message });
-    }
-});
-// Sipariş Onay / Red İşlemi (Google Sheet DURUM = OK veya DEC güncellemesi)
-app.post('/api/orders/status', async (req, res) => {
-    try {
-        const { orderId, status } = req.body;
-        if (!orderId || !status || (status !== 'OK' && status !== 'DEC')) {
-            return res.status(400).json({ success: false, error: 'orderId ve geçerli bir status (OK veya DEC) gereklidir' });
-        }
-        const success = await order_service_1.OrderService.updateOrderStatus(orderId, status);
-        if (success) {
-            res.json({
-                success: true,
-                message: `Sipariş ${orderId} durumu '${status}' olarak Google Sheets'e kaydedildi.`,
-                orderId,
-                status
+            // Toplu Fiyat ve Stok Güncelleme (Bulk Save API)
+            app.post('/api/products/bulk-update', (req, res) => {
+                try {
+                    const { updates } = req.body; // Array<{ productCode: string, stock?: number, price?: number }>
+                    if (!Array.isArray(updates) || updates.length === 0) {
+                        return res.status(400).json({ success: false, error: 'Güncellenecek veri listesi boş veya geçersiz.' });
+                    }
+                    const updatePriceStmt = db_1.db.prepare('UPDATE products SET price = ?, updated_at = CURRENT_TIMESTAMP WHERE product_code = ?');
+                    const updateStockStmt = db_1.db.prepare('UPDATE products SET stock = ?, updated_at = CURRENT_TIMESTAMP WHERE product_code = ?');
+                    let updatedCount = 0;
+                    const bulkTransaction = db_1.db.transaction((items) => {
+                        for (const item of items) {
+                            if (item.productCode) {
+                                if (item.price !== undefined && !isNaN(Number(item.price))) {
+                                    updatePriceStmt.run(Number(item.price), item.productCode);
+                                    updatedCount++;
+                                }
+                                if (item.stock !== undefined && !isNaN(Number(item.stock))) {
+                                    updateStockStmt.run(Number(item.stock), item.productCode);
+                                    updatedCount++;
+                                }
+                            }
+                        }
+                    });
+                    bulkTransaction(updates);
+                    res.json({ success: true, message: `${updates.length} adet ürünün fiyat ve stok verileri başarıyla kaydedildi!`, updatedCount });
+                }
+                catch (e) {
+                    res.status(500).json({ success: false, error: e.message });
+                }
             });
-        }
-        else {
-            res.status(500).json({ success: false, error: 'Sipariş durumu Google Sheets üzerinde güncellenemedi.' });
-        }
-    }
-    catch (err) {
-        console.error('[API /api/orders/status Error]:', err);
-        res.status(500).json({ success: false, error: err.message || 'Sunucu hatası' });
-    }
-});
-// Ürün Silme API
-app.post('/api/products/delete', async (req, res) => {
-    try {
-        const { productCode } = req.body;
-        if (!productCode) {
-            return res.status(400).json({ success: false, error: 'productCode parametresi gereklidir' });
-        }
-        const success = await stock_service_1.StockService.deleteProduct(productCode);
-        if (success) {
-            res.json({ success: true, message: `Ürün (${productCode}) Google Sheets stok tablosundan silindi.` });
-        }
-        else {
-            res.status(500).json({ success: false, error: 'Ürün Google Sheets stok tablosundan silinemedi.' });
-        }
-    }
-    catch (err) {
-        console.error('[API /api/products/delete Error]:', err);
-        res.status(500).json({ success: false, error: err.message || 'Sunucu hatası' });
-    }
-});
-// Sipariş Silme API
-app.post('/api/orders/delete', async (req, res) => {
-    try {
-        const { orderId } = req.body;
-        if (!orderId) {
-            return res.status(400).json({ success: false, error: 'orderId parametresi gereklidir' });
-        }
-        const success = await order_service_1.OrderService.deleteOrder(orderId);
-        if (success) {
-            res.json({ success: true, message: `Sipariş (${orderId}) Google Sheets siparişler tablosundan silindi.` });
-        }
-        else {
-            res.status(500).json({ success: false, error: 'Sipariş Google Sheets siparişler tablosundan silinemedi.' });
-        }
-    }
-    catch (err) {
-        console.error('[API /api/orders/delete Error]:', err);
-        res.status(500).json({ success: false, error: err.message || 'Sunucu hatası' });
-    }
-});
-// Ürün Stok Güncelleme API
-app.post('/api/products/update-stock', async (req, res) => {
-    try {
-        const { productCode, newStock } = req.body;
-        if (!productCode || newStock === undefined || newStock === null) {
-            return res.status(400).json({ success: false, error: 'productCode ve newStock parametreleri gereklidir' });
-        }
-        const success = await stock_service_1.StockService.updateStock(productCode, Number(newStock));
-        if (success) {
-            res.json({ success: true, message: `Ürün (${productCode}) stoğu ${newStock} olarak güncellendi.`, productCode, newStock: Number(newStock) });
-        }
-        else {
-            res.status(500).json({ success: false, error: 'Ürün stoğu Google Sheets üzerinde güncellenemedi.' });
-        }
-    }
-    catch (err) {
-        console.error('[API /api/products/update-stock Error]:', err);
-        res.status(500).json({ success: false, error: err.message || 'Sunucu hatası' });
-    }
-});
-// Google Gemini AI İle Akıllı Ürün Ekleme API (Çoklu Beden / Batch Destekli)
-app.post('/api/ai/create-product', async (req, res) => {
-    try {
-        const { prompt } = req.body;
-        if (!prompt || typeof prompt !== 'string' || prompt.trim() === '') {
-            return res.status(400).json({ success: false, error: 'Lütfen ürün komut metni giriniz.' });
-        }
-        const result = await gemini_service_1.GeminiService.createProductFromPrompt(prompt.trim());
-        if (result.success && result.products && result.products.length > 0) {
-            res.json({
-                success: true,
-                message: result.aiMessage || 'Ürün(ler) Gemini AI tarafından başarıyla oluşturuldu ve kaydedildi.',
-                products: result.products,
-                product: result.products[0]
+            // Sipariş Onay / Red İşlemi (Google Sheet DURUM = OK veya DEC güncellemesi)
+            app.post('/api/orders/status', async (req, res) => {
+                try {
+                    const { orderId, status } = req.body;
+                    if (!orderId || !status || (status !== 'OK' && status !== 'DEC')) {
+                        return res.status(400).json({ success: false, error: 'orderId ve geçerli bir status (OK veya DEC) gereklidir' });
+                    }
+                    const success = await order_service_1.OrderService.updateOrderStatus(orderId, status);
+                    if (success) {
+                        res.json({
+                            success: true,
+                            message: `Sipariş ${orderId} durumu '${status}' olarak Google Sheets'e kaydedildi.`,
+                            orderId,
+                            status
+                        });
+                    }
+                    else {
+                        res.status(500).json({ success: false, error: 'Sipariş durumu Google Sheets üzerinde güncellenemedi.' });
+                    }
+                }
+                catch (err) {
+                    console.error('[API /api/orders/status Error]:', err);
+                    res.status(500).json({ success: false, error: err.message || 'Sunucu hatası' });
+                }
             });
-        }
-        else {
-            res.status(500).json({ success: false, error: result.error || 'Gemini AI ile ürün oluşturulamadı.' });
-        }
-    }
-    catch (err) {
-        console.error('[API /api/ai/create-product Error]:', err);
-        res.status(500).json({ success: false, error: err.message || 'Yapay zeka sunucu hatası' });
-    }
-});
-const db_2 = require("./database/db");
-// Veritabanını Başlat (SQLite Migration & Seed)
-(0, db_2.initDatabase)();
-// Sunucuyu Başlat
-app.listen(env_1.env.port, () => {
-    console.log(`
+            // Ürün Silme API
+            app.post('/api/products/delete', async (req, res) => {
+                try {
+                    const { productCode } = req.body;
+                    if (!productCode) {
+                        return res.status(400).json({ success: false, error: 'productCode parametresi gereklidir' });
+                    }
+                    const success = await stock_service_1.StockService.deleteProduct(productCode);
+                    if (success) {
+                        res.json({ success: true, message: `Ürün (${productCode}) Google Sheets stok tablosundan silindi.` });
+                    }
+                    else {
+                        res.status(500).json({ success: false, error: 'Ürün Google Sheets stok tablosundan silinemedi.' });
+                    }
+                }
+                catch (err) {
+                    console.error('[API /api/products/delete Error]:', err);
+                    res.status(500).json({ success: false, error: err.message || 'Sunucu hatası' });
+                }
+            });
+            // Sipariş Silme API
+            app.post('/api/orders/delete', async (req, res) => {
+                try {
+                    const { orderId } = req.body;
+                    if (!orderId) {
+                        return res.status(400).json({ success: false, error: 'orderId parametresi gereklidir' });
+                    }
+                    const success = await order_service_1.OrderService.deleteOrder(orderId);
+                    if (success) {
+                        res.json({ success: true, message: `Sipariş (${orderId}) Google Sheets siparişler tablosundan silindi.` });
+                    }
+                    else {
+                        res.status(500).json({ success: false, error: 'Sipariş Google Sheets siparişler tablosundan silinemedi.' });
+                    }
+                }
+                catch (err) {
+                    console.error('[API /api/orders/delete Error]:', err);
+                    res.status(500).json({ success: false, error: err.message || 'Sunucu hatası' });
+                }
+            });
+            // Ürün Stok Güncelleme API
+            app.post('/api/products/update-stock', async (req, res) => {
+                try {
+                    const { productCode, newStock } = req.body;
+                    if (!productCode || newStock === undefined || newStock === null) {
+                        return res.status(400).json({ success: false, error: 'productCode ve newStock parametreleri gereklidir' });
+                    }
+                    const success = await stock_service_1.StockService.updateStock(productCode, Number(newStock));
+                    if (success) {
+                        res.json({ success: true, message: `Ürün (${productCode}) stoğu ${newStock} olarak güncellendi.`, productCode, newStock: Number(newStock) });
+                    }
+                    else {
+                        res.status(500).json({ success: false, error: 'Ürün stoğu Google Sheets üzerinde güncellenemedi.' });
+                    }
+                }
+                catch (err) {
+                    console.error('[API /api/products/update-stock Error]:', err);
+                    res.status(500).json({ success: false, error: err.message || 'Sunucu hatası' });
+                }
+            });
+            // Google Gemini AI İle Akıllı Ürün Ekleme API (Çoklu Beden / Batch Destekli)
+            app.post('/api/ai/create-product', async (req, res) => {
+                try {
+                    const { prompt } = req.body;
+                    if (!prompt || typeof prompt !== 'string' || prompt.trim() === '') {
+                        return res.status(400).json({ success: false, error: 'Lütfen ürün komut metni giriniz.' });
+                    }
+                    const result = await gemini_service_1.GeminiService.createProductFromPrompt(prompt.trim());
+                    if (result.success && result.products && result.products.length > 0) {
+                        res.json({
+                            success: true,
+                            message: result.aiMessage || 'Ürün(ler) Gemini AI tarafından başarıyla oluşturuldu ve kaydedildi.',
+                            products: result.products,
+                            product: result.products[0]
+                        });
+                    }
+                    else {
+                        res.status(500).json({ success: false, error: result.error || 'Gemini AI ile ürün oluşturulamadı.' });
+                    }
+                }
+                catch (err) {
+                    console.error('[API /api/ai/create-product Error]:', err);
+                    res.status(500).json({ success: false, error: err.message || 'Yapay zeka sunucu hatası' });
+                }
+            });
+            import { initDatabase } from './database/db';
+            // Veritabanını Başlat (SQLite Migration & Seed)
+            (0, db_2.initDatabase)();
+            // Sunucuyu Başlat
+            app.listen(env_1.env.port, () => {
+                console.log(`
   🚀 iscworks bot - Enterprise AI Backend Sunucusu Başlatıldı!
   -------------------------------------------------------------
   🤖 Sistem Adı: iscworks bot
@@ -369,4 +394,9 @@ app.listen(env_1.env.port, () => {
   🎛️ Admin Panel: http://localhost:${env_1.env.port}/admin
   -------------------------------------------------------------
   `);
+            });
+        }
+    }
+    finally {
+    }
 });

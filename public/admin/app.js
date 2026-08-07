@@ -352,18 +352,22 @@ function renderProductsTable() {
         <td><strong>${escapeHtml(p.name || '-')}</strong></td>
         <td>${escapeHtml(p.color || '-')}</td>
         <td><span class="size-pill">${escapeHtml(p.size || '-')}</span></td>
-        <td>${stockBadge}</td>
+        <td>
+          <div style="display:flex; align-items:center; gap:4px;">
+            <input type="number" id="stock_${escapeHtml(p.productCode)}" value="${stock}" style="width:65px; padding:4px 6px; border-radius:6px; border:1px solid #475569; background:#0f172a; color:#f8fafc; font-weight:600;" />
+            ${stockBadge}
+          </div>
+        </td>
         <td>
           <div style="display:flex; align-items:center; gap:4px;">
             <input type="number" id="price_${escapeHtml(p.productCode)}" value="${p.price || 299}" style="width:75px; padding:4px 6px; border-radius:6px; border:1px solid #475569; background:#0f172a; color:#4ade80; font-weight:700;" />
-            <button class="btn btn-sm btn-stock" onclick="updateProductPrice('${escapeHtml(p.productCode)}')">💾</button>
           </div>
         </td>
         <td><small class="text-muted">${escapeHtml(p.category || '-')}</small></td>
         <td>
           <div class="action-btn-group">
-            <button class="btn btn-sm btn-stock" onclick="updateProductStock('${escapeHtml(p.productCode)}', ${stock})">
-              <i class="fa-solid fa-pen-to-square"></i> Stok Güncelle
+            <button class="btn btn-sm btn-stock" onclick="updateProductPrice('${escapeHtml(p.productCode)}')">
+              <i class="fa-solid fa-floppy-disk"></i> Fiyat Kaydet
             </button>
             <button class="btn btn-sm btn-delete" onclick="deleteProduct('${escapeHtml(p.productCode)}')">
               <i class="fa-solid fa-trash-can"></i> Sil
@@ -373,6 +377,61 @@ function renderProductsTable() {
       </tr>
     `;
   }).join('');
+}
+
+// Tüm Ürün Fiyat ve Stoklarını Toplu Kaydet (Bulk Save)
+async function saveAllPricesAndStocks() {
+  const updates = [];
+
+  for (const p of state.products) {
+    if (!p.productCode) continue;
+    const priceInput = document.getElementById(`price_${p.productCode}`);
+    const stockInput = document.getElementById(`stock_${p.productCode}`);
+
+    const itemUpdate = { productCode: p.productCode };
+    let hasChange = false;
+
+    if (priceInput) {
+      const val = Number(priceInput.value);
+      if (!isNaN(val) && val >= 0) {
+        itemUpdate.price = val;
+        hasChange = true;
+      }
+    }
+    if (stockInput) {
+      const val = Number(stockInput.value);
+      if (!isNaN(val) && val >= 0) {
+        itemUpdate.stock = val;
+        hasChange = true;
+      }
+    }
+
+    if (hasChange) {
+      updates.push(itemUpdate);
+    }
+  }
+
+  if (updates.length === 0) {
+    showToast('Kaydedilecek veri bulunamadı.', 'info');
+    return;
+  }
+
+  try {
+    const res = await fetch(`${API_BASE}/api/products/bulk-update`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ updates })
+    });
+    const data = await res.json();
+    if (data.success) {
+      showToast(`💾 TOPLU KAYIT BAŞARILI!\n${updates.length} adet ürünün fiyat ve stok değişiklikleri kaydedildi!`, 'success');
+      fetchStocks();
+    } else {
+      showToast(data.error || 'Toplu kayıt başarısız.', 'error');
+    }
+  } catch (e) {
+    showToast('Toplu kayıt yapılırken sunucu hatası oluştu.', 'error');
+  }
 }
 
 // Ürün Fiyatı Güncelleme (API)

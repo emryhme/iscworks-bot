@@ -128,9 +128,14 @@
       <!-- Tab Content: Ürün & Stok Listesi -->
       <section class="tab-content active" id="productsTab">
         <div class="card glass-card">
-          <div class="card-header">
+          <div class="card-header" style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:1rem;">
             <h3><i class="fa-solid fa-table-list"></i> Google Sheet Stok & Ürün Yönetimi</h3>
-            <span class="table-count" id="productsTableCount">0 ürün listelendi</span>
+            <div style="display:flex; align-items:center; gap:0.75rem;">
+              <span class="table-count" id="productsTableCount">0 ürün listelendi</span>
+              <button class="btn btn-success btn-glow btn-sm" id="btnSaveAllPricesAndStocks" onclick="saveAllPricesAndStocks()">
+                <i class="fa-solid fa-floppy-disk"></i> 💾 Değişiklikleri Toplu Kaydet
+              </button>
+            </div>
           </div>
           <div class="table-responsive">
             <table class="data-table" id="productsTable">
