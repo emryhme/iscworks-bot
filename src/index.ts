@@ -257,6 +257,11 @@ app.post('/api/products/price', (req, res) => {
       res.json({ success: true, message: `Ürün (${productCode}) fiyatı ${numPrice} TL olarak güncellendi.` });
     } else {
       res.status(404).json({ success: false, error: 'Ürün bulunamadı.' });
+    }
+  } catch (e: any) {
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
 // Toplu Fiyat ve Stok Güncelleme (Bulk Save API)
 app.post('/api/products/bulk-update', (req, res) => {
   try {
