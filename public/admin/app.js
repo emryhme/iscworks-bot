@@ -692,16 +692,19 @@ async function handleSettingsSubmit(e) {
 
 // Fetch and Handle Campaigns
 async function fetchCampaigns() {
+  const tableBody = document.getElementById('campaignsTableBody');
+  if (!tableBody) return;
+
   try {
     const res = await fetch(`${API_BASE}/api/campaigns`);
     if (!res.ok) return;
     const data = await res.json();
-    if (data.success && Array.isArray(data.campaigns) && elements.campaignsTableBody) {
+    if (data.success && Array.isArray(data.campaigns)) {
       if (data.campaigns.length === 0) {
-        elements.campaignsTableBody.innerHTML = `<tr><td colspan="6" style="text-align:center;">Aktif kampanya bulunmuyor.</td></tr>`;
+        tableBody.innerHTML = `<tr><td colspan="6" style="text-align:center; padding: 1.5rem; color: #94a3b8;">Aktif kampanya bulunmuyor.</td></tr>`;
         return;
       }
-      elements.campaignsTableBody.innerHTML = data.campaigns.map(c => `
+      tableBody.innerHTML = data.campaigns.map(c => `
         <tr>
           <td>#${c.id}</td>
           <td><strong>${escapeHtml(c.title)}</strong></td>
@@ -714,17 +717,35 @@ async function fetchCampaigns() {
         </tr>
       `).join('');
     }
-  } catch (e) {}
+  } catch (e) {
+    console.error('fetchCampaigns error:', e);
+  }
 }
 
 async function handleCampaignSubmit(e) {
   e.preventDefault();
+
+  const titleElem = document.getElementById('campTitle');
+  const codeElem = document.getElementById('campCode');
+  const percentElem = document.getElementById('campPercent');
+  const descElem = document.getElementById('campDesc');
+
+  if (!titleElem || !descElem) {
+    showToast('Lütfen başlık ve açıklama alanlarını doldurun.', 'error');
+    return;
+  }
+
   const payload = {
-    title: document.getElementById('campTitle').value,
-    code: document.getElementById('campCode').value,
-    discountPercent: Number(document.getElementById('campPercent').value) || 0,
-    description: document.getElementById('campDesc').value
+    title: titleElem.value.trim(),
+    code: codeElem ? codeElem.value.trim().toUpperCase() : '',
+    discountPercent: percentElem ? (Number(percentElem.value) || 0) : 0,
+    description: descElem.value.trim()
   };
+
+  if (!payload.title || !payload.description) {
+    showToast('Başlık ve Açıklama zorunludur.', 'error');
+    return;
+  }
 
   try {
     const res = await fetch(`${API_BASE}/api/campaigns`, {
@@ -733,16 +754,16 @@ async function handleCampaignSubmit(e) {
       body: JSON.stringify(payload)
     });
     const data = await res.json();
-    if (data.success) {
-      showToast('🎉 Yeni kampanya başarıyla başlatıldı!', 'success');
-      elements.campaignForm.reset();
+    if (res.ok && data.success) {
+      showToast('🎉 Yeni kampanya başarıyla başlatıldı ve kaydedildi!', 'success');
+      const form = document.getElementById('campaignForm');
+      if (form) form.reset();
       fetchCampaigns();
-      fetchData();
     } else {
-      showToast('❌ Kampanya oluşturulamadı.', 'error');
+      showToast(`❌ Kampanya kaydedilemedi: ${data.error || 'Bilinmeyen sunucu hatası'}`, 'error');
     }
   } catch (e) {
-    showToast('Kampanya oluşturulurken hata oluştu.', 'error');
+    showToast(`❌ Sunucu Bağlantı Hatası: ${e.message}`, 'error');
   }
 }
 
@@ -754,7 +775,6 @@ async function deleteCampaign(id) {
     if (data.success) {
       showToast('✅ Kampanya silindi.', 'success');
       fetchCampaigns();
-      fetchData();
     }
   } catch (e) {
     showToast('Kampanya silinirken hata oluştu.', 'error');
