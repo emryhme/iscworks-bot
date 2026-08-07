@@ -603,7 +603,7 @@ function renderOrdersTable() {
     }
 
     return `
-      <tr>
+      <tr style="cursor:pointer;" onclick="openOrderDetailsModal('${escapeHtml(o.orderId)}')">
         <td><strong class="text-purple">${escapeHtml(o.orderId || '-')}</strong></td>
         <td><strong>${escapeHtml(o.customerName || '-')}</strong></td>
         <td><span class="code-tag">${escapeHtml(o.customerPhone || '-')}</span></td>
@@ -614,7 +614,10 @@ function renderOrdersTable() {
         <td>${statusBadge}</td>
         <td><small class="text-muted">${escapeHtml(o.createdAt || '-')}</small></td>
         <td>
-          <div class="action-btn-group">
+          <div class="action-btn-group" onclick="event.stopPropagation()">
+            <button class="btn btn-sm btn-secondary" onclick="openOrderDetailsModal('${escapeHtml(o.orderId)}')">
+              <i class="fa-solid fa-eye"></i> Detay
+            </button>
             <button class="btn btn-sm btn-success" onclick="updateOrderStatus('${escapeHtml(o.orderId)}', 'OK')">
               <i class="fa-solid fa-check"></i> Onayla
             </button>
@@ -755,6 +758,177 @@ async function updateOrderStatus(orderId, status) {
   } catch (err) {
     showToast('Sipariş güncellenirken sunucu hatası oluştu.', 'error');
   }
+}
+
+// Order Details Modal Dynamic Engine
+function getOrCreateOrderDetailsModal() {
+  let modal = document.getElementById('orderDetailsModal');
+  if (modal) return modal;
+
+  modal = document.createElement('div');
+  modal.id = 'orderDetailsModal';
+  modal.style.cssText = `
+    position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+    background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(10px);
+    display: none; align-items: center; justify-content: center; z-index: 9999;
+  `;
+
+  modal.innerHTML = `
+    <div style="background: linear-gradient(135deg, #1e293b, #0f172a); border: 1px solid #334155; border-radius: 16px; width: 92%; max-width: 680px; padding: 2rem; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.8); animation: modalFadeIn 0.3s ease; max-height: 90vh; overflow-y: auto;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.5rem; border-bottom:1px solid #334155; padding-bottom:1rem;">
+        <h3 style="color:#f8fafc; margin:0; font-size:1.3rem; display:flex; align-items:center; gap:10px;">
+          <i class="fa-solid fa-receipt text-gold"></i> Sipariş Detay İnceleme Ekranı
+        </h3>
+        <button id="btnCloseOrderDetailsModal" style="background:none; border:none; color:#94a3b8; font-size:1.6rem; cursor:pointer;">&times;</button>
+      </div>
+
+      <div id="orderDetailsModalBody">
+        <!-- Dynamic Order Details Content -->
+      </div>
+
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-top:1.5rem; border-top:1px solid #334155; padding-top:1.25rem; flex-wrap:wrap; gap:10px;" id="orderDetailsModalFooter">
+        <!-- Action Buttons -->
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(modal);
+
+  const btnClose = document.getElementById('btnCloseOrderDetailsModal');
+  if (btnClose) btnClose.onclick = () => { modal.style.display = 'none'; };
+
+  return modal;
+}
+
+function openOrderDetailsModal(orderId) {
+  const order = state.orders.find(o => o.orderId === orderId);
+  if (!order) {
+    showToast('Sipariş detayları bulunamadı.', 'error');
+    return;
+  }
+
+  const modal = getOrCreateOrderDetailsModal();
+  const body = document.getElementById('orderDetailsModalBody');
+  const footer = document.getElementById('orderDetailsModalFooter');
+
+  const status = (order.status || 'BEKLEMEDE').toUpperCase();
+  let statusBadge = `<span class="status-badge pending">${status}</span>`;
+  if (status === 'OK' || status === 'ONAYLANDI') {
+    statusBadge = `<span class="status-badge success"><i class="fa-solid fa-check"></i> ONAYLANDI</span>`;
+  } else if (status === 'DEC' || status === 'REDDEDİLDİ') {
+    statusBadge = `<span class="status-badge danger"><i class="fa-solid fa-xmark"></i> REDDEDİLDİ</span>`;
+  }
+
+  const totalPriceNum = Number(order.totalPrice);
+  const qty = Number(order.quantity) || 1;
+  const fallbackPrice = qty * 299;
+  const netTotal = (!isNaN(totalPriceNum) && totalPriceNum > 0) ? totalPriceNum : fallbackPrice;
+
+  const phoneClean = (order.customerPhone || '').replace(/[^0-9]/g, '');
+  const whatsappUrl = phoneClean ? `https://wa.me/${phoneClean.startsWith('90') ? phoneClean : '90' + phoneClean}` : '#';
+
+  if (body) {
+    body.innerHTML = `
+      <!-- Sipariş Üst Kimlik Kartı -->
+      <div style="background:#0f172a; border:1px solid #334155; border-radius:12px; padding:1.25rem; margin-bottom:1.25rem; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+        <div>
+          <span style="color:#94a3b8; font-size:0.8rem; text-transform:uppercase; font-weight:600;">SİPARİŞ NUMARASI</span>
+          <h2 style="color:#a855f7; margin:2px 0 0 0; font-size:1.3rem;">#${escapeHtml(order.orderId)}</h2>
+        </div>
+        <div style="text-align:right;">
+          <span style="color:#94a3b8; font-size:0.8rem; text-transform:uppercase; font-weight:600;">DURUM & TARİH</span>
+          <div style="margin-top:4px; display:flex; align-items:center; gap:8px;">
+            ${statusBadge}
+            <span style="color:#cbd5e1; font-size:0.85rem;"><i class="fa-solid fa-clock"></i> ${escapeHtml(order.createdAt || '-')}</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Müşteri ve İletişim Bilgileri Kartı -->
+      <div style="background:#0f172a; border:1px solid #334155; border-radius:12px; padding:1.25rem; margin-bottom:1.25rem;">
+        <h4 style="color:#fbbf24; margin:0 0 1rem 0; font-size:1rem; display:flex; align-items:center; gap:8px;">
+          <i class="fa-solid fa-user-gear"></i> Müşteri & İletişim Bilgileri
+        </h4>
+        <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap:12px; font-size:0.9rem;">
+          <div>
+            <span style="color:#94a3b8; display:block; font-size:0.8rem;">Adı Soyadı:</span>
+            <strong style="color:#f8fafc; font-size:1rem;">👤 ${escapeHtml(order.customerName)}</strong>
+          </div>
+          <div>
+            <span style="color:#94a3b8; display:block; font-size:0.8rem;">Telefon Numarası:</span>
+            <strong style="color:#38bdf8;">
+              📞 <a href="tel:${escapeHtml(order.customerPhone)}" style="color:inherit; text-decoration:none;">${escapeHtml(order.customerPhone)}</a>
+              ${phoneClean ? `<a href="${whatsappUrl}" target="_blank" style="margin-left:6px; color:#22c55e;" title="WhatsApp İle İletişim Kur"><i class="fa-brands fa-whatsapp"></i></a>` : ''}
+            </strong>
+          </div>
+          <div>
+            <span style="color:#94a3b8; display:block; font-size:0.8rem;">Instagram ID (senderId):</span>
+            <span class="code-tag" style="background:#1e293b; color:#cbd5e1; padding:3px 8px; border-radius:6px;">${escapeHtml(order.senderId || 'Web Siparişi / Yok')}</span>
+          </div>
+        </div>
+
+        <div style="margin-top:1rem; border-top:1px dashed #334155; padding-top:0.75rem;">
+          <span style="color:#94a3b8; display:block; font-size:0.8rem; margin-bottom:4px;">📍 Teslimat Adresi:</span>
+          <div style="background:#1e293b; border:1px solid #334155; padding:0.75rem; border-radius:8px; color:#f8fafc; font-size:0.9rem; line-height:1.4; display:flex; justify-content:space-between; align-items:center;">
+            <span>${escapeHtml(order.address)}</span>
+            <button class="btn btn-sm btn-secondary" onclick="navigator.clipboard.writeText('${escapeHtml(order.address)}'); showToast('📋 Adres panoya kopyalandı!','success');" title="Adresi Kopyala">
+              <i class="fa-solid fa-copy"></i> Kopyala
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Ürün ve Tutar Sepet Detay Kartı -->
+      <div style="background:#0f172a; border:1px solid #334155; border-radius:12px; padding:1.25rem;">
+        <h4 style="color:#34d399; margin:0 0 1rem 0; font-size:1rem; display:flex; align-items:center; gap:8px;">
+          <i class="fa-solid fa-bag-shopping"></i> Ürün & Sepet Detayları
+        </h4>
+        <div style="display:flex; justify-content:space-between; align-items:center; background:#1e293b; padding:0.85rem 1rem; border-radius:8px; margin-bottom:1rem; border:1px solid #334155;">
+          <div>
+            <strong style="color:#f8fafc; font-size:1rem;">🛍️ ${escapeHtml(order.productName || order.productCode)}</strong>
+            <div style="margin-top:4px; display:flex; gap:8px;">
+              <span class="size-pill">${escapeHtml(order.productCode)}</span>
+              <span class="code-tag">Beden: ${escapeHtml(order.size || 'M')}</span>
+              <span class="code-tag">Adet: ${order.quantity || 1}</span>
+            </div>
+          </div>
+          <div style="text-align:right;">
+            <span style="color:#94a3b8; font-size:0.8rem; display:block;">Net Toplam Tutar:</span>
+            <strong style="color:#22c55e; font-size:1.25rem;">${netTotal.toFixed(2)} TL</strong>
+          </div>
+        </div>
+
+        <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:10px; background:#0f172a; padding:0.75rem; border-radius:8px; font-size:0.85rem; text-align:center;">
+          <div><span style="color:#94a3b8;">Birim Fiyat:</span><br><strong style="color:#cbd5e1;">${(Number(order.unitPrice) || 299).toFixed(2)} TL</strong></div>
+          <div><span style="color:#94a3b8;">Kargo Ücreti:</span><br><strong style="color:#cbd5e1;">${(Number(order.shippingFee) || 0).toFixed(2)} TL</strong></div>
+          <div><span style="color:#94a3b8;">İndirim:</span><br><strong style="color:#f43f5e;">-${(Number(order.discount) || 0).toFixed(2)} TL</strong></div>
+        </div>
+      </div>
+    `;
+  }
+
+  if (footer) {
+    footer.innerHTML = `
+      <div style="display:flex; gap:8px; flex-wrap:wrap;">
+        <button class="btn btn-sm btn-success" onclick="updateOrderStatus('${escapeHtml(order.orderId)}', 'OK'); document.getElementById('orderDetailsModal').style.display='none';">
+          <i class="fa-solid fa-check"></i> Siparişi Onayla
+        </button>
+        <button class="btn btn-sm btn-delete" onclick="document.getElementById('orderDetailsModal').style.display='none'; openRejectionModal('${escapeHtml(order.orderId)}');">
+          <i class="fa-solid fa-xmark"></i> Siparişi Reddet & DM Yolla
+        </button>
+        ${order.senderId ? `
+          <button class="btn btn-sm btn-secondary" onclick="document.getElementById('orderDetailsModal').style.display='none'; selectOrderForReward('${escapeHtml(order.senderId)}');">
+            <i class="fa-solid fa-gift text-gold"></i> VIP Ödül Tanımla
+          </button>
+        ` : ''}
+      </div>
+      <button class="btn btn-sm" style="background:#334155; color:#f8fafc;" onclick="document.getElementById('orderDetailsModal').style.display='none';">
+        Kapat (&times;)
+      </button>
+    `;
+  }
+
+  modal.style.display = 'flex';
 }
 
 // Rejection Modal Dynamic Engine
