@@ -28,8 +28,8 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // HTTP Basic Auth Middleware (Yönetim Koruması)
-const ADMIN_USER = process.env.ADMIN_USER || 'patron';
-const ADMIN_PASS = process.env.ADMIN_PASS || 'tonystark2026!';
+const ADMIN_USER = process.env.ADMIN_USER || 'tonystark';
+const ADMIN_PASS = process.env.ADMIN_PASS || 'cintonik!';
 
 const basicAuth = (req: express.Request, res: express.Response, next: express.NextFunction) => {
   const authHeader = req.headers.authorization;
