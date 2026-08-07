@@ -58,7 +58,7 @@ app.get('/admin', basicAuth, (req, res) => {
 });
 
 app.use('/', (req, res, next) => {
-  if (req.path === '/webhook/instagram' || req.path.startsWith('/webhook')) {
+  if (req.path === '/webhook/instagram' || req.path.startsWith('/webhook') || req.path.startsWith('/api')) {
     return next();
   }
   return basicAuth(req, res, next);

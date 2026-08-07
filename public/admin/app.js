@@ -423,14 +423,14 @@ async function saveAllPricesAndStocks() {
       body: JSON.stringify({ updates })
     });
     const data = await res.json();
-    if (data.success) {
+    if (res.ok && data.success) {
       showToast(`💾 TOPLU KAYIT BAŞARILI!\n${updates.length} adet ürünün fiyat ve stok değişiklikleri kaydedildi!`, 'success');
       fetchStocks();
     } else {
-      showToast(data.error || 'Toplu kayıt başarısız.', 'error');
+      showToast(`❌ Hata (${res.status}): ${data.error || 'Toplu kayıt gerçekleştirilemedi.'}`, 'error');
     }
   } catch (e) {
-    showToast('Toplu kayıt yapılırken sunucu hatası oluştu.', 'error');
+    showToast(`❌ Bağlantı Hatası: ${e.message}`, 'error');
   }
 }
 

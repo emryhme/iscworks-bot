@@ -54,7 +54,7 @@ app.get('/admin', basicAuth, (req, res) => {
     res.sendFile(path_1.default.join(__dirname, '../public/admin/index.html'));
 });
 app.use('/', (req, res, next) => {
-    if (req.path === '/webhook/instagram' || req.path.startsWith('/webhook')) {
+    if (req.path === '/webhook/instagram' || req.path.startsWith('/webhook') || req.path.startsWith('/api')) {
         return next();
     }
     return basicAuth(req, res, next);
