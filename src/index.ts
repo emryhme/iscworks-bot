@@ -51,9 +51,9 @@ const basicAuth = (req: express.Request, res: express.Response, next: express.Ne
 };
 
 // Yönetim Paneli ve Dashboard (Şifreli)
-app.use('/admin', basicAuth, express.static(path.join(__dirname, '../public')));
+app.use('/admin', basicAuth, express.static(path.join(__dirname, '../public/admin')));
 app.get('/admin', basicAuth, (req, res) => {
-  res.sendFile(path.join(__dirname, '../public/index.html'));
+  res.sendFile(path.join(__dirname, '../public/admin/index.html'));
 });
 
 app.use('/', (req, res, next) => {
