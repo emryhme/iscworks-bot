@@ -108,6 +108,22 @@ function setupEventListeners() {
   if (rewardForm) {
     rewardForm.addEventListener('submit', handleRewardSubmit);
   }
+
+  const btnSendAdminChat = document.getElementById('btnSendAdminChat');
+  const aiAdminChatInput = document.getElementById('aiAdminChatInput');
+
+  if (btnSendAdminChat) {
+    btnSendAdminChat.addEventListener('click', sendAdminChatMessage);
+  }
+
+  if (aiAdminChatInput) {
+    aiAdminChatInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        sendAdminChatMessage();
+      }
+    });
+  }
 }
 
 // Web Audio API Tabanlı Hoş İki Tonlu Sipariş Çanı
@@ -1124,4 +1140,92 @@ function escapeHtml(str) {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#039;');
+}
+
+// Quick Action Helper for AI Copilot
+function setAiPrompt(text) {
+  const input = document.getElementById('aiAdminChatInput');
+  if (input) {
+    input.value = text;
+    input.focus();
+  }
+}
+
+// Admin Copilot Chat Logic
+async function sendAdminChatMessage() {
+  const input = document.getElementById('aiAdminChatInput');
+  const chatWindow = document.getElementById('aiAdminChatWindow');
+  const sendBtn = document.getElementById('btnSendAdminChat');
+
+  if (!input || !chatWindow) return;
+  const prompt = input.value.trim();
+  if (!prompt) return;
+
+  // Append User Message Bubble (Patron)
+  const userBubble = document.createElement('div');
+  userBubble.style.cssText = 'display:flex; gap:10px; justify-content:flex-end; align-items:flex-start; margin-top:6px;';
+  userBubble.innerHTML = `
+    <div style="background:linear-gradient(135deg, #2563eb, #1d4ed8); color:#ffffff; padding:0.85rem 1.1rem; border-radius:12px; border-top-right-radius:2px; max-width:80%; font-size:0.92rem; line-height:1.5;">
+      ${escapeHtml(prompt).replace(/\n/g, '<br>')}
+    </div>
+    <div style="width:36px; height:36px; border-radius:50%; background:linear-gradient(135deg, #fbbf24, #f59e0b); display:flex; align-items:center; justify-content:center; color:#000; font-size:16px; font-weight:bold;">
+      <i class="fa-solid fa-crown"></i>
+    </div>
+  `;
+  chatWindow.appendChild(userBubble);
+
+  input.value = '';
+  chatWindow.scrollTop = chatWindow.scrollHeight;
+
+  // Loading Indicator Bubble
+  const loadingBubble = document.createElement('div');
+  loadingBubble.id = 'aiLoadingBubble';
+  loadingBubble.style.cssText = 'display:flex; gap:10px; align-items:flex-start; margin-top:6px;';
+  loadingBubble.innerHTML = `
+    <div style="width:36px; height:36px; border-radius:50%; background:linear-gradient(135deg, #a855f7, #6366f1); display:flex; align-items:center; justify-content:center; color:#fff; font-size:16px;">
+      <i class="fa-solid fa-robot"></i>
+    </div>
+    <div style="background:#1e293b; color:#94a3b8; padding:0.85rem 1.1rem; border-radius:12px; border-top-left-radius:2px; font-size:0.92rem; border:1px solid #334155;">
+      <i class="fa-solid fa-spinner fa-spin"></i> F.R.I.D.A.Y. emrinizi işliyor...
+    </div>
+  `;
+  chatWindow.appendChild(loadingBubble);
+  chatWindow.scrollTop = chatWindow.scrollHeight;
+
+  if (sendBtn) sendBtn.disabled = true;
+
+  try {
+    const res = await fetch(`${API_BASE}/api/ai/admin-copilot`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt })
+    });
+    const data = await res.json();
+    loadingBubble.remove();
+
+    const replyText = (data && data.reply) ? data.reply : '❌ Bir hata oluştu.';
+
+    // Append AI Response Bubble
+    const aiBubble = document.createElement('div');
+    aiBubble.style.cssText = 'display:flex; gap:10px; align-items:flex-start; margin-top:6px;';
+    aiBubble.innerHTML = `
+      <div style="width:36px; height:36px; border-radius:50%; background:linear-gradient(135deg, #a855f7, #6366f1); display:flex; align-items:center; justify-content:center; color:#fff; font-size:16px;">
+        <i class="fa-solid fa-robot"></i>
+      </div>
+      <div style="background:#1e293b; color:#f8fafc; padding:0.85rem 1.1rem; border-radius:12px; border-top-left-radius:2px; max-width:80%; font-size:0.92rem; line-height:1.5; border:1px solid #334155;">
+        ${escapeHtml(replyText).replace(/\n/g, '<br>')}
+      </div>
+    `;
+    chatWindow.appendChild(aiBubble);
+    chatWindow.scrollTop = chatWindow.scrollHeight;
+
+    // Tazeleme
+    fetchData();
+
+  } catch (err) {
+    if (loadingBubble) loadingBubble.remove();
+    showToast('AI Asistan bağlantı hatası.', 'error');
+  } finally {
+    if (sendBtn) sendBtn.disabled = false;
+  }
 }

@@ -191,6 +191,24 @@ app.post('/api/settings', (req, res) => {
   }
 });
 
+import { AdminCopilotService } from './services/admin-copilot.service';
+
+// Admin Copilot Chat Endpoint
+app.post('/api/ai/admin-copilot', async (req, res) => {
+  try {
+    const { prompt } = req.body;
+    if (!prompt || !prompt.trim()) {
+      return res.status(400).json({ success: false, error: 'Lütfen bir yönetim komutu yazınız.' });
+    }
+
+    const reply = await AdminCopilotService.processAdminCommand(prompt.trim());
+    res.json({ success: true, reply });
+  } catch (err: any) {
+    console.error('[API /api/ai/admin-copilot Error]:', err);
+    res.status(500).json({ success: false, error: err.message || 'Sunucu hatası' });
+  }
+});
+
 // Web Chat & Simulator API End-point'i
 app.post('/api/chat', async (req, res) => {
   const { senderId, message } = req.body;

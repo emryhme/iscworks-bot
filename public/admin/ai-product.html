@@ -42,34 +42,48 @@
           <a href="campaigns.html" class="tab-btn"><i class="fa-solid fa-bullhorn"></i> 🎉 Kampanyalar</a>
           <a href="rewards.html" class="tab-btn"><i class="fa-solid fa-gift"></i> 💎 VIP Sadakat Ödülleri</a>
           <a href="settings.html" class="tab-btn"><i class="fa-solid fa-truck"></i> 🚚 Fiyat & Kargo Ayarları</a>
-          <a href="ai-product.html" class="tab-btn btn-ai-tab active"><i class="fa-solid fa-wand-magic-sparkles"></i> ✨ Gemini AI ile Ürün Ekle</a>
+          <a href="ai-product.html" class="tab-btn btn-ai-tab active"><i class="fa-solid fa-robot"></i> ✨ Yapay Zekadan Destek Al</a>
         </div>
       </section>
 
       <section class="tab-content active" id="aiProductTab">
-        <div class="card glass-card form-card ai-card">
-          <div class="card-header">
-            <h3><i class="fa-solid fa-wand-magic-sparkles text-gold"></i> Gemini AI ile Doğal Dilde Otomatik Ürün & Stok Ekleme</h3>
+        <div class="card glass-card form-card ai-card" style="max-width:900px; margin:0 auto;">
+          <div class="card-header" style="display:flex; align-items:center; justify-content:space-between;">
+            <h3><i class="fa-solid fa-robot text-gold"></i> F.R.I.D.A.Y. Yönetim & Asistan Copilot</h3>
+            <span class="status-badge in-stock"><i class="fa-solid fa-circle text-green" style="font-size:8px;"></i> Canlı AI Bağlantısı</span>
           </div>
-          <div class="card-body">
-            <p class="ai-hint-text">
-              İstediğiniz ürün bilgisini Türkçe doğal dilde yazın. Yapay zeka kısa kodu, renk, beden, stok adedini ve kategoriyi kendisi ayıklayarak SQLite veritabanına ve Google Sheet'e otomatik eklesin!
+          <div class="card-body" style="padding:1.5rem;">
+            <p class="ai-hint-text" style="color:#94a3b8; font-size:0.9rem; margin-bottom:1.2rem;">
+              Patron, mağazanızla ilgili herhangi bir emri Türkçe yazabilirsiniz: <strong>Stok güncelleme, fiyat değiştirme, sipariş sorgulama veya yeni ürün ekleme!</strong>
             </p>
 
-            <div class="form-group">
-              <label for="aiProductPrompt">Ürün Açıklaması veya Serbest Metin</label>
-              <textarea id="aiProductPrompt" rows="4" placeholder="Örnek: Kırmızı kumaş gömlek ekle, kısa kodu KGMKRM olsun, S, M, L bedenlerinden 15'er adet stoğumuz var, kategorisi gömlek."></textarea>
+            <!-- Quick Action Pills -->
+            <div style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:1.2rem;" id="aiQuickActions">
+              <button class="btn btn-sm btn-secondary" onclick="setAiPrompt('KGMLW-M ürününün stok adedini 50 yap')">📦 Stok Güncelle</button>
+              <button class="btn btn-sm btn-secondary" onclick="setAiPrompt('KGMLW-M fiyatını 450 TL olarak ayarla')">💰 Fiyat Güncelle</button>
+              <button class="btn btn-sm btn-secondary" onclick="setAiPrompt('Son verilen siparişleri listele')">🛍️ Sipariş Sorgula</button>
+              <button class="btn btn-sm btn-secondary" onclick="setAiPrompt('Siyah M beden Erkek Polo Tişört ekle, fiyatı 399 TL stok 25 adet olsun')">✨ Yeni Ürün Ekle</button>
             </div>
 
-            <div class="form-actions">
-              <button class="btn btn-primary btn-glow btn-ai-submit" id="btnSubmitAiProduct">
-                <i class="fa-solid fa-robot"></i> Yapay Zeka İle Oluştur ve Kaydet
+            <!-- Chat Window -->
+            <div id="aiAdminChatWindow" style="background:#0f172a; border:1px solid #334155; border-radius:12px; height:420px; overflow-y:auto; padding:1.25rem; display:flex; flex-direction:column; gap:12px; margin-bottom:1.2rem;">
+              <div style="display:flex; gap:10px; align-items:flex-start;">
+                <div style="width:36px; height:36px; border-radius:50%; background:linear-gradient(135deg, #a855f7, #6366f1); display:flex; align-items:center; justify-content:center; color:#fff; font-size:16px;">
+                  <i class="fa-solid fa-robot"></i>
+                </div>
+                <div style="background:#1e293b; color:#f8fafc; padding:0.85rem 1.1rem; border-radius:12px; border-top-left-radius:2px; max-width:80%; font-size:0.92rem; line-height:1.5; border:1px solid #334155;">
+                  Merhaba Sayın Tony Stark (Patron)! 🤖 Ben F.R.I.D.A.Y. Mağaza Yönetim Asistanınızım.<br><br>
+                  Bugün hangi işlemi yapmamı istersiniz? Stok düzenleme, fiyat güncelleme, sipariş sorgulama veya yeni ürün ekleme emirlerinizi bekliyorum!
+                </div>
+              </div>
+            </div>
+
+            <!-- Input Area -->
+            <div style="display:flex; gap:10px;">
+              <textarea id="aiAdminChatInput" rows="2" placeholder="Örn: KGMLW-M fiyatını 450 TL yap ve stoğunu 50 adede çıkar..." style="flex:1; background:#0f172a; border:1px solid #475569; border-radius:10px; color:#f8fafc; padding:0.75rem; font-family:inherit; font-size:0.92rem; resize:none;"></textarea>
+              <button class="btn btn-primary btn-glow" id="btnSendAdminChat" style="padding:0 1.5rem; display:flex; align-items:center; gap:8px;">
+                <i class="fa-solid fa-paper-plane"></i> Gönder
               </button>
-            </div>
-
-            <div class="ai-result-box" id="aiResultBox" style="display: none; margin-top: 1.5rem;">
-              <h4><i class="fa-solid fa-circle-check text-green"></i> AI İşlem Sonucu</h4>
-              <pre id="aiResultContent"></pre>
             </div>
           </div>
         </div>
