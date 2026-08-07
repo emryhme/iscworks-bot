@@ -77,7 +77,36 @@
               </div>
             </form>
 
-            <h4 style="margin-top:2rem; margin-bottom:1rem; color:#f8fafc;"><i class="fa-solid fa-list-check"></i> Tanımlı VIP Ödül Listesi</h4>
+            <h4 style="margin-top:2.5rem; margin-bottom:1rem; color:#f8fafc;">
+              <i class="fa-solid fa-cart-shopping text-gold"></i> 📦 Sipariş Veren Müşteriler (Hızlı Ödül Seçici)
+            </h4>
+            <p style="color:#94a3b8; font-size:0.85rem; margin-bottom:1rem;">
+              Aşağıdaki sipariş veren müşterilerden birine tıklayarak Instagram ID'sini yukarıdaki ödül formuna otomatik aktarabilirsiniz.
+            </p>
+            <div class="table-responsive">
+              <table class="data-table" id="rewardOrdersTable">
+                <thead>
+                  <tr>
+                    <th>SİPARİŞ ID</th>
+                    <th>INSTAGRAM ID</th>
+                    <th>MÜŞTERİ ADI</th>
+                    <th>TELEFON</th>
+                    <th>SİPARİŞ TUTARI</th>
+                    <th>TARİH</th>
+                    <th>Hızlı İşlem</th>
+                  </tr>
+                </thead>
+                <tbody id="rewardOrdersTableBody">
+                  <tr>
+                    <td colspan="7" class="loading-cell">
+                      <i class="fa-solid fa-spinner fa-spin"></i> Sipariş verileri yükleniyor...
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <h4 style="margin-top:2.5rem; margin-bottom:1rem; color:#f8fafc;"><i class="fa-solid fa-list-check"></i> Tanımlı VIP Ödül Listesi</h4>
             <div class="table-responsive">
               <table class="data-table" id="rewardsTable">
                 <thead>

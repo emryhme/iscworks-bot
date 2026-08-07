@@ -251,6 +251,7 @@ function renderTables() {
   renderProductsTable();
   renderOrdersTable();
   renderRewardsTable();
+  renderRewardOrdersTable();
 }
 
 // Render VIP Sadakat Ödülleri Tablosu
@@ -297,6 +298,67 @@ function renderRewardsTable() {
       </tr>
     `;
   }).join('');
+}
+
+// Render VIP Sadakat Ekranındaki Sipariş Seçici Tablosu
+function renderRewardOrdersTable() {
+  const tableBody = document.getElementById('rewardOrdersTableBody');
+  if (!tableBody) return;
+
+  const orders = state.orders || [];
+  if (orders.length === 0) {
+    tableBody.innerHTML = `
+      <tr>
+        <td colspan="7" class="loading-cell">
+          <i class="fa-solid fa-inbox"></i> Henüz verilmiş bir sipariş bulunmuyor.
+        </td>
+      </tr>
+    `;
+    return;
+  }
+
+  tableBody.innerHTML = orders.map(o => {
+    const senderId = o.senderId || 'Bilinmiyor';
+    const priceDisplay = o.totalPrice 
+      ? `<strong class="text-green">${Number(o.totalPrice).toFixed(2)} TL</strong>` 
+      : `<span class="text-muted">-</span>`;
+
+    return `
+      <tr style="cursor:pointer;" onclick="selectOrderForReward('${escapeHtml(senderId)}')">
+        <td><strong class="text-purple">${escapeHtml(o.orderId || '-')}</strong></td>
+        <td><span class="code-tag">${escapeHtml(senderId)}</span></td>
+        <td><strong>${escapeHtml(o.customerName || '-')}</strong></td>
+        <td>${escapeHtml(o.customerPhone || '-')}</td>
+        <td>${priceDisplay}</td>
+        <td><small class="text-muted">${escapeHtml(o.createdAt || '-')}</small></td>
+        <td>
+          <button class="btn btn-sm btn-primary" onclick="event.stopPropagation(); selectOrderForReward('${escapeHtml(senderId)}')">
+            <i class="fa-solid fa-hand-pointer"></i> ID'yi Form'a Aktar
+          </button>
+        </td>
+      </tr>
+    `;
+  }).join('');
+}
+
+// Sipariş Tıklandığında Müşteri ID'sini Sadakat Ödül Formuna Otomatik Doldur
+function selectOrderForReward(senderId) {
+  const senderInput = document.getElementById('rewardSenderId');
+  const percentInput = document.getElementById('rewardPercent');
+  const rewardForm = document.getElementById('rewardForm');
+
+  if (!senderInput) return;
+
+  senderInput.value = senderId;
+  showToast(`✨ Müşteri Instagram ID (${senderId}) ödül formuna kopyalandı!`, 'success');
+
+  if (rewardForm) {
+    rewardForm.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+
+  if (percentInput) {
+    setTimeout(() => percentInput.focus(), 300);
+  }
 }
 
 // Render Products Table
