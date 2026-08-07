@@ -81,15 +81,18 @@ app.post('/api/rewards', (req, res) => {
             return res.status(400).json({ success: false, error: 'Instagram/Müşteri ID ve İndirim Oranı zorunludur.' });
         }
         const sId = senderId.trim();
-        const code = (rewardCode || 'VIP20').trim().toUpperCase();
+        const code = (rewardCode || 'YINEBEKLERIZ').trim().toUpperCase();
         const percent = Number(discountPercent) || 20;
         const minAmt = Number(minQualifyingAmount) || 2000;
+        // Müşteri Adını Veritabanındaki Son Siparişinden Çek
+        const lastOrder = db_1.db.prepare('SELECT customer_name FROM orders WHERE sender_id = ? ORDER BY id DESC LIMIT 1').get(sId);
+        const customerNameDisplay = (lastOrder && lastOrder.customer_name) ? lastOrder.customer_name.trim() : 'Müşterimiz';
         const stmt = db_1.db.prepare(`
       INSERT INTO user_rewards (sender_id, reward_code, discount_percent, min_qualifying_amount, is_used)
       VALUES (?, ?, ?, ?, 0)
     `);
         stmt.run(sId, code, percent, minAmt);
-        const dmNotice = `🎉 TEBRİKLER / VIP ÖDÜL KAZANDINIZ!\n\nSayın Müşterimiz, hesabınıza (ID: ${sId}) özel %${percent} VIP İNDİRİM HAKKI tanımlanmıştır! (Ödül Kodu: ${code})\n\nBir sonraki siparişinizde bu indirim otomatik olarak uygulanacaktır. Keyifli alışverişler dileriz! 🎁✨`;
+        const dmNotice = `🎉 TEBRİKLER / VIP ÖDÜL KAZANDINIZ!\nSayın ${customerNameDisplay}, instagram profilinize özel %${percent} VIP İNDİRİM tanımlanmıştır! (Ödül Kodu: ${code})\nBir sonraki siparişinizde bu indirim otomatik olarak uygulanacaktır. Keyifli alışverişler dileriz! 🎁✨`;
         // Müşteriye Instagram DM Bildirimi Gönder
         facebook_service_1.FacebookService.sendMessage(sId, dmNotice).catch(err => {
             console.error('[Reward DM Error]:', err.message);

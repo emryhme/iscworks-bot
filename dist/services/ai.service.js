@@ -269,15 +269,15 @@ Yalnızca aşağıdaki JSON yapısını döndür (bilinmeyen alanlar için null 
                     // 2. Bu sipariş 2000 TL ve üzeri ise, Müşterinin Instagram ID'sine BIR DAHA Kİ SİPARİŞİ İÇİN %20 İNDİRİM HAKKI TANIMLA!
                     let earnedNewLoyaltyReward = false;
                     if (subtotal >= loyaltyThreshold) {
-                        // Müşteriye yeni %20 VIP Ödülü ver
-                        const rewardCode = `VIP20-${senderId.slice(-4)}`;
+                        // Müşteriye yeni VIP Ödülü ver (Ödül Kodu: YINEBEKLERIZ)
+                        const rewardCode = 'YINEBEKLERIZ';
                         db_1.db.prepare(`
               INSERT INTO user_rewards (sender_id, reward_code, discount_percent, min_qualifying_amount)
               VALUES (?, ?, 20.0, ?)
             `).run(senderId, rewardCode, loyaltyThreshold);
                         earnedNewLoyaltyReward = true;
                         // Instagram DM Otomatik Bildirimi Gönder
-                        const autoDmText = `🎉 TEBRİKLER! ${loyaltyThreshold} TL ve üzeri siparişiniz için hesabınıza (Instagram ID: ${senderId}) tanımlı BIR DAHA Kİ SİPARİŞİNİZDE GEÇERLİ %20 VIP İNDİRİM HAKKI tanımlandı! Bir sonraki siparişinizde otomatik uygulanacaktır. 🎁✨`;
+                        const autoDmText = `🎉 TEBRİKLER / VIP ÖDÜL KAZANDINIZ!\nSayın ${customerName.trim()}, instagram profilinize özel %20 VIP İNDİRİM tanımlanmıştır! (Ödül Kodu: ${rewardCode})\nBir sonraki siparişinizde bu indirim otomatik olarak uygulanacaktır. Keyifli alışverişler dileriz! 🎁✨`;
                         facebook_service_1.FacebookService.sendMessage(senderId, autoDmText).catch(e => console.error('[Auto Reward DM Error]:', e.message));
                     }
                     const combinedProductCode = ctx.cart.map(i => `${i.productCode} (${i.size}) x${i.quantity}`).join(', ');
