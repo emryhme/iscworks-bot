@@ -127,6 +127,8 @@ function setupEventListeners() {
         sendAdminChatMessage();
       }
     });
+  }
+
   const btnToggleAutoReward = document.getElementById('btnToggleAutoReward');
   if (btnToggleAutoReward) {
     btnToggleAutoReward.addEventListener('click', toggleAutoRewardSetting);
