@@ -425,7 +425,7 @@ async function saveAllPricesAndStocks() {
     const data = await res.json();
     if (res.ok && data.success) {
       showToast(`💾 TOPLU KAYIT BAŞARILI!\n${updates.length} adet ürünün fiyat ve stok değişiklikleri kaydedildi!`, 'success');
-      fetchStocks();
+      fetchData();
     } else {
       showToast(`❌ Hata (${res.status}): ${data.error || 'Toplu kayıt gerçekleştirilemedi.'}`, 'error');
     }
@@ -453,7 +453,7 @@ async function updateProductPrice(productCode) {
     const data = await res.json();
     if (data.success) {
       showToast(`✅ ${productCode} fiyatı ${newPrice} TL olarak kaydedildi.`, 'success');
-      fetchStocks();
+      fetchData();
     } else {
       showToast(data.error || 'Fiyat güncellenemedi.', 'error');
     }
