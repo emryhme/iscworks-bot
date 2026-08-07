@@ -4,6 +4,7 @@ import { WebhookController } from './controllers/webhook.controller';
 import { OrderService } from './services/order.service';
 import { StockService } from './services/stock.service';
 
+import { db } from './database/db';
 import path from 'path';
 import axios from 'axios';
 import { AIService } from './services/ai.service';

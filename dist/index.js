@@ -8,6 +8,7 @@ const env_1 = require("./config/env");
 const webhook_controller_1 = require("./controllers/webhook.controller");
 const order_service_1 = require("./services/order.service");
 const stock_service_1 = require("./services/stock.service");
+const db_1 = require("./database/db");
 const path_1 = __importDefault(require("path"));
 const axios_1 = __importDefault(require("axios"));
 const ai_service_1 = require("./services/ai.service");
@@ -61,7 +62,7 @@ app.use('/', (req, res, next) => {
 // Kampanyalar API
 app.get('/api/campaigns', (req, res) => {
     try {
-        const campaigns = db.prepare('SELECT * FROM campaigns ORDER BY id DESC').all();
+        const campaigns = db_1.db.prepare('SELECT * FROM campaigns ORDER BY id DESC').all();
         res.json({ success: true, campaigns });
     }
     catch (e) {
@@ -71,7 +72,7 @@ app.get('/api/campaigns', (req, res) => {
 app.post('/api/campaigns', (req, res) => {
     try {
         const { title, description, code, discountPercent, discountAmount, minOrderAmount } = req.body;
-        const stmt = db.prepare(`
+        const stmt = db_1.db.prepare(`
       INSERT INTO campaigns (title, description, code, discount_percent, discount_amount, min_order_amount, active)
       VALUES (?, ?, ?, ?, ?, ?, 1)
     `);
@@ -84,7 +85,7 @@ app.post('/api/campaigns', (req, res) => {
 });
 app.delete('/api/campaigns/:id', (req, res) => {
     try {
-        db.prepare('DELETE FROM campaigns WHERE id = ?').run(req.params.id);
+        db_1.db.prepare('DELETE FROM campaigns WHERE id = ?').run(req.params.id);
         res.json({ success: true, message: 'Kampanya silindi.' });
     }
     catch (e) {
@@ -94,7 +95,7 @@ app.delete('/api/campaigns/:id', (req, res) => {
 // Sistem Ayarları & Kargo Fiyatı API
 app.get('/api/settings', (req, res) => {
     try {
-        const settings = db.prepare('SELECT * FROM settings').all();
+        const settings = db_1.db.prepare('SELECT * FROM settings').all();
         res.json({ success: true, settings });
     }
     catch (e) {
@@ -105,10 +106,10 @@ app.post('/api/settings', (req, res) => {
     try {
         const { shippingFee, freeShippingThreshold } = req.body;
         if (shippingFee !== undefined) {
-            db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES ("shipping_fee", ?)').run(String(shippingFee));
+            db_1.db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES ("shipping_fee", ?)').run(String(shippingFee));
         }
         if (freeShippingThreshold !== undefined) {
-            db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES ("free_shipping_threshold", ?)').run(String(freeShippingThreshold));
+            db_1.db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES ("free_shipping_threshold", ?)').run(String(freeShippingThreshold));
         }
         res.json({ success: true, message: 'Kargo ayarları güncellendi.' });
     }
@@ -328,9 +329,9 @@ app.post('/api/ai/create-product', async (req, res) => {
         res.status(500).json({ success: false, error: err.message || 'Yapay zeka sunucu hatası' });
     }
 });
-const db_1 = require("./database/db");
+const db_2 = require("./database/db");
 // Veritabanını Başlat (SQLite Migration & Seed)
-(0, db_1.initDatabase)();
+(0, db_2.initDatabase)();
 // Sunucuyu Başlat
 app.listen(env_1.env.port, () => {
     console.log(`
