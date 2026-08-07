@@ -27,10 +27,10 @@ export class AdminCopilotService {
       description: 'Bir ürünün stok adedini günceller. Parametreler: productCode (string), newStock (number), size (string, opsiyonel).',
       func: async (inputStr: string) => {
         try {
-          const { productCode, newStock, size } = JSON.parse(inputStr);
-          const success = await StockService.updateStock(productCode, Number(newStock), size || '');
+          const { productCode, newStock } = JSON.parse(inputStr);
+          const success = await StockService.updateStock(productCode, Number(newStock));
           if (success) {
-            return `✅ ${productCode} ${size ? '(' + size + ')' : ''} stoğu ${newStock} adet olarak güncellendi!`;
+            return `✅ ${productCode} stoğu ${newStock} adet olarak güncellendi!`;
           } else {
             return `❌ ${productCode} stoğu veritabanında bulunamadı veya güncellenemedi.`;
           }
