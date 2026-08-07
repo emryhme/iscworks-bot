@@ -138,10 +138,41 @@ export class OrderService {
   }
 
   /**
-   * Tüm siparişleri SQLite veritabanından getirir.
+   * Tüm siparişleri SQLite veritabanından getirir (Self-Healing Korumalı).
    */
   public static async getOrders(): Promise<SavedOrder[]> {
     try {
+      // 1. Tablo veya Kolon Eksikse Anında Tamir Et (Self-Healing Schema)
+      try {
+        db.exec(`
+          CREATE TABLE IF NOT EXISTS orders (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            order_id TEXT UNIQUE NOT NULL,
+            first_name TEXT NOT NULL,
+            last_name TEXT DEFAULT '',
+            customer_phone TEXT NOT NULL,
+            address TEXT NOT NULL,
+            product_code TEXT NOT NULL,
+            product_name TEXT DEFAULT '',
+            size TEXT DEFAULT '',
+            quantity INTEGER NOT NULL DEFAULT 1,
+            unit_price REAL NOT NULL DEFAULT 0,
+            shipping_fee REAL NOT NULL DEFAULT 0,
+            discount REAL NOT NULL DEFAULT 0,
+            total_price REAL NOT NULL DEFAULT 0,
+            status TEXT NOT NULL DEFAULT 'BEKLEMEDE',
+            sender_id TEXT DEFAULT '',
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+          );
+        `);
+        try { db.exec(`ALTER TABLE orders ADD COLUMN unit_price REAL NOT NULL DEFAULT 0;`); } catch (e) {}
+        try { db.exec(`ALTER TABLE orders ADD COLUMN shipping_fee REAL NOT NULL DEFAULT 0;`); } catch (e) {}
+        try { db.exec(`ALTER TABLE orders ADD COLUMN discount REAL NOT NULL DEFAULT 0;`); } catch (e) {}
+        try { db.exec(`ALTER TABLE orders ADD COLUMN total_price REAL NOT NULL DEFAULT 0;`); } catch (e) {}
+        try { db.exec(`ALTER TABLE orders ADD COLUMN sender_id TEXT DEFAULT '';`); } catch (e) {}
+      } catch (err) {}
+
       const stmt = db.prepare(`
         SELECT 
           order_id as orderId, 
