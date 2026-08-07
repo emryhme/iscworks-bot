@@ -23,7 +23,7 @@ class AdminCopilotService {
         // 1. Stok Güncelleme Aracı
         const stokGuncelleTool = new tools_1.DynamicTool({
             name: 'STOK_GUNCELLE',
-            description: 'Bir ürünün stok adedini günceller. Parametreler: productCode (string), newStock (number), size (string, opsiyonel).',
+            description: 'Bir ürünün stok adedini günceller. Parametreler: productCode (string), newStock (number).',
             func: async (inputStr) => {
                 try {
                     const { productCode, newStock } = JSON.parse(inputStr);
@@ -116,21 +116,58 @@ class AdminCopilotService {
                 }
             }
         });
+        // 5. Ürün ve Stok Listeleme / Sorgulama Aracı (Database Product Search)
+        const urunListeleSorgulaTool = new tools_1.DynamicTool({
+            name: 'URUN_LISTELE_SORGULA',
+            description: 'Veritabanındaki tüm ürünleri ve stok durumlarını listeler veya kelimeye göre arar. Parametreler: query (string, opsiyonel - ürün adı, kod, kısa kod, renk veya kategori).',
+            func: async (inputStr) => {
+                try {
+                    const parsed = inputStr ? JSON.parse(inputStr) : {};
+                    const query = parsed.query || '';
+                    const products = await stock_service_1.StockService.fetchAllSheetRows();
+                    let filtered = products;
+                    if (query) {
+                        const q = query.toLowerCase().trim();
+                        filtered = products.filter(p => (p.productCode || '').toLowerCase().includes(q) ||
+                            (p.shortCode || '').toLowerCase().includes(q) ||
+                            (p.name || '').toLowerCase().includes(q) ||
+                            (p.color || '').toLowerCase().includes(q) ||
+                            (p.category || '').toLowerCase().includes(q));
+                    }
+                    if (filtered.length === 0)
+                        return 'Aradığınız kriterlere uygun ürün veritabanında bulunamadı.';
+                    const list = filtered.slice(0, 10).map(p => `• ${p.productCode} (${p.name}) | Beden: ${p.size} | Stok: ${p.stock} adet | Fiyat: ${p.price || 299} TL`).join('\n');
+                    return `🏷️ Toplam ${filtered.length} adet ürün bulundu. İlk ${Math.min(10, filtered.length)} ürün:\n${list}`;
+                }
+                catch (e) {
+                    return `❌ Ürün sorgulama hatası: ${e.message}`;
+                }
+            }
+        });
         const model = new openai_1.ChatOpenAI({
             openAIApiKey: apiKey,
             modelName: env_1.env.openaiModel || 'gpt-4o',
             temperature: 0.1
         });
-        const tools = [stokGuncelleTool, fiyatGuncelleTool, siparisSorgulaTool, urunEkleTool];
+        const tools = [stokGuncelleTool, fiyatGuncelleTool, siparisSorgulaTool, urunEkleTool, urunListeleSorgulaTool];
         const boundModel = model.bindTools(tools);
         const systemPrompt = new messages_1.SystemMessage(`
 Sen BARON'S SILLAGE Yönetici ve Mağaza Copilot Asistanısın (F.R.I.D.A.Y.).
 Kullanıcın Sayın Tony Stark (Patron)'dır.
 
+VERİTABANI VE ARAÇ YETKİLERİN:
+Sen veritabanındaki ürünleri, stokları, fiyatları ve siparişleri Doğrudan Sorgulama ve Değiştirme Yetkisine SAHİPSİN!
+- Ürünleri ve stok durumunu aramak/görüntülemek için URUN_LISTELE_SORGULA aracını kullan.
+- Stok değiştirmek için STOK_GUNCELLE aracını kullan.
+- Fiyat değiştirmek için FIYAT_GUNCELLE aracını kullan.
+- Sipariş sorgulamak için SIPARIS_SORGULA aracını kullan.
+- Yeni ürün eklemek için URUN_EKLE aracını kullan.
+
+⚠️ KESİNLİKLE "ürün listenizi görüntülemek için bir araç kullanamıyorum" DEME! Senin URUN_LISTELE_SORGULA aracın var ve veritabanına %100 erişimin var.
+
 Görevlerin:
-1. Patronun Türkçe doğal dille verdiği yönetim emirlerini anlayıp doğru araçları (STOK_GUNCELLE, FIYAT_GUNCELLE, SIPARIS_SORGULA, URUN_EKLE) çağırarak işlemi gerçekleştirmek.
-2. İşlem tamamlandığında Patron'a saygılı, samimi, karizmatik ve net bir Türkçe özet sunmak (Örn: "Emredersiniz Patron! KGMLW-M stoğu 50 adet yapıldı ve fiyatı 450 TL olarak güncellendi.").
-3. Eğer bilgi eksikse (örn hangi beden veya hangi ürün kodu olduğu söylenmediyse) sormak.
+1. Patron'un Türkçe doğal dille verdiği yönetim emirlerini anlayıp araçları çalıştırarak işlemi gerçekleştirmek.
+2. İşlem tamamlandığında Patron'a saygılı, samimi, karizmatik ve net bir Türkçe yanıt sunmak.
     `);
         let messages = [systemPrompt, new messages_1.HumanMessage(userPrompt)];
         let response = await boundModel.invoke(messages);
@@ -148,6 +185,8 @@ Görevlerin:
                     toolResult = await siparisSorgulaTool.invoke(JSON.stringify(tc.args));
                 else if (tc.name === 'URUN_EKLE')
                     toolResult = await urunEkleTool.invoke(JSON.stringify(tc.args));
+                else if (tc.name === 'URUN_LISTELE_SORGULA')
+                    toolResult = await urunListeleSorgulaTool.invoke(JSON.stringify(tc.args));
                 messages.push(new messages_1.ToolMessage({ content: toolResult, tool_call_id: tc.id }));
             }
             response = await boundModel.invoke(messages);
