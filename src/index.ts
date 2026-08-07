@@ -270,19 +270,19 @@ app.post('/api/products/bulk-update', (req, res) => {
       return res.status(400).json({ success: false, error: 'Güncellenecek veri listesi boş veya geçersiz.' });
     }
 
-    const updatePriceStmt = db.prepare('UPDATE products SET price = ?, updated_at = CURRENT_TIMESTAMP WHERE product_code = ?');
-    const updateStockStmt = db.prepare('UPDATE products SET stock = ?, updated_at = CURRENT_TIMESTAMP WHERE product_code = ?');
+    const updatePriceStmt = db.prepare('UPDATE products SET price = ?, updated_at = CURRENT_TIMESTAMP WHERE product_code = ? OR short_code = ?');
+    const updateStockStmt = db.prepare('UPDATE products SET stock = ?, updated_at = CURRENT_TIMESTAMP WHERE product_code = ? OR short_code = ?');
 
     let updatedCount = 0;
     const bulkTransaction = db.transaction((items: any[]) => {
       for (const item of items) {
         if (item.productCode) {
           if (item.price !== undefined && !isNaN(Number(item.price))) {
-            updatePriceStmt.run(Number(item.price), item.productCode);
+            updatePriceStmt.run(Number(item.price), item.productCode, item.productCode);
             updatedCount++;
           }
           if (item.stock !== undefined && !isNaN(Number(item.stock))) {
-            updateStockStmt.run(Number(item.stock), item.productCode);
+            updateStockStmt.run(Number(item.stock), item.productCode, item.productCode);
             updatedCount++;
           }
         }
