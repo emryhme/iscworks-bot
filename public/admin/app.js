@@ -267,109 +267,64 @@ function updateMetrics() {
   if (statTotalOrders) statTotalOrders.textContent = totalOrders.toLocaleString('tr-TR');
   if (ordersBadgeCount) ordersBadgeCount.textContent = totalOrders;
 
-  // 1. Gerçek Satış Kanalları Dağılımını Hesapla
-  calculateRealSalesChannels();
+  // 1. Gerçek Ciro ve Sipariş Trendi Çizgi Grafiğini Çiz
+  renderRevenueTrendLineChart();
 
-  // 2. En Çok Satılan Ürünler Analitiği Grafiğini Çiz
-  renderTopProductsAnalyticsChart();
+  // 2. Gerçek En Çok Satılan Ürünler (Top 5) Sıralamasını Çiz
+  renderTopProductsRankingList();
 }
 
-function calculateRealSalesChannels() {
-  const channelList = document.getElementById('salesChannelList');
-  if (!channelList) return;
+let revenueTrendChartInstance = null;
 
-  const orders = state.orders || [];
-  let igCount = 0, igRevenue = 0;
-  let webCount = 0, webRevenue = 0;
-  let totalRevenue = 0;
-
-  orders.forEach(o => {
-    const qty = Number(o.quantity) || 1;
-    const price = Number(o.totalPrice) || (qty * 299);
-    totalRevenue += price;
-
-    if (o.senderId && String(o.senderId).trim() !== '') {
-      igCount++;
-      igRevenue += price;
-    } else {
-      webCount++;
-      webRevenue += price;
-    }
-  });
-
-  const safeTotalRev = totalRevenue > 0 ? totalRevenue : 1;
-  const igPercent = ((igRevenue / safeTotalRev) * 100).toFixed(1);
-  const webPercent = ((webRevenue / safeTotalRev) * 100).toFixed(1);
-
-  channelList.innerHTML = `
-    <div class="channel">
-        <div class="channel-icon"><i class="fa-brands fa-instagram" style="color:#e1306c; font-size:18px;"></i></div>
-        <div class="channel-info">
-            <strong>Instagram DM Otomasyonu (Gemini AI Bot)</strong>
-            <span>${igCount} Sipariş (₺${igRevenue.toLocaleString('tr-TR')} Ciro)</span>
-            <div class="progress"><div style="width:${igPercent}%; background:#e1306c;"></div></div>
-        </div>
-        <div class="channel-price">${igPercent}%</div>
-    </div>
-
-    <div class="channel" style="margin-top:14px;">
-        <div class="channel-icon"><i class="fa-solid fa-globe" style="color:#2563eb; font-size:18px;"></i></div>
-        <div class="channel-info">
-            <strong>Online Mağaza / Web Siparişleri</strong>
-            <span>${webCount} Sipariş (₺${webRevenue.toLocaleString('tr-TR')} Ciro)</span>
-            <div class="progress"><div style="width:${webPercent}%; background:#2563eb;"></div></div>
-        </div>
-        <div class="channel-price">${webPercent}%</div>
-    </div>
-  `;
-}
-
-let topProductsChartInstance = null;
-
-function renderTopProductsAnalyticsChart() {
-  const ctx = document.getElementById('topProductsChart');
+function renderRevenueTrendLineChart() {
+  const ctx = document.getElementById('revenueTrendChart');
   if (!ctx) return;
 
   const orders = state.orders || [];
-  const productSalesMap = {};
+  const dailyRevenueMap = {};
 
   orders.forEach(o => {
-    const code = (o.productCode || 'GENEL').toUpperCase();
+    let dateStr = 'Bugün';
+    if (o.createdAt) {
+      dateStr = String(o.createdAt).split('T')[0].split(' ')[0];
+    }
     const qty = Number(o.quantity) || 1;
     const price = Number(o.totalPrice) || (qty * 299);
 
-    if (!productSalesMap[code]) {
-      productSalesMap[code] = { code, qty: 0, revenue: 0 };
+    if (!dailyRevenueMap[dateStr]) {
+      dailyRevenueMap[dateStr] = 0;
     }
-    productSalesMap[code].qty += qty;
-    productSalesMap[code].revenue += price;
+    dailyRevenueMap[dateStr] += price;
   });
 
-  const sortedProducts = Object.values(productSalesMap).sort((a, b) => b.qty - a.qty).slice(0, 6);
+  let labels = Object.keys(dailyRevenueMap);
+  let revenues = Object.values(dailyRevenueMap);
 
-  if (sortedProducts.length === 0) {
-    sortedProducts.push({ code: 'HENÜZ SİPARİŞ YOK', qty: 0, revenue: 0 });
+  if (labels.length === 0) {
+    labels = ['10 Ağu', '11 Ağu', '12 Ağu', '13 Ağu', '14 Ağu'];
+    revenues = [0, 0, 0, 0, 0];
   }
 
-  const labels = sortedProducts.map(p => p.code);
-  const quantities = sortedProducts.map(p => p.qty);
-
-  if (topProductsChartInstance) {
-    topProductsChartInstance.destroy();
+  if (revenueTrendChartInstance) {
+    revenueTrendChartInstance.destroy();
   }
 
   if (window.Chart) {
-    topProductsChartInstance = new Chart(ctx, {
-      type: 'bar',
+    revenueTrendChartInstance = new Chart(ctx, {
+      type: 'line',
       data: {
         labels: labels,
         datasets: [{
-          label: 'Satılan Adet',
-          data: quantities,
-          backgroundColor: 'rgba(255, 153, 0, 0.85)',
+          label: 'Ciro (TL)',
+          data: revenues,
+          borderWidth: 2.5,
+          tension: 0.4,
+          fill: true,
+          backgroundColor: 'rgba(255, 153, 0, 0.1)',
           borderColor: '#ff9900',
-          borderWidth: 1.5,
-          borderRadius: 6
+          pointBackgroundColor: '#ff9900',
+          pointRadius: 3,
+          pointHoverRadius: 6
         }]
       },
       options: {
@@ -380,19 +335,78 @@ function renderTopProductsAnalyticsChart() {
           tooltip: {
             callbacks: {
               label: function(context) {
-                const item = sortedProducts[context.dataIndex];
-                return ` Satılan: ${item.qty} adet (Toplam Ciro: ₺${item.revenue.toLocaleString('tr-TR')})`;
+                return ` Ciro: ₺${Number(context.raw).toLocaleString('tr-TR')}`;
               }
             }
           }
         },
         scales: {
           x: { grid: { display: false }, ticks: { font: { size: 10, family: 'Inter' } } },
-          y: { grid: { color: '#f0f0f0' }, ticks: { precision: 0, font: { size: 10, family: 'Inter' } } }
+          y: {
+            grid: { color: '#f0f0f0' },
+            ticks: {
+              font: { size: 10, family: 'Inter' },
+              callback: function(value) { return '₺' + value.toLocaleString('tr-TR'); }
+            }
+          }
         }
       }
     });
   }
+}
+
+function renderTopProductsRankingList() {
+  const topList = document.getElementById('topProductsList');
+  if (!topList) return;
+
+  const orders = state.orders || [];
+  const productSalesMap = {};
+
+  orders.forEach(o => {
+    const code = (o.productCode || 'DİĞER').toUpperCase();
+    const name = o.productName || code;
+    const qty = Number(o.quantity) || 1;
+    const price = Number(o.totalPrice) || (qty * 299);
+
+    if (!productSalesMap[code]) {
+      productSalesMap[code] = { code, name, qty: 0, revenue: 0 };
+    }
+    productSalesMap[code].qty += qty;
+    productSalesMap[code].revenue += price;
+  });
+
+  const sortedProducts = Object.values(productSalesMap).sort((a, b) => b.qty - a.qty).slice(0, 5);
+
+  if (sortedProducts.length === 0) {
+    topList.innerHTML = `
+      <div style="text-align:center; padding:30px; color:#6b7280; font-size:12px;">
+        Henüz verilmiş bir sipariş bulunmuyor.
+      </div>
+    `;
+    return;
+  }
+
+  const maxQty = sortedProducts[0].qty || 1;
+
+  topList.innerHTML = sortedProducts.map((p, index) => {
+    const percent = Math.min(100, Math.round((p.qty / maxQty) * 100));
+    const colors = ['#ff9900', '#3b82f6', '#10b981', '#a855f7', '#64748b'];
+    const barColor = colors[index % colors.length];
+
+    return `
+      <div class="channel" style="margin-bottom:12px;">
+          <div class="channel-icon" style="background:${barColor}15; color:${barColor}; font-weight:800; font-size:12px;">
+              #${index + 1}
+          </div>
+          <div class="channel-info">
+              <strong>${escapeHtml(p.code)} - ${escapeHtml(p.name)}</strong>
+              <span>${p.qty} Adet Satıldı (₺${p.revenue.toLocaleString('tr-TR')} Ciro)</span>
+              <div class="progress"><div style="width:${percent}%; background:${barColor};"></div></div>
+          </div>
+          <div class="channel-price" style="color:${barColor}; font-weight:700;">${p.qty} Adet</div>
+      </div>
+    `;
+  }).join('');
 }
 
 // Render Products & Orders Tables
