@@ -53,6 +53,24 @@
             <span class="table-count" id="rewardsTableCount">0 Ödül Listelendi</span>
           </div>
           <div class="card-body">
+            <!-- Satıcı Hediye Verme Kontrol Kutusu -->
+            <div style="background: rgba(30, 41, 59, 0.7); border: 1px solid #334155; border-radius: 12px; padding: 1.25rem; margin-bottom: 1.5rem; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;">
+              <div>
+                <h4 style="margin: 0; color: #f8fafc; font-size: 1rem; display: flex; align-items: center; gap: 8px;">
+                  <i class="fa-solid fa-robot text-purple"></i> 🤖 Yapay Zeka (F.R.I.D.A.Y.) 2000 TL Otomatik VIP Ödülü Verilsin Mi?
+                </h4>
+                <p style="margin: 4px 0 0 0; color: #94a3b8; font-size: 0.85rem;">
+                  Kapalı ise yapay zeka kafasına göre otomatik hediye vermez. Sadece sizin panelden manuel tanımladığınız ödüller geçerli olur.
+                </p>
+              </div>
+              <div style="display: flex; align-items: center; gap: 10px;">
+                <span id="autoRewardStatusBadge" class="status-badge out-of-stock">KAPALI (Sadece Manuel)</span>
+                <button class="btn btn-sm btn-secondary" id="btnToggleAutoReward" type="button">
+                  <i class="fa-solid fa-toggle-off"></i> Ayarı Değiştir
+                </button>
+              </div>
+            </div>
+
             <form id="rewardForm">
               <div class="form-grid">
                 <div class="form-group">
@@ -78,10 +96,10 @@
             </form>
 
             <h4 style="margin-top:2.5rem; margin-bottom:1rem; color:#f8fafc;">
-              <i class="fa-solid fa-cart-shopping text-gold"></i> 📦 Sipariş Veren Müşteriler (Hızlı Ödül Seçici)
+              <i class="fa-solid fa-cart-shopping text-gold"></i> 📦 Sipariş Veren Müşteriler (Hızlı Ödül & Yönetim)
             </h4>
             <p style="color:#94a3b8; font-size:0.85rem; margin-bottom:1rem;">
-              Aşağıdaki sipariş veren müşterilerden birine tıklayarak Instagram ID'sini yukarıdaki ödül formuna otomatik aktarabilirsiniz.
+              Aşağıdaki sipariş veren müşterilerin Instagram ID'sini yukarıdaki ödüle aktarabilir veya sipariş kaydını silebilirsiniz.
             </p>
             <div class="table-responsive">
               <table class="data-table" id="rewardOrdersTable">
@@ -93,7 +111,7 @@
                     <th>TELEFON</th>
                     <th>SİPARİŞ TUTARI</th>
                     <th>TARİH</th>
-                    <th>Hızlı İşlem</th>
+                    <th>İşlemler</th>
                   </tr>
                 </thead>
                 <tbody id="rewardOrdersTableBody">

@@ -123,6 +123,9 @@ function setupEventListeners() {
         sendAdminChatMessage();
       }
     });
+  const btnToggleAutoReward = document.getElementById('btnToggleAutoReward');
+  if (btnToggleAutoReward) {
+    btnToggleAutoReward.addEventListener('click', toggleAutoRewardSetting);
   }
 }
 
@@ -190,6 +193,7 @@ async function fetchData() {
     state.isInitialLoad = false;
     updateMetrics();
     renderTables();
+    loadAutoRewardSetting();
     setSyncStatus('success', 'Live SQLite & Sheet Sync');
 
   } catch (error) {
@@ -353,9 +357,14 @@ function renderRewardOrdersTable() {
         <td>${priceDisplay}</td>
         <td><small class="text-muted">${escapeHtml(o.createdAt || '-')}</small></td>
         <td>
-          <button class="btn btn-sm btn-primary" onclick="event.stopPropagation(); selectOrderForReward('${escapeHtml(senderId)}')">
-            <i class="fa-solid fa-hand-pointer"></i> ID'yi Form'a Aktar
-          </button>
+          <div style="display:flex; gap:6px;">
+            <button class="btn btn-sm btn-primary" onclick="event.stopPropagation(); selectOrderForReward('${escapeHtml(senderId)}')">
+              <i class="fa-solid fa-hand-pointer"></i> Form'a Aktar
+            </button>
+            <button class="btn btn-sm btn-delete" onclick="event.stopPropagation(); deleteOrder('${escapeHtml(o.orderId)}')">
+              <i class="fa-solid fa-trash"></i> Sil
+            </button>
+          </div>
         </td>
       </tr>
     `;
@@ -1227,5 +1236,76 @@ async function sendAdminChatMessage() {
     showToast('AI Asistan bağlantı hatası.', 'error');
   } finally {
     if (sendBtn) sendBtn.disabled = false;
+  }
+}
+
+// Sipariş Silme (Tüm Panellerden)
+async function deleteOrder(orderId) {
+  if (!confirm(`Sipariş #${orderId} kaydını veritabanından silmek istediğinize emin misiniz?`)) return;
+
+  try {
+    const res = await fetch(`${API_BASE}/api/orders/delete`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ orderId })
+    });
+    const data = await res.json();
+    if (data.success) {
+      showToast(`🗑️ Sipariş #${orderId} başarıyla silindi.`, 'success');
+      fetchData();
+    } else {
+      showToast(`❌ Sipariş silinemedi: ${data.error || ''}`, 'error');
+    }
+  } catch (err) {
+    showToast('Sunucu hatası oluştu.', 'error');
+  }
+}
+
+// Auto VIP Reward Setting Toggle Engine
+async function loadAutoRewardSetting() {
+  const badge = document.getElementById('autoRewardStatusBadge');
+  const btn = document.getElementById('btnToggleAutoReward');
+  if (!badge || !btn) return;
+
+  try {
+    const res = await fetch(`${API_BASE}/api/settings`);
+    const data = await res.json();
+    if (data.success && data.settings) {
+      const val = data.settings.auto_vip_reward_enabled;
+      const isEnabled = val === '1' || val === 'true';
+
+      if (isEnabled) {
+        badge.className = 'status-badge in-stock';
+        badge.innerHTML = '<i class="fa-solid fa-circle text-green" style="font-size:8px;"></i> AÇIK (Yapay Zeka Verir)';
+        btn.innerHTML = '<i class="fa-solid fa-toggle-on text-green"></i> Kapat (Manuel Yap)';
+      } else {
+        badge.className = 'status-badge out-of-stock';
+        badge.textContent = 'KAPALI (Sadece Manuel)';
+        btn.innerHTML = '<i class="fa-solid fa-toggle-off"></i> Aç (Yapay Zekaya Ver)';
+      }
+    }
+  } catch (e) {}
+}
+
+async function toggleAutoRewardSetting() {
+  const badge = document.getElementById('autoRewardStatusBadge');
+  if (!badge) return;
+
+  const currentlyEnabled = badge.textContent.includes('AÇIK');
+  const newValue = currentlyEnabled ? '0' : '1';
+
+  try {
+    const res = await fetch(`${API_BASE}/api/settings`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ key: 'auto_vip_reward_enabled', value: newValue })
+    });
+    const data = await res.json();
+    if (data.success) {
+      showToast(`✅ Otomatik VIP Ödülü ayarı ${newValue === '1' ? 'AÇILDI' : 'KAPATILDI (Sadece Satıcı Manuel Ekler)'}`, 'success');
+      loadAutoRewardSetting();
+    }
+  } catch (e) {
+    showToast('Ayar değiştirilemedi.', 'error');
   }
 }

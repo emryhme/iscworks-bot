@@ -266,9 +266,11 @@ Yalnızca aşağıdaki JSON yapısını döndür (bilinmeyen alanlar için null 
                         }
                     }
                     const totalPrice = Math.max(0, subtotal + shippingFee - discount);
-                    // 2. Bu sipariş 2000 TL ve üzeri ise, Müşterinin Instagram ID'sine BIR DAHA Kİ SİPARİŞİ İÇİN %20 İNDİRİM HAKKI TANIMLA!
+                    // 2. Satıcı İzni Varsa (auto_vip_reward_enabled === '1') ve Sipariş Tutarı Eşik Değeri Geçtiyse Otomatik Ödül Tanımla!
                     let earnedNewLoyaltyReward = false;
-                    if (subtotal >= loyaltyThreshold) {
+                    const autoVipSetting = db_1.db.prepare("SELECT value FROM settings WHERE key = 'auto_vip_reward_enabled'").get();
+                    const isAutoVipEnabled = autoVipSetting && (autoVipSetting.value === '1' || autoVipSetting.value === 'true');
+                    if (isAutoVipEnabled && subtotal >= loyaltyThreshold) {
                         // Müşteriye yeni VIP Ödülü ver (Ödül Kodu: YINEBEKLERIZ)
                         const rewardCode = 'YINEBEKLERIZ';
                         db_1.db.prepare(`
