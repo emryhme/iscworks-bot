@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>CommerceOS — VIP Ödüller & Sadakat</title>
+  <title>BARON'S SILLAGE — VIP Sadakat Ödülleri</title>
 
   <script src="https://unpkg.com/lucide@latest"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -17,9 +17,9 @@
 <aside class="sidebar" id="sidebar">
     <a href="index.html" class="logo">
         <div class="logo-mark">
-            <i data-lucide="shopping-bag" size="18"></i>
+            <i data-lucide="crown" size="20"></i>
         </div>
-        Commerce<span>OS</span>
+        BARON'S<span> SILLAGE</span>
     </a>
 
     <div class="section-title">ANA MENÜ</div>
@@ -36,8 +36,8 @@
     </a>
 
     <a href="new-product.html" class="nav-item">
-        <i data-lucide="package"></i>
-        Yeni Ürün Ekle
+        <i data-lucide="package-plus"></i>
+        Yeni Ürün Girişi
     </a>
 
     <a href="campaigns.html" class="nav-item">
@@ -46,11 +46,11 @@
     </a>
 
     <a href="rewards.html" class="nav-item active">
-        <i data-lucide="star"></i>
+        <i data-lucide="gift"></i>
         VIP Ödüller
     </a>
 
-    <div class="section-title">YÖNETİM & AI</div>
+    <div class="section-title">AI & MAĞAZA YÖNETİMİ</div>
 
     <a href="ai-product.html" class="nav-item">
         <i data-lucide="sparkles"></i>
@@ -59,15 +59,15 @@
 
     <a href="settings.html" class="nav-item">
         <i data-lucide="settings"></i>
-        Ayarlar & Kargo
+        Fiyat & Kargo Ayarları
     </a>
 
     <div class="sidebar-bottom">
         <div class="store-card">
-            <div class="store-avatar">N</div>
+            <div class="store-avatar">B</div>
             <div class="store-info">
-                <strong>Nova Store</strong>
-                <small>BARON'S SILLAGE</small>
+                <strong>BARON'S SILLAGE</strong>
+                <small>Enterprise Admin Console</small>
             </div>
             <i data-lucide="chevron-down" size="15" style="margin-left:auto;color:#9ca3af"></i>
         </div>
@@ -86,13 +86,13 @@
 
             <div class="search">
                 <i data-lucide="search" size="15"></i>
-                <input type="text" placeholder="Müşteri veya ödül kodu ara...">
+                <input type="text" placeholder="Müşteri ID veya ödül kodu ara...">
                 <span style="font-size:9px;color:#9ca3af">⌘ K</span>
             </div>
         </div>
 
         <div class="top-actions">
-            <div class="sync-badge" id="syncStatusBadge" style="margin-right:10px;">
+            <div class="sync-badge" id="syncStatusBadge" style="margin-right:8px;">
                 <span class="pulse-dot"></span>
                 <span>Live SQLite & Sheet Sync</span>
             </div>
@@ -107,10 +107,10 @@
             </button>
 
             <div class="user">
-                <div class="avatar">EM</div>
+                <div class="avatar">TS</div>
                 <div class="user-text">
-                    <strong>Emre İşcenkal</strong>
-                    <span>Administrator</span>
+                    <strong>Tony Stark</strong>
+                    <span>Mağaza Sahibi (Patron)</span>
                 </div>
                 <i data-lucide="chevron-down" size="13"></i>
             </div>
@@ -128,7 +128,7 @@
 
             <div class="header-actions">
                 <div style="display:flex; align-items:center; gap:10px; background:white; padding:8px 14px; border:1px solid #e5e7eb; border-radius:8px;">
-                    <span style="font-size:11px; font-weight:600;">2000 TL Yapay Zeka Oto-Ödül:</span>
+                    <span style="font-size:11px; font-weight:600; color:#374151;">2000 TL Yapay Zeka Oto-Ödül:</span>
                     <span class="status-badge out-of-stock" id="autoRewardStatusBadge">KAPALI (Sadece Manuel)</span>
                     <button class="btn btn-primary btn-sm" id="btnToggleAutoReward" onclick="toggleAutoRewardSetting()">
                         Aç / Kapat
@@ -140,7 +140,7 @@
         <!-- FORM CARD -->
         <div class="card table-card">
             <div class="table-header">
-                <div class="table-title">💎 Özel VIP Sadakat Ödülü Tanımla & DM Gönder</div>
+                <div class="table-title">💎 Özel VIP Sadakat Ödülü Tanımla & Instagram DM Gönder</div>
             </div>
 
             <form id="rewardForm">
@@ -175,10 +175,10 @@
             </form>
         </div>
 
-        <!-- RECENT ORDERS FOR REWARD SELECTION -->
+        <!-- RECENT ORDERS FOR REWARD SELECTION & DELETION -->
         <div class="card table-card">
             <div class="table-header">
-                <div class="table-title">🛍️ Son Sipariş Veren Müşteriler (Hızlı Ödül & Silme)</div>
+                <div class="table-title">🛍️ Son Sipariş Veren Müşteriler (Hızlı Form'a Aktarma & Sipariş Silme)</div>
             </div>
 
             <div class="table-responsive">

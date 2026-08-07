@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>CommerceOS — F.R.I.D.A.Y. AI Copilot</title>
+  <title>BARON'S SILLAGE — F.R.I.D.A.Y. AI Copilot</title>
 
   <script src="https://unpkg.com/lucide@latest"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -17,9 +17,9 @@
 <aside class="sidebar" id="sidebar">
     <a href="index.html" class="logo">
         <div class="logo-mark">
-            <i data-lucide="shopping-bag" size="18"></i>
+            <i data-lucide="crown" size="20"></i>
         </div>
-        Commerce<span>OS</span>
+        BARON'S<span> SILLAGE</span>
     </a>
 
     <div class="section-title">ANA MENÜ</div>
@@ -36,8 +36,8 @@
     </a>
 
     <a href="new-product.html" class="nav-item">
-        <i data-lucide="package"></i>
-        Yeni Ürün Ekle
+        <i data-lucide="package-plus"></i>
+        Yeni Ürün Girişi
     </a>
 
     <a href="campaigns.html" class="nav-item">
@@ -46,11 +46,11 @@
     </a>
 
     <a href="rewards.html" class="nav-item">
-        <i data-lucide="star"></i>
+        <i data-lucide="gift"></i>
         VIP Ödüller
     </a>
 
-    <div class="section-title">YÖNETİM & AI</div>
+    <div class="section-title">AI & MAĞAZA YÖNETİMİ</div>
 
     <a href="ai-product.html" class="nav-item active">
         <i data-lucide="sparkles"></i>
@@ -59,15 +59,15 @@
 
     <a href="settings.html" class="nav-item">
         <i data-lucide="settings"></i>
-        Ayarlar & Kargo
+        Fiyat & Kargo Ayarları
     </a>
 
     <div class="sidebar-bottom">
         <div class="store-card">
-            <div class="store-avatar">N</div>
+            <div class="store-avatar">B</div>
             <div class="store-info">
-                <strong>Nova Store</strong>
-                <small>BARON'S SILLAGE</small>
+                <strong>BARON'S SILLAGE</strong>
+                <small>Enterprise Admin Console</small>
             </div>
             <i data-lucide="chevron-down" size="15" style="margin-left:auto;color:#9ca3af"></i>
         </div>
@@ -92,9 +92,9 @@
         </div>
 
         <div class="top-actions">
-            <div class="sync-badge" id="syncStatusBadge" style="margin-right:10px;">
+            <div class="sync-badge" id="syncStatusBadge" style="margin-right:8px;">
                 <span class="pulse-dot"></span>
-                <span>Gemini AI Active</span>
+                <span>Gemini AI Engine Active</span>
             </div>
 
             <button class="icon-button" id="btnToggleSound" title="Bildirim Sesleri">
@@ -107,10 +107,10 @@
             </button>
 
             <div class="user">
-                <div class="avatar">EM</div>
+                <div class="avatar">TS</div>
                 <div class="user-text">
-                    <strong>Emre İşcenkal</strong>
-                    <span>Administrator</span>
+                    <strong>Tony Stark</strong>
+                    <span>Mağaza Sahibi (Patron)</span>
                 </div>
                 <i data-lucide="chevron-down" size="13"></i>
             </div>
@@ -123,7 +123,7 @@
         <div class="page-header">
             <div class="page-title">
                 <h1>F.R.I.D.A.Y. AI Yönetim Asistanı</h1>
-                <p>Yapay zeka ile stok düzenleyin, fiyat güncelleyin, ürün ekleyin ve canlı sipariş sorgulayın.</p>
+                <p>Doğal Türkçe cümlelerle stok düzenleyin, fiyat güncelleyin, yeni ürün ekleyin veya sipariş sorgulayın.</p>
             </div>
         </div>
 
@@ -135,15 +135,15 @@
 
             <div style="padding:20px;">
                 <!-- Chat Message Window -->
-                <div id="aiAdminChatWindow" style="height:380px; overflow-y:auto; border:1px solid #e5e7eb; background:#f9fafb; border-radius:10px; padding:1.25rem; display:flex; flex-direction:column; gap:12px; margin-bottom:1.25rem;">
+                <div id="aiAdminChatWindow" style="height:400px; overflow-y:auto; border:1px solid #e5e7eb; background:#f9fafb; border-radius:10px; padding:1.25rem; display:flex; flex-direction:column; gap:12px; margin-bottom:1.25rem;">
                     <!-- Friday Intro Bubble -->
                     <div style="display:flex; gap:10px; align-items:flex-start;">
                         <div style="width:36px; height:36px; border-radius:50%; background:#111827; display:flex; align-items:center; justify-content:center; color:#ff9900; font-size:16px;">
                             <i class="fa-solid fa-robot"></i>
                         </div>
                         <div style="background:#ffffff; color:#111827; padding:0.85rem 1.1rem; border-radius:12px; border-top-left-radius:2px; max-width:80%; font-size:0.92rem; line-height:1.5; border:1px solid #e5e7eb; box-shadow:0 2px 8px rgba(0,0,0,0.04);">
-                            Merhaba Patron! Ben F.R.I.D.A.Y. 🤖<br>
-                            Mağazanızdaki stokları güncellemek, fiyat değiştirmek, siparişleri sorgulamak veya veritabanındaki ürünleri listelemek için bana emredebilirsiniz. Size nasıl yardımcı olabilirim?
+                            Merhaba Tony Stark (Patron)! Ben F.R.I.D.A.Y. 🤖<br>
+                            Mağazanızdaki stokları güncellemek, fiyat değiştirmek, siparişleri sorgulamak veya veritabanındaki ürünleri listelemek için bana doğrudan yazabilirsiniz. Size nasıl yardımcı olabilirim?
                         </div>
                     </div>
                 </div>

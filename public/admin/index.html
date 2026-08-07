@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>CommerceOS — Mağaza & Stok Dashboard</title>
+  <title>BARON'S SILLAGE — CommerceOS Engine</title>
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script src="https://unpkg.com/lucide@latest"></script>
@@ -19,9 +19,9 @@
 <aside class="sidebar" id="sidebar">
     <a href="index.html" class="logo">
         <div class="logo-mark">
-            <i data-lucide="shopping-bag" size="18"></i>
+            <i data-lucide="crown" size="20"></i>
         </div>
-        Commerce<span>OS</span>
+        BARON'S<span> SILLAGE</span>
     </a>
 
     <div class="section-title">ANA MENÜ</div>
@@ -38,8 +38,8 @@
     </a>
 
     <a href="new-product.html" class="nav-item">
-        <i data-lucide="package"></i>
-        Yeni Ürün Ekle
+        <i data-lucide="package-plus"></i>
+        Yeni Ürün Girişi
     </a>
 
     <a href="campaigns.html" class="nav-item">
@@ -48,11 +48,11 @@
     </a>
 
     <a href="rewards.html" class="nav-item">
-        <i data-lucide="star"></i>
+        <i data-lucide="gift"></i>
         VIP Ödüller
     </a>
 
-    <div class="section-title">YÖNETİM & AI</div>
+    <div class="section-title">AI & MAĞAZA YÖNETİMİ</div>
 
     <a href="ai-product.html" class="nav-item">
         <i data-lucide="sparkles"></i>
@@ -61,15 +61,15 @@
 
     <a href="settings.html" class="nav-item">
         <i data-lucide="settings"></i>
-        Ayarlar & Kargo
+        Fiyat & Kargo Ayarları
     </a>
 
     <div class="sidebar-bottom">
         <div class="store-card">
-            <div class="store-avatar">N</div>
+            <div class="store-avatar">B</div>
             <div class="store-info">
-                <strong>Nova Store</strong>
-                <small>BARON'S SILLAGE</small>
+                <strong>BARON'S SILLAGE</strong>
+                <small>Enterprise Admin Console</small>
             </div>
             <i data-lucide="chevron-down" size="15" style="margin-left:auto;color:#9ca3af"></i>
         </div>
@@ -88,18 +88,18 @@
 
             <div class="search">
                 <i data-lucide="search" size="15"></i>
-                <input type="text" id="searchInput" placeholder="Sipariş, ürün kodu veya müşteri ara...">
+                <input type="text" id="searchInput" placeholder="Ürün kodu, ismi, rengi veya sipariş no ara...">
                 <span style="font-size:9px;color:#9ca3af">⌘ K</span>
             </div>
         </div>
 
         <div class="top-actions">
-            <div class="sync-badge" id="syncStatusBadge" style="margin-right:10px;">
+            <div class="sync-badge" id="syncStatusBadge" style="margin-right:8px;">
                 <span class="pulse-dot"></span>
                 <span>Live SQLite & Sheet Sync</span>
             </div>
 
-            <button class="icon-button" id="btnToggleSound" title="Bildirim Sesleri">
+            <button class="icon-button" id="btnToggleSound" title="Bildirim Seslerini Aç/Kapat">
                 <i data-lucide="bell" size="17"></i>
                 <span class="notification-dot"></span>
             </button>
@@ -109,10 +109,10 @@
             </button>
 
             <div class="user">
-                <div class="avatar">EM</div>
+                <div class="avatar">TS</div>
                 <div class="user-text">
-                    <strong>Emre İşcenkal</strong>
-                    <span>Administrator</span>
+                    <strong>Tony Stark</strong>
+                    <span>Mağaza Sahibi (Patron)</span>
                 </div>
                 <i data-lucide="chevron-down" size="13"></i>
             </div>
@@ -124,30 +124,30 @@
 
         <div class="page-header">
             <div class="page-title">
-                <h1>Dashboard & Stok Yönetimi</h1>
-                <p>Mağazanızın canlı performansına ve stok verilerine genel bakış.</p>
+                <h1>Mağaza & Stok Dashboard</h1>
+                <p>Google Sheet ve SQLite verileriyle canlı senkronize çalışan yönetim konsolu.</p>
             </div>
 
             <div class="header-actions">
                 <button class="btn" id="btnSaveAllPricesAndStocks" onclick="saveAllPricesAndStocks()">
                     <i data-lucide="save" size="14"></i>
-                    Toplu Kaydet
+                    Değişiklikleri Toplu Kaydet
                 </button>
 
                 <a href="ai-product.html" class="btn btn-primary">
                     <i data-lucide="sparkles" size="14"></i>
-                    AI Copilot Destek Al
+                    Gemini AI Destek Al
                 </a>
             </div>
         </div>
 
-        <!-- KPI -->
+        <!-- KPI GRID -->
         <div class="kpi-grid">
             <div class="card kpi">
                 <div class="kpi-top">
                     <span class="kpi-label">TOPLAM ÜRÜN KODU</span>
                     <div class="kpi-icon orange">
-                        <i data-lucide="package" size="16"></i>
+                        <i data-lucide="boxes" size="16"></i>
                     </div>
                 </div>
                 <div class="kpi-value" id="statTotalProducts">--</div>
@@ -161,13 +161,13 @@
                 <div class="kpi-top">
                     <span class="kpi-label">TOPLAM STOK ADEDİ</span>
                     <div class="kpi-icon blue">
-                        <i data-lucide="boxes" size="16"></i>
+                        <i data-lucide="package" size="16"></i>
                     </div>
                 </div>
                 <div class="kpi-value" id="statTotalStock">--</div>
                 <div class="kpi-bottom">
                     <span class="up">↑ Anlık Adet</span>
-                    <span class="muted">depo durumu</span>
+                    <span class="muted">depo miktarı</span>
                 </div>
             </div>
 
@@ -181,32 +181,32 @@
                 <div class="kpi-value" id="statTotalOrders">--</div>
                 <div class="kpi-bottom">
                     <span class="up">↑ Live Satışlar</span>
-                    <span class="muted">sipariş kaydı</span>
+                    <span class="muted">tamamlanan & beklemede</span>
                 </div>
             </div>
 
             <div class="card kpi">
                 <div class="kpi-top">
-                    <span class="kpi-label">YAPAY ZEKA İŞLEMİ</span>
+                    <span class="kpi-label">YAPAY ZEKA ASİSTANI</span>
                     <div class="kpi-icon purple">
-                        <i data-lucide="sparkles" size="16"></i>
+                        <i data-lucide="bot" size="16"></i>
                     </div>
                 </div>
                 <div class="kpi-value">F.R.I.D.A.Y.</div>
                 <div class="kpi-bottom">
                     <span class="up">✓ 7/24 Aktif</span>
-                    <span class="muted">AI asistanı</span>
+                    <span class="muted">yönetim copilotu</span>
                 </div>
             </div>
         </div>
 
-        <!-- CHARTS -->
+        <!-- CHARTS & CHANNELS -->
         <div class="grid-main">
             <div class="card chart-card">
                 <div class="card-header">
                     <div>
-                        <div class="card-title">Satış Performansı</div>
-                        <div class="card-subtitle">Son 30 günlük satış ve sipariş trendi</div>
+                        <div class="card-title">Satış Performansı & Sipariş Trendi</div>
+                        <div class="card-subtitle">Son 30 günlük mağaza ciro ve sipariş akışı</div>
                     </div>
                     <select class="select">
                         <option>Son 30 gün</option>
@@ -222,47 +222,47 @@
             <div class="card chart-card">
                 <div class="card-header">
                     <div>
-                        <div class="card-title">Satış Kanalları</div>
-                        <div class="card-subtitle">Kanallara göre gelir dağılımı</div>
+                        <div class="card-title">Satış Kanalları Dağılımı</div>
+                        <div class="card-subtitle">Siparişlerin geldiği kanallar</div>
                     </div>
                 </div>
                 <div class="channel-list">
                     <div class="channel">
                         <div class="channel-icon"><i data-lucide="instagram" size="16"></i></div>
                         <div class="channel-info">
-                            <strong>Instagram DM Bot</strong>
-                            <span>Canlı Sipariş & AI</span>
-                            <div class="progress"><div style="width:76%"></div></div>
+                            <strong>Instagram DM Otomasyonu</strong>
+                            <span>Gemini AI Bot Siparişleri</span>
+                            <div class="progress"><div style="width:78%"></div></div>
                         </div>
-                        <div class="channel-price">76.4%</div>
+                        <div class="channel-price">78.0%</div>
                     </div>
                     <div class="channel">
                         <div class="channel-icon"><i data-lucide="globe" size="16"></i></div>
                         <div class="channel-info">
-                            <strong>Online Mağaza</strong>
-                            <span>Web Siparişleri</span>
-                            <div class="progress"><div style="width:45%"></div></div>
+                            <strong>Online Mağaza / Web</strong>
+                            <span>Direkt Siparişler</span>
+                            <div class="progress"><div style="width:16%"></div></div>
                         </div>
-                        <div class="channel-price">18.0%</div>
+                        <div class="channel-price">16.0%</div>
                     </div>
                     <div class="channel">
-                        <div class="channel-icon"><i data-lucide="store" size="16"></i></div>
+                        <div class="channel-icon"><i data-lucide="gift" size="16"></i></div>
                         <div class="channel-info">
-                            <strong>Manuel Satıcı Tanımları</strong>
-                            <span>VIP Ödül & Form</span>
-                            <div class="progress"><div style="width:27%"></div></div>
+                            <strong>VIP Sadakat & Formlar</strong>
+                            <span>Özel Müşteri Tanımları</span>
+                            <div class="progress"><div style="width:6%"></div></div>
                         </div>
-                        <div class="channel-price">5.6%</div>
+                        <div class="channel-price">6.0%</div>
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- PRODUCTS TABLE -->
+        <!-- LIVE STOCKS TABLE -->
         <div class="card table-card">
             <div class="table-header">
                 <div>
-                    <div class="table-title">Ürün & Stok Yönetimi</div>
+                    <div class="table-title">Google Sheet Stok & Ürün Listesi (Canlı Düzenlenebilir)</div>
                     <span style="font-size:10px;color:#6b7280;" id="productsTableCount">0 ürün listelendi</span>
                 </div>
                 <button class="btn btn-primary btn-sm" onclick="saveAllPricesAndStocks()">
@@ -288,7 +288,7 @@
                     <tbody id="productsTableBody">
                         <tr>
                             <td colspan="9" style="text-align:center;padding:40px;color:#6b7280;">
-                                Stok verileri yükleniyor...
+                                Stok verileri SQLite ve Google Sheet ile senkronize ediliyor...
                             </td>
                         </tr>
                     </tbody>
@@ -319,7 +319,7 @@
             datasets:[
                 {
                     label:"Satış (TL)",
-                    data:[9200,14200,12600,16500,19400,24100,26700,28900],
+                    data:[11200,15400,13600,18500,21400,26100,29700,32900],
                     borderWidth:2,
                     tension:.4,
                     fill:true,
