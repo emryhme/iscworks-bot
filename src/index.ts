@@ -1,0 +1,278 @@
+import express from 'express';
+import { env } from './config/env';
+import { WebhookController } from './controllers/webhook.controller';
+import { OrderService } from './services/order.service';
+import { StockService } from './services/stock.service';
+
+import path from 'path';
+import axios from 'axios';
+import { AIService } from './services/ai.service';
+import { GeminiService } from './services/gemini.service';
+import { extractProductCode } from './utils/regex.util';
+
+const app = express();
+
+// CORS Middleware
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, bypass-tunnel-reminder');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.header('Bypass-Tunnel-Reminder', 'true');
+  if (req.method === 'OPTIONS') {
+    return res.sendStatus(200);
+  }
+  next();
+});
+
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+app.use(express.static(path.join(__dirname, '../public')));
+
+// Admin Panel Statik Dosyaları Sun
+const adminPanelPath = path.resolve(process.cwd(), '../admin-panel');
+app.use('/admin', express.static(adminPanelPath));
+
+// Web Chat & Simulator API End-point'i
+app.post('/api/chat', async (req, res) => {
+  const { senderId, message } = req.body;
+  if (!senderId || !message) {
+    return res.status(400).json({ error: 'senderId and message required' });
+  }
+
+  const result = await AIService.processMessage(senderId, message);
+  res.json({ success: true, reply: result.reply, tokens: result.tokens });
+});
+
+// n8n Entegrasyon Uç Noktası (Instagram Meta -> n8n -> Backend)
+app.post('/api/n8n/chat', async (req, res) => {
+  try {
+    const { senderId, message, attachmentTitle, callbackUrl } = req.body;
+    if (!senderId) {
+      return res.status(400).json({ success: false, error: 'senderId parametresi zorunludur' });
+    }
+
+    let finalMessage = message || '';
+    if (attachmentTitle) {
+      const extractedCode = extractProductCode(attachmentTitle);
+      if (extractedCode) {
+        finalMessage = `${extractedCode}\n\nMüşteri bu ürünü sipariş etmek istiyor. Lütfen ürünün stok durumunu, beden seçeneklerini kontrol ederek müşteriye yardımcı ol.`;
+      }
+    }
+
+    if (!finalMessage) {
+      return res.status(400).json({ success: false, error: 'message veya attachmentTitle parametresi zorunludur' });
+    }
+
+    // Eğer callbackUrl verilmişse (Asenkron Webhook Modu)
+    if (callbackUrl) {
+      res.json({ success: true, status: 'processing', message: 'Yanıt hazırlanıyor, Webhook adresine yollanacak.' });
+
+      // Arka planda AI yanıtını üretip Webhook'a yolla
+      AIService.processMessage(senderId, finalMessage).then(result => {
+        axios.post(callbackUrl, {
+          success: true,
+          senderId,
+          reply: result.reply,
+          tokens: result.tokens
+        }).catch((err: any) => console.error('[Webhook Callback Error]:', err.message));
+      }).catch((err: any) => console.error('[AI Processing Error]:', err.message));
+
+      return;
+    }
+
+    // Senkron Yanıt Modu (Standart)
+    const result = await AIService.processMessage(senderId, finalMessage);
+    res.json({
+      success: true,
+      senderId,
+      reply: result.reply,
+      tokens: result.tokens
+    });
+  } catch (err: any) {
+    console.error('[API /api/n8n/chat Error]:', err);
+    res.status(500).json({ success: false, error: err.message || 'Sunucu hatası' });
+  }
+});
+
+// Webhook End-point'leri
+app.get('/webhook/instagram', WebhookController.verifyWebhook);
+app.post('/webhook/instagram', WebhookController.handleWebhook);
+
+// Admin API End-point'leri (Siparişleri Görme & Stok Listesi)
+app.get('/api/orders', async (req, res) => {
+  const orders = await OrderService.getOrders();
+  res.json({ success: true, count: orders.length, orders });
+});
+
+app.get('/api/stocks', async (req, res) => {
+  const stocks = await StockService.getAllProducts();
+  res.json({ success: true, stocks });
+});
+
+app.get('/api/stock/:code', async (req, res) => {
+  const result = await StockService.checkStock(req.params.code);
+  res.json(result);
+});
+
+// Yeni Ürün Ekleme (Google Sheet Senkronizasyonu)
+app.post('/api/products', async (req, res) => {
+  try {
+    const { shortCode, productCode, name, color, size, stock, category } = req.body;
+    if (!shortCode || !name || !size) {
+      return res.status(400).json({ success: false, error: 'Kısa kod, ürün ismi ve numara alanları zorunludur' });
+    }
+
+    const result = await StockService.addProduct({
+      shortCode,
+      productCode,
+      name,
+      color,
+      size,
+      stock: stock ? Number(stock) : 0,
+      category
+    });
+
+    if (result.success) {
+      res.json({
+        success: true,
+        message: 'Ürün Google Sheets stok tablosuna başarıyla kaydedildi!',
+        productCode: result.productCode
+      });
+    } else {
+      res.status(500).json({ success: false, error: 'Google Sheets stok tablosuna kaydedilemedi' });
+    }
+  } catch (err: any) {
+    console.error('[API /api/products Error]:', err);
+    res.status(500).json({ success: false, error: err.message || 'Sunucu hatası' });
+  }
+});
+
+// Sipariş Onay / Red İşlemi (Google Sheet DURUM = OK veya DEC güncellemesi)
+app.post('/api/orders/status', async (req, res) => {
+  try {
+    const { orderId, status } = req.body;
+    if (!orderId || !status || (status !== 'OK' && status !== 'DEC')) {
+      return res.status(400).json({ success: false, error: 'orderId ve geçerli bir status (OK veya DEC) gereklidir' });
+    }
+
+    const success = await OrderService.updateOrderStatus(orderId, status);
+    if (success) {
+      res.json({
+        success: true,
+        message: `Sipariş ${orderId} durumu '${status}' olarak Google Sheets'e kaydedildi.`,
+        orderId,
+        status
+      });
+    } else {
+      res.status(500).json({ success: false, error: 'Sipariş durumu Google Sheets üzerinde güncellenemedi.' });
+    }
+  } catch (err: any) {
+    console.error('[API /api/orders/status Error]:', err);
+    res.status(500).json({ success: false, error: err.message || 'Sunucu hatası' });
+  }
+});
+
+// Ürün Silme API
+app.post('/api/products/delete', async (req, res) => {
+  try {
+    const { productCode } = req.body;
+    if (!productCode) {
+      return res.status(400).json({ success: false, error: 'productCode parametresi gereklidir' });
+    }
+
+    const success = await StockService.deleteProduct(productCode);
+    if (success) {
+      res.json({ success: true, message: `Ürün (${productCode}) Google Sheets stok tablosundan silindi.` });
+    } else {
+      res.status(500).json({ success: false, error: 'Ürün Google Sheets stok tablosundan silinemedi.' });
+    }
+  } catch (err: any) {
+    console.error('[API /api/products/delete Error]:', err);
+    res.status(500).json({ success: false, error: err.message || 'Sunucu hatası' });
+  }
+});
+
+// Sipariş Silme API
+app.post('/api/orders/delete', async (req, res) => {
+  try {
+    const { orderId } = req.body;
+    if (!orderId) {
+      return res.status(400).json({ success: false, error: 'orderId parametresi gereklidir' });
+    }
+
+    const success = await OrderService.deleteOrder(orderId);
+    if (success) {
+      res.json({ success: true, message: `Sipariş (${orderId}) Google Sheets siparişler tablosundan silindi.` });
+    } else {
+      res.status(500).json({ success: false, error: 'Sipariş Google Sheets siparişler tablosundan silinemedi.' });
+    }
+  } catch (err: any) {
+    console.error('[API /api/orders/delete Error]:', err);
+    res.status(500).json({ success: false, error: err.message || 'Sunucu hatası' });
+  }
+});
+
+// Ürün Stok Güncelleme API
+app.post('/api/products/update-stock', async (req, res) => {
+  try {
+    const { productCode, newStock } = req.body;
+    if (!productCode || newStock === undefined || newStock === null) {
+      return res.status(400).json({ success: false, error: 'productCode ve newStock parametreleri gereklidir' });
+    }
+
+    const success = await StockService.updateStock(productCode, Number(newStock));
+    if (success) {
+      res.json({ success: true, message: `Ürün (${productCode}) stoğu ${newStock} olarak güncellendi.`, productCode, newStock: Number(newStock) });
+    } else {
+      res.status(500).json({ success: false, error: 'Ürün stoğu Google Sheets üzerinde güncellenemedi.' });
+    }
+  } catch (err: any) {
+    console.error('[API /api/products/update-stock Error]:', err);
+    res.status(500).json({ success: false, error: err.message || 'Sunucu hatası' });
+  }
+});
+
+// Google Gemini AI İle Akıllı Ürün Ekleme API (Çoklu Beden / Batch Destekli)
+app.post('/api/ai/create-product', async (req, res) => {
+  try {
+    const { prompt } = req.body;
+    if (!prompt || typeof prompt !== 'string' || prompt.trim() === '') {
+      return res.status(400).json({ success: false, error: 'Lütfen ürün komut metni giriniz.' });
+    }
+
+    const result = await GeminiService.createProductFromPrompt(prompt.trim());
+    if (result.success && result.products && result.products.length > 0) {
+      res.json({
+        success: true,
+        message: result.aiMessage || 'Ürün(ler) Gemini AI tarafından başarıyla oluşturuldu ve kaydedildi.',
+        products: result.products,
+        product: result.products[0]
+      });
+    } else {
+      res.status(500).json({ success: false, error: result.error || 'Gemini AI ile ürün oluşturulamadı.' });
+    }
+  } catch (err: any) {
+    console.error('[API /api/ai/create-product Error]:', err);
+    res.status(500).json({ success: false, error: err.message || 'Yapay zeka sunucu hatası' });
+  }
+});
+
+import { initDatabase } from './database/db';
+
+// Veritabanını Başlat (SQLite Migration & Seed)
+initDatabase();
+
+// Sunucuyu Başlat
+app.listen(env.port, () => {
+  console.log(`
+  🚀 iscworks bot - Enterprise AI Backend Sunucusu Başlatıldı!
+  -------------------------------------------------------------
+  🤖 Sistem Adı: iscworks bot
+  🌐 Port: ${env.port}
+  🗄️ Database: SQLite (barons.db)
+  📩 n8n Cloud API: http://localhost:${env.port}/api/n8n/chat
+  📊 Admin API: http://localhost:${env.port}/api/orders
+  🎛️ Admin Panel: http://localhost:${env.port}/admin
+  -------------------------------------------------------------
+  `);
+});
