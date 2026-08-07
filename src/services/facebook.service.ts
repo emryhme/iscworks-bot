@@ -15,15 +15,11 @@ export class FacebookService {
       return false;
     }
 
-    // Metin temizliği (satır sonu & fazla boşluk)
-    const sanitizedText = text
-      .trim()
-      .replace(/[ \t]+/g, ' ')
-      .replace(/\n+/g, '\n');
+    const sanitizedText = text ? text.trim() : '';
 
     try {
-      const url = `https://graph.facebook.com/v21.0/me/messages`;
-      await axios.post(
+      const url = `https://graph.facebook.com/v21.0/me/messages?access_token=${encodeURIComponent(env.fbPageAccessToken)}`;
+      const res = await axios.post(
         url,
         {
           recipient: { id: recipientId },
@@ -36,10 +32,11 @@ export class FacebookService {
           }
         }
       );
-      console.log(`[FacebookService] 📤 Mesaj başarıyla gönderildi -> ${recipientId}`);
+      console.log(`[FacebookService] 📤 Mesaj başarıyla gönderildi -> ${recipientId} (Status: ${res.status})`);
       return true;
     } catch (error: any) {
-      console.error('[FacebookService] ❌ Mesaj gönderim hatası:', error?.response?.data || error.message);
+      const errDetails = error?.response?.data ? JSON.stringify(error.response.data) : error.message;
+      console.error(`[FacebookService] ❌ Mesaj gönderim hatası (${recipientId}):`, errDetails);
       return false;
     }
   }

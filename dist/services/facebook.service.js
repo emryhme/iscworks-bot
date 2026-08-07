@@ -19,14 +19,10 @@ class FacebookService {
             console.log(`[FB Mock -> ${recipientId}]: ${text}`);
             return false;
         }
-        // Metin temizliği (satır sonu & fazla boşluk)
-        const sanitizedText = text
-            .trim()
-            .replace(/[ \t]+/g, ' ')
-            .replace(/\n+/g, '\n');
+        const sanitizedText = text ? text.trim() : '';
         try {
-            const url = `https://graph.facebook.com/v21.0/me/messages`;
-            await axios_1.default.post(url, {
+            const url = `https://graph.facebook.com/v21.0/me/messages?access_token=${encodeURIComponent(env_1.env.fbPageAccessToken)}`;
+            const res = await axios_1.default.post(url, {
                 recipient: { id: recipientId },
                 message: { text: sanitizedText }
             }, {
@@ -35,11 +31,12 @@ class FacebookService {
                     'Content-Type': 'application/json'
                 }
             });
-            console.log(`[FacebookService] 📤 Mesaj başarıyla gönderildi -> ${recipientId}`);
+            console.log(`[FacebookService] 📤 Mesaj başarıyla gönderildi -> ${recipientId} (Status: ${res.status})`);
             return true;
         }
         catch (error) {
-            console.error('[FacebookService] ❌ Mesaj gönderim hatası:', error?.response?.data || error.message);
+            const errDetails = error?.response?.data ? JSON.stringify(error.response.data) : error.message;
+            console.error(`[FacebookService] ❌ Mesaj gönderim hatası (${recipientId}):`, errDetails);
             return false;
         }
     }

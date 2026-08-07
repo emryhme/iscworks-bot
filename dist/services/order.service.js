@@ -156,15 +156,18 @@ class OrderService {
                 if (status === 'DEC' && prevStatus !== 'DEC') {
                     console.log(`[OrderService] 🔄 Sipariş reddedildi, ${targetProductCode} (${existingOrder.size}) stoğuna +${qty} iade ediliyor...`);
                     await stock_service_1.StockService.restoreStock(targetProductCode, qty, existingOrder.size);
-                    const senderId = existingOrder.sender_id;
+                    const senderId = (existingOrder.sender_id || existingOrder.senderId || '').trim();
+                    console.log(`[OrderService] 📤 Sipariş Red DM işlemi başlatıldı. OrderID: ${orderId}, SenderID: ${senderId}`);
                     if (senderId) {
                         const customerName = `${existingOrder.first_name || ''} ${existingOrder.last_name || ''}`.trim() || 'Müşterimiz';
                         const defaultReason = 'Siparişiniz operasyonel nedenlerle onaylanamamıştır.';
                         const cleanReason = reason && reason.trim() ? reason.trim() : defaultReason;
-                        const dmMessage = ` Sayın ${customerName},\n\nSiparişiniz (#${orderId}) maalesef onaylanamamıştır.\n\nİptal / Red Nedeni:\n${cleanReason}\n\nAnlayışınız için teşekkür eder, keyifli günler dileriz. 🌸`;
-                        facebook_service_1.FacebookService.sendMessage(senderId, dmMessage).catch(err => {
-                            console.error('[Order Rejection DM Error]:', err.message);
-                        });
+                        const dmMessage = `Sayın ${customerName},\n\nSiparişiniz (#${orderId}) maalesef onaylanamamıştır.\n\nİptal / Red Nedeni:\n${cleanReason}\n\nAnlayışınız için teşekkür eder, keyifli günler dileriz. 🌸`;
+                        const sent = await facebook_service_1.FacebookService.sendMessage(senderId, dmMessage);
+                        console.log(`[OrderService] 📤 Red DM gönderim sonucu: ${sent}`);
+                    }
+                    else {
+                        console.warn(`[OrderService] ⚠️ Siparişte (ID: ${orderId}) sender_id bilgisi bulunamadığı için DM yollanamadı.`);
                     }
                 }
                 // 2. Sipariş ONAYLANDIYSA (OK): Müşteriye "Siparişiniz Onaylandı" Mesajı Gönder!
