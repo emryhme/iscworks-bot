@@ -6,11 +6,13 @@ import { StockService } from './stock.service';
 import { OrderService } from './order.service';
 import { TelegramService } from './telegram.service';
 import { extractProductCode } from '../utils/regex.util';
+import { db } from '../database/db';
 
 interface SessionContext {
   history: BaseMessage[];
   productCode?: string;
   size?: string;
+  quantity?: number;
   customerName?: string;
   customerPhone?: string;
   address?: string;
@@ -34,8 +36,7 @@ export class AIService {
   }
 
   /**
-   * Yapay Zeka Destekli Akıllı Veri Ayıklama Motoru (AI Extraction - F.R.I.D.A.Y.)
-   * Statik regex kuralları yerine GPT-4o-mini ile isim, telefon, adres, ürün kodu ve beden ayıklar.
+   * Yapay Zeka Destekli Akıllı Veri Ayıklama Motoru (AI Extractor - F.R.I.D.A.Y.)
    */
   private static async extractSessionDataWithAI(senderId: string, userText: string, apiKey: string) {
     const ctx = this.getSessionContext(senderId);
@@ -49,7 +50,7 @@ export class AIService {
 
       const extractionPrompt = `
 Sen BARON'S SILLAGE için Türkçe Yapay Zeka Veri Ayıklayıcısısın (AI Extractor).
-Müşterinin gönderdiği mesajdan ad-soyad, telefon, adres, ürün kodu ve beden verilerini eksiksiz ayıkla.
+Müşterinin gönderdiği mesajdan ad-soyad, telefon, adres, ürün kodu, beden ve adet verilerini ayıkla.
 
 Müşteri Mesajı: "${userText}"
 
@@ -59,7 +60,8 @@ Yalnızca aşağıdaki JSON yapısını döndür (bilinmeyen alanlar için null 
   "customerPhone": "Müşterinin 10 veya 11 haneli Telefon Numarası (Örn: 05428523712, bulunamazsa null)",
   "address": "Müşterinin Açık Teslimat Adresi (Örn: Süleyman Mahallesi 1010 Sokak No 7, bulunamazsa null)",
   "productCode": "Varsa Ürün Kodu (Örn: KGMLW, TSW, NDL41, bulunamazsa null)",
-  "size": "Varsa Beden (Örn: S, M, L, XL, 41, bulunamazsa null)"
+  "size": "Varsa Beden (Örn: S, M, L, XL, 41, bulunamazsa null)",
+  "quantity": "Varsa Adet Sayısı (Örn: 1, 2, 3, bulunamazsa null)"
 }
 `;
 
@@ -83,6 +85,9 @@ Yalnızca aşağıdaki JSON yapısını döndür (bilinmeyen alanlar için null 
         if (data.size && data.size !== 'null') {
           ctx.size = data.size.trim().toUpperCase();
         }
+        if (data.quantity && data.quantity !== 'null' && !isNaN(Number(data.quantity))) {
+          ctx.quantity = Number(data.quantity);
+        }
       }
     } catch (e: any) {
       console.warn('[AI Extractor] ⚠️ AI veri ayıklama hatası:', e.message);
@@ -90,15 +95,15 @@ Yalnızca aşağıdaki JSON yapısını döndür (bilinmeyen alanlar için null 
   }
 
   /**
-   * 1. Alt Düğüm Araçlarını (Leaf Tools) Tanımlar
+   * Alt Düğüm Araçlarını Tanımlar
    */
   private static createLeafTools(senderId: string) {
     const ctx = this.getSessionContext(senderId);
 
-    // STOK Tool (Google Sheets Baron-DB)
+    // STOK Tool (Sadece Beden VE Adet biliniyorsa çalışır)
     const stokTool = new DynamicTool({
       name: 'STOK',
-      description: 'Ürün kodu yada ürün ismiyle stok sorgulaması yap.',
+      description: 'Ürün kodu, BEDEN ve ADET bilgisi mevcutsa stok kontrolü yapar.',
       func: async (input: string) => {
         try {
           const query = input || ctx.productCode || '';
@@ -115,6 +120,7 @@ Yalnızca aşağıdaki JSON yapısını döndür (bilinmeyen alanlar için null 
             productName: result.product?.name,
             productCode: result.product?.productCode || ctx.productCode,
             size: result.product?.size || ctx.size,
+            price: result.product?.price || 299,
             availableSizes: result.product?.availableSizes,
             message: result.inStock ? 'Stokta mevcuttur.' : 'Stokta kalmamıştır.'
           });
@@ -124,10 +130,10 @@ Yalnızca aşağıdaki JSON yapısını döndür (bilinmeyen alanlar için null 
       }
     });
 
-    // KAYIT Tool (Google Sheets SİPARİŞLER)
+    // KAYIT Tool (5 BİLGİ TAMAMLANMADAN SİPARİŞ OLUŞTURMAZ!)
     const kayitTool = new DynamicTool({
       name: 'KAYIT',
-      description: 'SİPARİŞ DETAYLARINI BURAYA KAYDEDER. JSON: {"customerName":"...","customerPhone":"...","address":"...","productCode":"...","size":"...","quantity":1}',
+      description: 'SADECE 5 BİLGİ (İsim, Telefon, Adres, Beden, Adet) EKSİKSİZ TAMAMLANDIĞINDA SİPARİŞİ OLUŞTURUR.',
       func: async (input: string) => {
         try {
           let data: any = {};
@@ -137,50 +143,89 @@ Yalnızca aşağıdaki JSON yapısını döndür (bilinmeyen alanlar için null 
             data = {};
           }
 
-          // Esnek Parametre Haritalama & Hafızadan Kurtarma (Fallback)
-          let rawName = data.customerName || data.fullName || data.full_name || data.name || data.customer || '';
-          if (ctx.customerName && ctx.customerName !== 'Müşteri') {
-            rawName = ctx.customerName;
-          } else if (!rawName || rawName.trim() === 'Müşteri' || rawName.trim().length <= 1) {
-            rawName = ctx.customerName || 'Müşteri';
-          }
-          const finalCustomerName = rawName;
+          const customerName = data.customerName || ctx.customerName;
+          const customerPhone = data.customerPhone || ctx.customerPhone;
+          const address = data.address || ctx.address;
+          const size = data.size || ctx.size;
+          const quantity = Number(data.quantity) || ctx.quantity || 1;
+          const productCode = data.productCode || ctx.productCode || 'KGMLW';
 
-          let rawAddress = data.address || data.deliveryAddress || data.delivery_address || '';
-          if (ctx.address && ctx.address !== 'Adres Belirtilmedi') {
-            rawAddress = ctx.address;
-          } else if (!rawAddress || rawAddress.trim() === 'Adres Belirtilmedi') {
-            rawAddress = ctx.address || 'Adres Belirtilmedi';
-          }
-          const finalAddress = rawAddress;
+          // 🔒 KATI KURAL: 5 BİLGİ EKSİKSİZ Mİ?
+          const missingFields: string[] = [];
+          if (!customerName || customerName.trim().length <= 1) missingFields.push('İsim Soyisim');
+          if (!customerPhone || customerPhone.trim().length < 10) missingFields.push('Telefon Numarası');
+          if (!address || address.trim().length < 3) missingFields.push('Teslimat Adresi');
+          if (!size) missingFields.push('Beden (S, M, L, XL vb.)');
+          if (!quantity) missingFields.push('Adet Sayısı');
 
-          let rawPhone = data.customerPhone || data.phone || data.customer_phone || data.phoneNumber || data.phone_number || '';
-          if (ctx.customerPhone) {
-            rawPhone = ctx.customerPhone;
-          } else if (!rawPhone || rawPhone === '05550000000' || rawPhone === '05551234567') {
-            rawPhone = ctx.customerPhone || rawPhone || '05550000000';
+          if (missingFields.length > 0) {
+            return JSON.stringify({
+              success: false,
+              orderCreated: false,
+              missingFields: missingFields,
+              message: `Sipariş oluşturulamadı! Eksik bilgiler: ${missingFields.join(', ')}. Lütfen müşteriden bu bilgileri isteyin.`
+            });
           }
-          const finalPhone = rawPhone;
 
-          let rawCode = data.productCode || data.product_code || data.code || data.product || '';
-          if (!rawCode || rawCode === 'URUN') {
-            rawCode = ctx.productCode || 'KGMLW';
+          // Fiyat ve Kargo Hesaplaması
+          const productQuery = db.prepare('SELECT * FROM products WHERE product_code = ? OR short_code = ?').get(productCode, productCode) as any;
+          const unitPrice = productQuery?.price || 299;
+          const subtotal = unitPrice * quantity;
+
+          // Ayarlardan Kargo Ücreti
+      const shippingSetting = db.prepare("SELECT value FROM settings WHERE key = 'shipping_fee'").get() as any;
+      const thresholdSetting = db.prepare("SELECT value FROM settings WHERE key = 'free_shipping_threshold'").get() as any;
+          
+          let shippingFee = Number(shippingSetting?.value || 49);
+          const freeThreshold = Number(thresholdSetting?.value || 1500);
+
+          if (subtotal >= freeThreshold) {
+            shippingFee = 0; // Ücretsiz Kargo
           }
-          const finalProductCode = rawCode;
-          const finalSize = data.size || data.beden || ctx.size || 'M';
+
+          // Aktif Kampanyaları Uygula
+          let discount = 0;
+          const activeCampaigns = db.prepare('SELECT * FROM campaigns WHERE active = 1').all() as any[];
+          for (const c of activeCampaigns) {
+            if (c.code === 'BARONS10') {
+              discount += (subtotal * 0.10); // %10 İndirim
+            }
+          }
+
+          const totalPrice = Math.max(0, subtotal + shippingFee - discount);
 
           const order = await OrderService.createOrder({
-            customerName: finalCustomerName,
-            customerPhone: finalPhone,
-            address: finalAddress,
-            productCode: finalProductCode,
-            productName: finalProductCode,
-            size: finalSize,
-            quantity: Number(data.quantity) || 1,
+            customerName: customerName,
+            customerPhone: customerPhone,
+            address: address,
+            productCode: productCode,
+            productName: productQuery?.name || productCode,
+            size: size,
+            quantity: quantity,
             senderId: senderId
           });
 
-          return JSON.stringify({ success: true, orderId: order.orderId, productCode: order.productCode });
+          // SQLite Order Fiyat Güncellemesi
+          db.prepare(`
+            UPDATE orders 
+            SET unit_price = ?, shipping_fee = ?, discount = ?, total_price = ?
+            WHERE order_id = ?
+          `).run(unitPrice, shippingFee, discount, totalPrice, order.orderId);
+
+          return JSON.stringify({
+            success: true,
+            orderCreated: true,
+            orderId: order.orderId,
+            productCode: order.productCode,
+            productName: productQuery?.name || order.productCode,
+            unitPrice,
+            quantity,
+            subtotal,
+            shippingFee,
+            discount,
+            totalPrice,
+            priceDetails: `Ürün Ara Toplam: ${subtotal.toFixed(2)} TL | Kargo: ${shippingFee === 0 ? 'ÜCRETSİZ' : shippingFee.toFixed(2) + ' TL'} | Kampanya İndirimi: ${discount > 0 ? '-' + discount.toFixed(2) + ' TL' : '0 TL'} | NET TOPLAM: ${totalPrice.toFixed(2)} TL`
+          });
         } catch (e: any) {
           return JSON.stringify({ error: e.message });
         }
@@ -190,16 +235,10 @@ Yalnızca aşağıdaki JSON yapısını döndür (bilinmeyen alanlar için null 
     // MESAJ Tool (Telegram Bildirimi)
     const mesajTool = new DynamicTool({
       name: 'MESAJ',
-      description: 'İşletme sahibine Telegram üzerinden HTML formatında bildirim gönderir.',
+      description: 'İşletme sahibine Telegram üzerinden HTML bildirim yollar.',
       func: async (input: string) => {
         try {
-          let data: any = {};
-          try {
-            data = typeof input === 'object' ? input : JSON.parse(input);
-          } catch {
-            data = { orderId: input };
-          }
-
+          let data: any = typeof input === 'object' ? input : JSON.parse(input);
           await TelegramService.notifyOrder({
             customerName: data.customerName || ctx.customerName || 'Müşteri',
             customerPhone: data.customerPhone || ctx.customerPhone || '',
@@ -239,33 +278,12 @@ Yalnızca aşağıdaki JSON yapısını döndür (bilinmeyen alanlar için null 
     return { stokTool, kayitTool, mesajTool, guncelleTool };
   }
 
-  /**
-   * n8n 'BİLGİLENDİRME' Sub-Agent Tool
-   */
   private static createBilgilendirmeSubAgent(model: ChatOpenAI, mesajTool: DynamicTool) {
     return new DynamicTool({
       name: 'BILGILENDIRME',
-      description: 'sipariş verildiğinde sipariş bilgilerini ve sipariş numarasını bu ajana gönder',
+      description: 'Sipariş tamamlandığında işletme sahibine bilgilendirme mesajı atar.',
       func: async (input: string) => {
-        const systemPrompt = new SystemMessage(`
-<görev>
-Sen işletme sahibini Telegram üzerinden yeni siparişler hakkında bilgilendiren asistansın. Sipariş tamamlandığında SADECE BİR KERE mesaj gönderirsin.
-</görev>
-
-<mesaj_şablonu>
-MESAJ aracıyla işletme sahibine şu HTML formatında bilgi ilet:
-
-🛍️ <b>YENİ SİPARİŞ BİLDİRİMİ</b>
-- <b>İSİM SOYİSİM:</b> {İsim Soyisim}
-- <b>ÜRÜN KODU:</b> {Ürün Kodu}
-- <b>BEDEN:</b> {Beden}
-- <b>ADRES:</b> {Adres}
-- <b>TELEFON:</b> {Telefon Numarası}
-- <b>SİPARİŞ NUMARASI:</b> <code>{Siparişte Oluşturulan Sipariş Numarası}</code>
-
-ONAYLAMAK İÇİN SİPARİŞ NUMARASI İLE ONAY YADA RED YAZINIZ.
-</mesaj_şablonu>
-`);
+        const systemPrompt = new SystemMessage(`İşletme sahibini Telegram üzerinden bilgilendir.`);
         const boundModel = model.bindTools([mesajTool]);
         const messages = [systemPrompt, new HumanMessage(input)];
         const response = await boundModel.invoke(messages);
@@ -279,24 +297,17 @@ ONAYLAMAK İÇİN SİPARİŞ NUMARASI İLE ONAY YADA RED YAZINIZ.
     });
   }
 
-  /**
-   * n8n 'SİPARİS' Sub-Agent Tool
-   */
   private static createSiparisSubAgent(model: ChatOpenAI, stokTool: DynamicTool, kayitTool: DynamicTool, bilgilendirmeAgentTool: DynamicTool) {
     return new DynamicTool({
       name: 'SIPARIS',
-      description: 'ANA AJANDAN ALINAN OUTPUTU DİREKT BURAYA VER',
+      description: 'Stok sorgulama ve sipariş kaydı işlemlerini yürütür.',
       func: async (input: string) => {
         const systemPrompt = new SystemMessage(`
 <görev>
-Sen stok sorgulaması yapmak ve sipariş tamamlandığında müşteri bilgilerini kaydetmekle görevli ajansın.
+Stok sorgulama ve sipariş kayıt ajansın.
+1. Stok sorgulaması (STOK) yapmak için MÜŞTERİNİN BEDEN VE ADET BELİRTTİĞİNDEN EMİN OL. Beden veya Adet yoksa STOK sorgusu yapma, müşteriden beden ve adet iste.
+2. Sipariş oluşturmak (KAYIT) için İsim, Telefon, Adres, Beden ve Adet bilgilerinin 5'inin de EKSİKSİZ olduğundan emin ol.
 </görev>
-
-<yönergeler>
-1. **Stok Sorgulama (STOK):** Müşterinin istediği Ürün Kodu veya İsim ile STOK aracından stok kontrolü yap.
-2. **Kayıt (KAYIT):** Sipariş bilgileri (İsim, Soyisim, Ürün Kodu, Beden, Adres, Telefon, Adet) eksiksiz alındığında KAYIT aracını çağırarak siparişi tabloya ekle.
-3. **Bilgilendirme (BİLGİLENDİRME):** Sipariş kaydı oluştuktan sonra BİLGİLENDİRME aracını çalıştırarak işletme sahibine sipariş detaylarını ilet.
-</yönergeler>
 `);
         const boundModel = model.bindTools([stokTool, kayitTool, bilgilendirmeAgentTool]);
         let messages: BaseMessage[] = [systemPrompt, new HumanMessage(input)];
@@ -323,15 +334,12 @@ Sen stok sorgulaması yapmak ve sipariş tamamlandığında müşteri bilgilerin
     });
   }
 
-  /**
-   * n8n 'STOK MAN' Sub-Agent Tool
-   */
   private static createStokManSubAgent(model: ChatOpenAI, guncelleTool: DynamicTool) {
     return new DynamicTool({
       name: 'STOK_MAN',
-      description: 'sipariş onaylanırsa buraya sipariş detaylarını gönder',
+      description: 'Sipariş onaylandığında stok düşer.',
       func: async (input: string) => {
-        const systemPrompt = new SystemMessage(`Sen bir stok güncelleme Ajanısın.`);
+        const systemPrompt = new SystemMessage(`Stok güncelleme Ajanı.`);
         const boundModel = model.bindTools([guncelleTool]);
         const response = await boundModel.invoke([systemPrompt, new HumanMessage(input)]);
         if (response.tool_calls && response.tool_calls.length > 0) {
@@ -344,9 +352,6 @@ Sen stok sorgulaması yapmak ve sipariş tamamlandığında müşteri bilgilerin
     });
   }
 
-  /**
-   * n8n Root 'ANA' Agent İşleyicisi
-   */
   public static async processMessage(senderId: string, userMessage: string): Promise<{
     reply: string;
     tokens: { promptTokens: number; completionTokens: number; totalTokens: number; costUsd: number };
@@ -374,9 +379,20 @@ Sen stok sorgulaması yapmak ve sipariş tamamlandığında müşteri bilgilerin
     };
 
     try {
-      // Yapay Zeka Destekli Akıllı Veri Ayıklama Motorunu Çalıştır (F.R.I.D.A.Y. AI Extractor)
       await this.extractSessionDataWithAI(senderId, userMessage, apiKey);
       const ctx = this.getSessionContext(senderId);
+
+      // Veritabanından Aktif Kampanyaları ve Kargo Ücretlerini Çek
+      const activeCampaigns = db.prepare('SELECT title, description, code FROM campaigns WHERE active = 1').all() as any[];
+      const shippingSetting = db.prepare("SELECT value FROM settings WHERE key = 'shipping_fee'").get() as any;
+      const thresholdSetting = db.prepare("SELECT value FROM settings WHERE key = 'free_shipping_threshold'").get() as any;
+      
+      const shippingFee = shippingSetting?.value || '49';
+      const freeThreshold = thresholdSetting?.value || '1500';
+
+      const campaignsText = activeCampaigns.length > 0
+        ? activeCampaigns.map(c => `- ${c.title}: ${c.description} (Kod: ${c.code || 'Yok'})`).join('\n')
+        : 'Şu an aktif özel kampanya bulunmamaktadır.';
 
       const model = new ChatOpenAI({
         openAIApiKey: apiKey,
@@ -384,7 +400,6 @@ Sen stok sorgulaması yapmak ve sipariş tamamlandığında müşteri bilgilerin
         temperature: 0.2
       });
 
-      // Alt Ajan ve Araç Ağacını Kur
       const { stokTool, kayitTool, mesajTool, guncelleTool } = this.createLeafTools(senderId);
       const bilgilendirmeAgentTool = this.createBilgilendirmeSubAgent(model, mesajTool);
       const siparisAgentTool = this.createSiparisSubAgent(model, stokTool, kayitTool, bilgilendirmeAgentTool);
@@ -395,23 +410,35 @@ Sen stok sorgulaması yapmak ve sipariş tamamlandığında müşteri bilgilerin
 
       const systemPrompt = new SystemMessage(`
 <görev>
-Sen BARON'S SILLAGE 7/24 Mağaza Müşteri Danışmanısın. Tıpkı gerçek bir insan satış temsilcisi gibi sıcak, son derece nazik ve doğal bir iletişim kurarsın.
+Sen BARON'S SILLAGE 7/24 Mağaza Müşteri Danışmanısın (F.R.I.D.A.Y.).
 </görev>
 
-<üslup_ve_doğallık_kuralları>
-1. ROBOTİK KALIPLARI KESİNLİKLE KULLANMA: Her mesajın sonuna "Başka bir konuda yardımcı olabilir miyim?" veya "Başka bir isteğiniz var mı?" gibi yapay robotik cümleler KESİNLİKLE KOYMA.
-2. İNSAN GİBİ KONUŞ: Gerçek bir butik mağaza danışmanı gibi akıcı konuş. (Örn: "KGMLW modelimiz stokta mevcuttur! Siparişinizi oluşturmamı ister misiniz?")
-</üslup_ve_doğallık_kuralları>
+<KATI_GÜVENLİK_VE_İŞ_KURALLARI>
+1. 🔒 **STOK SORGULAMA KURALI (BEDEN VE ADET ZORUNLUDUR):**
+   - Müşteri HANGİ BEDEN (S, M, L, XL, 41 vb.) ve KAÇ ADET ilgilendiğini söylemeden STOK SORGULAMASI YAPMA!
+   - Eğer müşteri sadece "Gömlek var mı?" veya "KGMLW var mı?" dediyse, nazikçe şöyle sor: "Hangi beden (S, M, L, XL vb.) ve kaç adet düşünüyorsunuz?"
 
-<akış_ve_kurallar>
-1. **İlk Temas:** İlk mesajda müşteriyi sıcak ve nazikçe karşıla.
-2. **Kısa Kod ve Beden Akışı:**
-   - Müşteri ürün ismi veya kısa kod verdiyse (Örn: KGMLW), ÖNCE hangi bedeni (S, M, L, XL veya 40, 41) istediğini sor.
-   - Beden bilgisi alındıktan sonra kısa kod ile bedeni birleştirip (Örn: KGMLW-M) SIPARIS aracını çalıştır.
-3. **HAFIZA VE VERİ KORUMA KURALI:**
-   - Önceki mesajlarda konuşulan ÜRÜN KODUNU (Örn: ${ctx.productCode || 'KGMLW'}) ve BEDENİ (Örn: ${ctx.size || 'M'}) asla unutma. SIPARIS veya KAYIT araçlarını çağırırken bu ürün kodunu ve müşterinin telefonunu eksiksiz aktar.
-4. **Sipariş Kaydı:** Müşteri bilgileri tam alındığında SIPARIS aracını çağırarak sipariş kaydını oluştur ve teşekkür et.
-</akış_ve_kurallar>
+2. 🔒 **SİPARİŞ OLUŞTURMA KURALI (5 BİLGİ TAMAMLANMADAN KESİNLİKLE SİPARİŞ VERME!):**
+   Şu 5 bilgi EKSİKSİZ alınmadan KAYIT/SIPARIS aracını tetikleme ve sipariş oluşturuldu deme:
+   ① Müşteri Adı ve Soyadı (${ctx.customerName || '❌ Eksik'})
+   ② Telefon Numarası (${ctx.customerPhone || '❌ Eksik'})
+   ③ Teslimat Adresi (${ctx.address || '❌ Eksik'})
+   ④ Beden Bilgisi (${ctx.size || '❌ Eksik'})
+   ⑤ Adet Sayısı (${ctx.quantity || '❌ Eksik'})
+   Eksik bilgi varsa müşteriden nazikçe bu eksik kalan bilgileri iste!
+
+3. 🎉 **KAMPANYALAR VE DÜKKAN İNDİRİMLERİ:**
+   Mağazamızın Aktif Kampanyaları:
+${campaignsText}
+
+4. 🚚 **KARGO ÜCRETİ VE FİYATLANDIRMA:**
+   - Standart Kargo Ücreti: ${shippingFee} TL.
+   - ${freeThreshold} TL ve üzeri siparişlerde KARGO ÜCRETSİZDİR!
+   - Ürün fiyatı sorulduğunda veya sipariş özeti verirken ürün fiyatını, kargo ücretini ve varsa kampanya indirimini hesaplayarak toplam tutarı belirt.
+
+5. 💬 **İNSANİ İLETİŞİM:**
+   Robotik cümleler kullanma. Her mesaj sonuna yapay soru kalıpları koyma. Sıcak ve doğal butik danışmanı gibi konuş.
+</KATI_GÜVENLİK_VE_İŞ_KURALLARI>
 `);
 
       ctx.history.push(new HumanMessage(userMessage));
@@ -424,7 +451,6 @@ Sen BARON'S SILLAGE 7/24 Mağaza Müşteri Danışmanısın. Tıpkı gerçek bir
       trackUsage(response, messages.length);
       messages.push(response);
 
-      // Root Agent Tool Execution Loop
       let count = 0;
       while (response.tool_calls && response.tool_calls.length > 0 && count < 4) {
         count++;
@@ -450,17 +476,13 @@ Sen BARON'S SILLAGE 7/24 Mağaza Müşteri Danışmanısın. Tıpkı gerçek bir
 
       return {
         reply: finalOutput,
-        tokens: {
-          promptTokens,
-          completionTokens,
-          totalTokens,
-          costUsd: Number(costUsd.toFixed(6))
-        }
+        tokens: { promptTokens, completionTokens, totalTokens, costUsd }
       };
+
     } catch (error: any) {
-      console.error('[AIService Hiyerarşik Ajan] ❌ Hata:', error);
+      console.error('[AIService] ❌ İşlem Hatası:', error);
       return {
-        reply: "Anlayışınız için teşekkür ederiz, talebinizi işleme alıyoruz.",
+        reply: "Üzgünüm, şu an bağlantıda geçici bir yoğunluk var. Lütfen biraz sonra tekrar deneyiniz.",
         tokens: { promptTokens: 0, completionTokens: 0, totalTokens: 0, costUsd: 0 }
       };
     }

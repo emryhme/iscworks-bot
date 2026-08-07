@@ -29,6 +29,7 @@ function initDatabase() {
       name TEXT NOT NULL,
       color TEXT DEFAULT '',
       size TEXT NOT NULL,
+      price REAL NOT NULL DEFAULT 299.00,
       stock INTEGER NOT NULL DEFAULT 0,
       category TEXT DEFAULT '',
       wp_link TEXT DEFAULT '',
@@ -50,20 +51,62 @@ function initDatabase() {
       product_name TEXT DEFAULT '',
       size TEXT DEFAULT '',
       quantity INTEGER NOT NULL DEFAULT 1,
+      unit_price REAL NOT NULL DEFAULT 0,
+      shipping_fee REAL NOT NULL DEFAULT 0,
+      discount REAL NOT NULL DEFAULT 0,
+      total_price REAL NOT NULL DEFAULT 0,
       status TEXT NOT NULL DEFAULT 'BEKLEMEDE',
       sender_id TEXT DEFAULT '',
       created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
       updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
     );
   `);
-    // Auto Migration: sender_id sütunu yoksa ekle
+    // 3. Kampanyalar Tablosu (campaigns)
+    exports.db.exec(`
+    CREATE TABLE IF NOT EXISTS campaigns (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      title TEXT NOT NULL,
+      description TEXT NOT NULL,
+      code TEXT DEFAULT '',
+      discount_percent REAL DEFAULT 0,
+      discount_amount REAL DEFAULT 0,
+      min_order_amount REAL DEFAULT 0,
+      active INTEGER NOT NULL DEFAULT 1,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
+    // 4. Sistem Ayarları Tablosu (settings - Kargo Fiyatları vb.)
+    exports.db.exec(`
+    CREATE TABLE IF NOT EXISTS settings (
+      key TEXT PRIMARY KEY,
+      value TEXT NOT NULL
+    );
+  `);
+    // Auto Migrations: Kolonlar eksikse otomatik ekle
+    try {
+        exports.db.exec(`ALTER TABLE products ADD COLUMN price REAL NOT NULL DEFAULT 299.00;`);
+    }
+    catch (e) { }
+    try {
+        exports.db.exec(`ALTER TABLE orders ADD COLUMN unit_price REAL NOT NULL DEFAULT 0;`);
+    }
+    catch (e) { }
+    try {
+        exports.db.exec(`ALTER TABLE orders ADD COLUMN shipping_fee REAL NOT NULL DEFAULT 0;`);
+    }
+    catch (e) { }
+    try {
+        exports.db.exec(`ALTER TABLE orders ADD COLUMN discount REAL NOT NULL DEFAULT 0;`);
+    }
+    catch (e) { }
+    try {
+        exports.db.exec(`ALTER TABLE orders ADD COLUMN total_price REAL NOT NULL DEFAULT 0;`);
+    }
+    catch (e) { }
     try {
         exports.db.exec(`ALTER TABLE orders ADD COLUMN sender_id TEXT DEFAULT '';`);
-        console.log('[Database] ➕ orders tablosuna sender_id sütunu başarıyla eklendi.');
     }
-    catch (e) {
-        // Sütun zaten mevcutsa hatayı yut
-    }
+    catch (e) { }
     // İndeksler (Sorgu Hızlandırma)
     exports.db.exec(`
     CREATE INDEX IF NOT EXISTS idx_products_code ON products(product_code);
@@ -71,42 +114,67 @@ function initDatabase() {
     CREATE INDEX IF NOT EXISTS idx_orders_id ON orders(order_id);
     CREATE INDEX IF NOT EXISTS idx_orders_phone ON orders(customer_phone);
     CREATE INDEX IF NOT EXISTS idx_orders_sender ON orders(sender_id);
+    CREATE INDEX IF NOT EXISTS idx_campaigns_active ON campaigns(active);
   `);
-    // Varsayılan Başlangıç Stok Verisini Yükle (Seed Data)
+    // Varsayılan Başlangıç Stok & Kampanya Verilerini Yükle
     seedInitialProducts();
+    seedInitialSettings();
+    seedInitialCampaigns();
 }
 /**
- * Başlangıç Stok Verilerini Ekler (Eğer tablo boşsa)
+ * Başlangıç Stok Verilerini Ekler
  */
 function seedInitialProducts() {
     const countStmt = exports.db.prepare('SELECT COUNT(*) as count FROM products');
     const result = countStmt.get();
     if (result.count === 0) {
-        console.log('[Database] 🚀 Ürünler tablosu boş, başlangıç stok verileri yükleniyor...');
+        console.log('[Database] 🚀 Ürünler tablosu boş, başlangıç stok ve fiyat verileri yükleniyor...');
         const insertStmt = exports.db.prepare(`
-      INSERT OR IGNORE INTO products (short_code, product_code, name, color, size, stock, category)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
+      INSERT OR IGNORE INTO products (short_code, product_code, name, color, size, price, stock, category)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `);
         const initialProducts = [
-            { shortCode: 'KGMLW', productCode: 'KGMLW-S', name: 'KUMAŞ GÖMLEK', color: 'BEYAZ', size: 'S', stock: 99, category: 'GÖMLEK' },
-            { shortCode: 'KGMLW', productCode: 'KGMLW-M', name: 'KUMAŞ GÖMLEK', color: 'BEYAZ', size: 'M', stock: 5, category: 'GÖMLEK' },
-            { shortCode: 'KGMLW', productCode: 'KGMLW-L', name: 'KUMAŞ GÖMLEK', color: 'BEYAZ', size: 'L', stock: 100, category: 'GÖMLEK' },
-            { shortCode: 'KTGMLB', productCode: 'KTGMLB-S', name: 'SİYAH KETEN GÖMLEK', color: 'SİYAH', size: 'S', stock: 100, category: 'KETEN GÖMLEK' },
-            { shortCode: 'KTGMLB', productCode: 'KTGMLB-M', name: 'SİYAH KETEN GÖMLEK', color: 'SİYAH', size: 'M', stock: 100, category: 'KETEN GÖMLEK' },
-            { shortCode: 'KTGMLB', productCode: 'KTGMLB-L', name: 'SİYAH KETEN GÖMLEK', color: 'SİYAH', size: 'L', stock: 100, category: 'KETEN GÖMLEK' },
-            { shortCode: 'DGMLP', productCode: 'DGMLP-S', name: 'PEMBE DESENLİ GÖMLEK', color: 'PEMBE', size: 'S', stock: 100, category: 'DESENLİ GÖMLEK' },
-            { shortCode: 'DGMLP', productCode: 'DGMLP-M', name: 'PEMBE DESENLİ GÖMLEK', color: 'PEMBE', size: 'M', stock: 100, category: 'DESENLİ GÖMLEK' },
-            { shortCode: 'DGMLP', productCode: 'DGMLP-L', name: 'PEMBE DESENLİ GÖMLEK', color: 'PEMBE', size: 'L', stock: 100, category: 'DESENLİ GÖMLEK' },
-            { shortCode: 'NDL41', productCode: 'NDL41-41', name: 'Nike Dunk Low', color: 'SİYAH/BEYAZ', size: '41', stock: 5, category: 'AYAKKABI' },
-            { shortCode: 'STRC39', productCode: 'STRC39-39', name: 'Streç Pantolon', color: 'SİYAH', size: '39', stock: 0, category: 'PANTOLON' },
-            { shortCode: 'TSW', productCode: 'TSW-S', name: 'BEYAZ TSHIRT', color: 'BEYAZ', size: 'S', stock: 50, category: 'TSHIRT' }
+            { shortCode: 'KGMLW', productCode: 'KGMLW-S', name: 'KUMAŞ GÖMLEK', color: 'BEYAZ', size: 'S', price: 299.00, stock: 99, category: 'GÖMLEK' },
+            { shortCode: 'KGMLW', productCode: 'KGMLW-M', name: 'KUMAŞ GÖMLEK', color: 'BEYAZ', size: 'M', price: 299.00, stock: 5, category: 'GÖMLEK' },
+            { shortCode: 'KGMLW', productCode: 'KGMLW-L', name: 'KUMAŞ GÖMLEK', color: 'BEYAZ', size: 'L', price: 299.00, stock: 100, category: 'GÖMLEK' },
+            { shortCode: 'KTGMLB', productCode: 'KTGMLB-S', name: 'SİYAH KETEN GÖMLEK', color: 'SİYAH', size: 'S', price: 349.00, stock: 100, category: 'KETEN GÖMLEK' },
+            { shortCode: 'KTGMLB', productCode: 'KTGMLB-M', name: 'SİYAH KETEN GÖMLEK', color: 'SİYAH', size: 'M', price: 349.00, stock: 100, category: 'KETEN GÖMLEK' },
+            { shortCode: 'KTGMLB', productCode: 'KTGMLB-L', name: 'SİYAH KETEN GÖMLEK', color: 'SİYAH', size: 'L', price: 349.00, stock: 100, category: 'KETEN GÖMLEK' },
+            { shortCode: 'DGMLP', productCode: 'DGMLP-S', name: 'DESENLİ GÖMLEK', color: 'PEMBE', size: 'S', price: 399.00, stock: 100, category: 'DESENLİ GÖMLEK' },
+            { shortCode: 'DGMLP', productCode: 'DGMLP-M', name: 'DESENLİ GÖMLEK', color: 'PEMBE', size: 'M', price: 399.00, stock: 100, category: 'DESENLİ GÖMLEK' },
+            { shortCode: 'NDL41', productCode: 'NDL41-41', name: 'NIKE DUNK LOW', color: 'BEYAZ/SİYAH', size: '41', price: 1299.00, stock: 50, category: 'AYAKKABI' },
+            { shortCode: 'STRC39', productCode: 'STRC39-39', name: 'STAR CROSS', color: 'BEYAZ', size: '39', price: 899.00, stock: 30, category: 'AYAKKABI' },
+            { shortCode: 'TSW', productCode: 'TSW-S', name: 'TSW T-SHIRT', color: 'BEYAZ', size: 'S', price: 199.00, stock: 75, category: 'T-SHIRT' }
         ];
-        const transaction = exports.db.transaction((products) => {
-            for (const p of products) {
-                insertStmt.run(p.shortCode, p.productCode, p.name, p.color, p.size, p.stock, p.category);
-            }
-        });
-        transaction(initialProducts);
-        console.log('[Database] ✅ Başlangıç ürün verileri SQLite veritabanına başarıyla yüklendi!');
+        for (const p of initialProducts) {
+            insertStmt.run(p.shortCode, p.productCode, p.name, p.color, p.size, p.price, p.stock, p.category);
+        }
+        console.log(`[Database] ✅ ${initialProducts.length} varsayılan ürün fiyatları ile yüklendi.`);
     }
 }
+/**
+ * Varsayılan Sistem Ayarlarını Yükler (Kargo Ücretleri)
+ */
+function seedInitialSettings() {
+    const setStmt = exports.db.prepare('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)');
+    setStmt.run('shipping_fee', '49'); // Standard Kargo 49 TL
+    setStmt.run('free_shipping_threshold', '1500'); // 1500 TL Üzeri Ücretsiz Kargo
+}
+/**
+ * Varsayılan Kampanyaları Yükler
+ */
+function seedInitialCampaigns() {
+    const countStmt = exports.db.prepare('SELECT COUNT(*) as count FROM campaigns');
+    const result = countStmt.get();
+    if (result.count === 0) {
+        const insertStmt = exports.db.prepare(`
+      INSERT INTO campaigns (title, description, code, discount_percent, discount_amount, min_order_amount, active)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `);
+        insertStmt.run('🚀 1500 TL Üzeri Ücretsiz Kargo!', '1500 TL ve üzeri siparişlerde kargo ücreti BARON\'S SILLAGE tarafından karşılanır.', 'KARGO_BEDAVA', 0, 49, 1500, 1);
+        insertStmt.run('🎉 BARONS10 İndirim Kodu', 'Tüm siparişlerde %10 Hoşgeldin İndirimi.', 'BARONS10', 10, 0, 0, 1);
+        console.log('[Database] ✅ Aktif başlangıç kampanyaları yüklendi.');
+    }
+}
+// Veritabanını Otomatik İlklendir
+initDatabase();

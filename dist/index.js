@@ -58,6 +58,64 @@ app.use('/', (req, res, next) => {
     }
     return basicAuth(req, res, next);
 }, express_1.default.static(path_1.default.join(__dirname, '../public')));
+// Kampanyalar API
+app.get('/api/campaigns', (req, res) => {
+    try {
+        const campaigns = db.prepare('SELECT * FROM campaigns ORDER BY id DESC').all();
+        res.json({ success: true, campaigns });
+    }
+    catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+app.post('/api/campaigns', (req, res) => {
+    try {
+        const { title, description, code, discountPercent, discountAmount, minOrderAmount } = req.body;
+        const stmt = db.prepare(`
+      INSERT INTO campaigns (title, description, code, discount_percent, discount_amount, min_order_amount, active)
+      VALUES (?, ?, ?, ?, ?, ?, 1)
+    `);
+        stmt.run(title, description, code || '', discountPercent || 0, discountAmount || 0, minOrderAmount || 0);
+        res.json({ success: true, message: 'Kampanya başarıyla oluşturuldu.' });
+    }
+    catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+app.delete('/api/campaigns/:id', (req, res) => {
+    try {
+        db.prepare('DELETE FROM campaigns WHERE id = ?').run(req.params.id);
+        res.json({ success: true, message: 'Kampanya silindi.' });
+    }
+    catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+// Sistem Ayarları & Kargo Fiyatı API
+app.get('/api/settings', (req, res) => {
+    try {
+        const settings = db.prepare('SELECT * FROM settings').all();
+        res.json({ success: true, settings });
+    }
+    catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+app.post('/api/settings', (req, res) => {
+    try {
+        const { shippingFee, freeShippingThreshold } = req.body;
+        if (shippingFee !== undefined) {
+            db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES ("shipping_fee", ?)').run(String(shippingFee));
+        }
+        if (freeShippingThreshold !== undefined) {
+            db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES ("free_shipping_threshold", ?)').run(String(freeShippingThreshold));
+        }
+        res.json({ success: true, message: 'Kargo ayarları güncellendi.' });
+    }
+    catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
 // Web Chat & Simulator API End-point'i
 app.post('/api/chat', async (req, res) => {
     const { senderId, message } = req.body;

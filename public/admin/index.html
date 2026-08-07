@@ -108,6 +108,12 @@
           <button class="tab-btn" data-tab="newProductTab">
             <i class="fa-solid fa-plus-circle"></i> Yeni Ürün Girişi
           </button>
+          <button class="tab-btn" data-tab="campaignsTab">
+            <i class="fa-solid fa-bullhorn"></i> 🎉 Kampanyalar
+          </button>
+          <button class="tab-btn" data-tab="settingsTab">
+            <i class="fa-solid fa-truck"></i> 🚚 Fiyat & Kargo Ayarları
+          </button>
           <button class="tab-btn btn-ai-tab" data-tab="aiProductTab">
             <i class="fa-solid fa-wand-magic-sparkles"></i> ✨ Gemini AI ile Ürün Ekle
           </button>
@@ -322,6 +328,80 @@
               <div class="ai-parsed-grid" id="aiParsedGrid"></div>
             </div>
 
+          </div>
+        </div>
+      </section>
+
+      <!-- Tab Content: Kampanyalar -->
+      <section class="tab-content" id="campaignsTab">
+        <div class="card glass-card">
+          <div class="card-header">
+            <h3><i class="fa-solid fa-bullhorn"></i> 🎉 Mağaza Kampanya Yönetimi</h3>
+          </div>
+          <div class="card-body">
+            <form id="newCampaignForm" style="margin-bottom: 2rem;">
+              <div class="form-grid">
+                <div class="form-group">
+                  <label>Kampanya Başlığı</label>
+                  <input type="text" id="campTitle" placeholder="Örn: 1500 TL Üzeri Ücretsiz Kargo" required>
+                </div>
+                <div class="form-group">
+                  <label>Açıklama (Yapay Zeka Okur)</label>
+                  <input type="text" id="campDesc" placeholder="Örn: 1500 TL üzeri kargo bedava" required>
+                </div>
+                <div class="form-group">
+                  <label>İndirim Kodu (Varsa)</label>
+                  <input type="text" id="campCode" placeholder="Örn: BARONS10">
+                </div>
+                <div class="form-group">
+                  <label>İndirim Yüzdesi (%)</label>
+                  <input type="number" id="campPercent" placeholder="Örn: 10" min="0" max="100">
+                </div>
+              </div>
+              <button type="submit" class="btn btn-primary mt-1"><i class="fa-solid fa-plus"></i> Kampanya Oluştur & Yapay Zekaya Tanıt</button>
+            </form>
+
+            <div class="table-responsive">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>ID</th>
+                    <th>Başlık</th>
+                    <th>Açıklama</th>
+                    <th>Kod</th>
+                    <th>İndirim</th>
+                    <th>İşlem</th>
+                  </tr>
+                </thead>
+                <tbody id="campaignsTableBody">
+                  <tr><td colspan="6" style="text-align:center;">Kampanyalar yükleniyor...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Tab Content: Fiyat & Kargo Ayarları -->
+      <section class="tab-content" id="settingsTab">
+        <div class="card glass-card">
+          <div class="card-header">
+            <h3><i class="fa-solid fa-truck-fast"></i> 🚚 Kargo ve Fiyatlandırma Ayarları</h3>
+          </div>
+          <div class="card-body">
+            <form id="settingsForm">
+              <div class="form-grid">
+                <div class="form-group">
+                  <label>Standart Kargo Ücreti (TL)</label>
+                  <input type="number" id="settingShippingFee" placeholder="49" required>
+                </div>
+                <div class="form-group">
+                  <label>Ücretsiz Kargo Limiti (TL)</label>
+                  <input type="number" id="settingFreeThreshold" placeholder="1500" required>
+                </div>
+              </div>
+              <button type="submit" class="btn btn-success mt-1"><i class="fa-solid fa-floppy-disk"></i> Kargo Ayarlarını Kaydet</button>
+            </form>
           </div>
         </div>
       </section>
