@@ -279,6 +279,10 @@ function renderTables() {
   renderOrdersTable();
   renderRewardsTable();
   renderRewardOrdersTable();
+
+  if (window.lucide && typeof window.lucide.createIcons === 'function') {
+    try { window.lucide.createIcons(); } catch (e) {}
+  }
 }
 
 // Render VIP Sadakat Ödülleri Tablosu

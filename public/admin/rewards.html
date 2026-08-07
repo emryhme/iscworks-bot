@@ -3,159 +3,250 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>VIP Sadakat Ödülleri - BARON'S SILLAGE</title>
-  
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <title>CommerceOS — VIP Ödüller & Sadakat</title>
+
+  <script src="https://unpkg.com/lucide@latest"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <div class="app-container">
-    <header class="navbar">
-      <div class="logo-area">
-        <div class="logo-icon"><i class="fa-solid fa-crown"></i></div>
-        <div>
-          <h1 class="logo-title">BARON'S SILLAGE</h1>
-          <span class="logo-subtitle">Enterprise Admin & Inventory Panel</span>
-        </div>
-      </div>
 
-      <div class="sync-badge-container">
-        <div class="sync-badge" id="syncStatusBadge">
-          <span class="pulse-dot"></span>
-          <i class="fa-brands fa-google"></i>
-          <span>Live SQLite & Sheet Sync</span>
+<div class="layout">
+
+<!-- SIDEBAR -->
+<aside class="sidebar" id="sidebar">
+    <a href="index.html" class="logo">
+        <div class="logo-mark">
+            <i data-lucide="shopping-bag" size="18"></i>
         </div>
-        <button class="btn btn-secondary btn-icon" id="btnToggleSound" title="Bildirim Seslerini Aç/Kapat"><i class="fa-solid fa-bell"></i></button>
-        <button class="btn btn-secondary btn-icon" id="btnRefreshData" title="Verileri Yenile"><i class="fa-solid fa-arrows-rotate"></i></button>
-      </div>
+        Commerce<span>OS</span>
+    </a>
+
+    <div class="section-title">ANA MENÜ</div>
+
+    <a href="index.html" class="nav-item">
+        <i data-lucide="layout-dashboard"></i>
+        Dashboard & Stok
+    </a>
+
+    <a href="orders.html" class="nav-item">
+        <i data-lucide="shopping-cart"></i>
+        Siparişler
+        <span class="nav-badge" id="ordersBadgeCount">0</span>
+    </a>
+
+    <a href="new-product.html" class="nav-item">
+        <i data-lucide="package"></i>
+        Yeni Ürün Ekle
+    </a>
+
+    <a href="campaigns.html" class="nav-item">
+        <i data-lucide="badge-percent"></i>
+        Kampanyalar
+    </a>
+
+    <a href="rewards.html" class="nav-item active">
+        <i data-lucide="star"></i>
+        VIP Ödüller
+    </a>
+
+    <div class="section-title">YÖNETİM & AI</div>
+
+    <a href="ai-product.html" class="nav-item">
+        <i data-lucide="sparkles"></i>
+        F.R.I.D.A.Y. AI Copilot
+    </a>
+
+    <a href="settings.html" class="nav-item">
+        <i data-lucide="settings"></i>
+        Ayarlar & Kargo
+    </a>
+
+    <div class="sidebar-bottom">
+        <div class="store-card">
+            <div class="store-avatar">N</div>
+            <div class="store-info">
+                <strong>Nova Store</strong>
+                <small>BARON'S SILLAGE</small>
+            </div>
+            <i data-lucide="chevron-down" size="15" style="margin-left:auto;color:#9ca3af"></i>
+        </div>
+    </div>
+</aside>
+
+<!-- MAIN -->
+<main class="main">
+
+    <!-- TOPBAR -->
+    <header class="topbar">
+        <div style="display:flex;align-items:center;gap:10px">
+            <button class="icon-button mobile-menu" onclick="toggleSidebar()">
+                <i data-lucide="menu"></i>
+            </button>
+
+            <div class="search">
+                <i data-lucide="search" size="15"></i>
+                <input type="text" placeholder="Müşteri veya ödül kodu ara...">
+                <span style="font-size:9px;color:#9ca3af">⌘ K</span>
+            </div>
+        </div>
+
+        <div class="top-actions">
+            <div class="sync-badge" id="syncStatusBadge" style="margin-right:10px;">
+                <span class="pulse-dot"></span>
+                <span>Live SQLite & Sheet Sync</span>
+            </div>
+
+            <button class="icon-button" id="btnToggleSound" title="Bildirim Sesleri">
+                <i data-lucide="bell" size="17"></i>
+                <span class="notification-dot"></span>
+            </button>
+
+            <button class="icon-button" id="btnRefreshData" title="Verileri Yenile">
+                <i data-lucide="refresh-cw" size="17"></i>
+            </button>
+
+            <div class="user">
+                <div class="avatar">EM</div>
+                <div class="user-text">
+                    <strong>Emre İşcenkal</strong>
+                    <span>Administrator</span>
+                </div>
+                <i data-lucide="chevron-down" size="13"></i>
+            </div>
+        </div>
     </header>
 
-    <main class="main-content">
-      <section class="controls-bar glass-card">
-        <div class="tabs">
-          <a href="index.html" class="tab-btn"><i class="fa-solid fa-tags"></i> Ürün & Stok Listesi</a>
-          <a href="orders.html" class="tab-btn"><i class="fa-solid fa-receipt"></i> Siparişler <span class="badge" id="ordersBadgeCount">0</span></a>
-          <a href="new-product.html" class="tab-btn"><i class="fa-solid fa-plus-circle"></i> Yeni Ürün Girişi</a>
-          <a href="campaigns.html" class="tab-btn"><i class="fa-solid fa-bullhorn"></i> 🎉 Kampanyalar</a>
-          <a href="rewards.html" class="tab-btn active"><i class="fa-solid fa-gift"></i> 💎 VIP Sadakat Ödülleri</a>
-          <a href="settings.html" class="tab-btn"><i class="fa-solid fa-truck"></i> 🚚 Fiyat & Kargo Ayarları</a>
-          <a href="ai-product.html" class="tab-btn btn-ai-tab"><i class="fa-solid fa-wand-magic-sparkles"></i> ✨ Gemini AI ile Ürün Ekle</a>
-        </div>
-      </section>
+    <!-- CONTENT -->
+    <section class="content">
 
-      <section class="tab-content active" id="rewardsTab">
-        <div class="card glass-card">
-          <div class="card-header">
-            <h3><i class="fa-solid fa-gift"></i> 💎 Kişiye Özel VIP Sadakat ve İndirim Ödülleri</h3>
-            <span class="table-count" id="rewardsTableCount">0 Ödül Listelendi</span>
-          </div>
-          <div class="card-body">
-            <!-- Satıcı Hediye Verme Kontrol Kutusu -->
-            <div style="background: rgba(30, 41, 59, 0.7); border: 1px solid #334155; border-radius: 12px; padding: 1.25rem; margin-bottom: 1.5rem; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;">
-              <div>
-                <h4 style="margin: 0; color: #f8fafc; font-size: 1rem; display: flex; align-items: center; gap: 8px;">
-                  <i class="fa-solid fa-robot text-purple"></i> 🤖 Yapay Zeka (F.R.I.D.A.Y.) 2000 TL Otomatik VIP Ödülü Verilsin Mi?
-                </h4>
-                <p style="margin: 4px 0 0 0; color: #94a3b8; font-size: 0.85rem;">
-                  Kapalı ise yapay zeka kafasına göre otomatik hediye vermez. Sadece sizin panelden manuel tanımladığınız ödüller geçerli olur.
-                </p>
-              </div>
-              <div style="display: flex; align-items: center; gap: 10px;">
-                <span id="autoRewardStatusBadge" class="status-badge out-of-stock">KAPALI (Sadece Manuel)</span>
-                <button class="btn btn-sm btn-secondary" id="btnToggleAutoReward" type="button">
-                  <i class="fa-solid fa-toggle-off"></i> Ayarı Değiştir
-                </button>
-              </div>
+        <div class="page-header">
+            <div class="page-title">
+                <h1>VIP Ödüller & Sadakat Yönetimi</h1>
+                <p>Müşterilerinize özel %20 VIP İndirimi tanımlayın ve yapay zeka otomasyonunu yönetin.</p>
+            </div>
+
+            <div class="header-actions">
+                <div style="display:flex; align-items:center; gap:10px; background:white; padding:8px 14px; border:1px solid #e5e7eb; border-radius:8px;">
+                    <span style="font-size:11px; font-weight:600;">2000 TL Yapay Zeka Oto-Ödül:</span>
+                    <span class="status-badge out-of-stock" id="autoRewardStatusBadge">KAPALI (Sadece Manuel)</span>
+                    <button class="btn btn-primary btn-sm" id="btnToggleAutoReward" onclick="toggleAutoRewardSetting()">
+                        Aç / Kapat
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- FORM CARD -->
+        <div class="card table-card">
+            <div class="table-header">
+                <div class="table-title">💎 Özel VIP Sadakat Ödülü Tanımla & DM Gönder</div>
             </div>
 
             <form id="rewardForm">
-              <div class="form-grid">
-                <div class="form-group">
-                  <label>Instagram ID / Müşteri ID</label>
-                  <input type="text" id="rewardSenderId" placeholder="Örn: 1234567890" required>
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label>Müşteri Instagram ID / Phone (senderId)</label>
+                        <input type="text" id="rewardSenderId" placeholder="Örn: 905551234567 veya IG sender_id" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Ödül Kodu</label>
+                        <input type="text" id="rewardCode" value="YINEBEKLERIZ" style="text-transform:uppercase;" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label>İndirim Oranı (%)</label>
+                        <input type="number" id="rewardPercent" value="20" min="1" max="100" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Minimum Hak Ediş Tutarı (TL)</label>
+                        <input type="number" id="rewardMinAmount" value="2000" required>
+                    </div>
                 </div>
-                <div class="form-group">
-                  <label>Ödül Kodu (İsteğe Bağlı)</label>
-                  <input type="text" id="rewardCode" placeholder="Örn: VIP20 veya SPECIAL" style="text-transform:uppercase;">
+
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary">
+                        <i data-lucide="send" size="14"></i>
+                        Ödülü Tanımla & DM Yolla
+                    </button>
                 </div>
-                <div class="form-group">
-                  <label>İndirim Oranı (%)</label>
-                  <input type="number" id="rewardPercent" placeholder="20" required min="1" max="100">
-                </div>
-                <div class="form-group">
-                  <label>Kazanılan Min. Sipariş Tutarı (TL)</label>
-                  <input type="number" id="rewardMinAmount" placeholder="2000" min="0">
-                </div>
-              </div>
-              <div class="form-actions">
-                <button type="submit" class="btn btn-primary btn-glow">💎 Müşteriye Ödül Tanımla</button>
-              </div>
             </form>
-
-            <h4 style="margin-top:2.5rem; margin-bottom:1rem; color:#f8fafc;">
-              <i class="fa-solid fa-cart-shopping text-gold"></i> 📦 Sipariş Veren Müşteriler (Hızlı Ödül & Yönetim)
-            </h4>
-            <p style="color:#94a3b8; font-size:0.85rem; margin-bottom:1rem;">
-              Aşağıdaki sipariş veren müşterilerin Instagram ID'sini yukarıdaki ödüle aktarabilir veya sipariş kaydını silebilirsiniz.
-            </p>
-            <div class="table-responsive">
-              <table class="data-table" id="rewardOrdersTable">
-                <thead>
-                  <tr>
-                    <th>SİPARİŞ ID</th>
-                    <th>INSTAGRAM ID</th>
-                    <th>MÜŞTERİ ADI</th>
-                    <th>TELEFON</th>
-                    <th>SİPARİŞ TUTARI</th>
-                    <th>TARİH</th>
-                    <th>İşlemler</th>
-                  </tr>
-                </thead>
-                <tbody id="rewardOrdersTableBody">
-                  <tr>
-                    <td colspan="7" class="loading-cell">
-                      <i class="fa-solid fa-spinner fa-spin"></i> Sipariş verileri yükleniyor...
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-
-            <h4 style="margin-top:2.5rem; margin-bottom:1rem; color:#f8fafc;"><i class="fa-solid fa-list-check"></i> Tanımlı VIP Ödül Listesi</h4>
-            <div class="table-responsive">
-              <table class="data-table" id="rewardsTable">
-                <thead>
-                  <tr>
-                    <th>ID</th>
-                    <th>INSTAGRAM ID</th>
-                    <th>ÖDÜL KODU</th>
-                    <th>KAZANILAN İNDİRİM</th>
-                    <th>MİN. SİPARİŞ TUTARI</th>
-                    <th>DURUM</th>
-                    <th>KAZANILMA TARİHİ</th>
-                    <th>KULLANILMA TARİHİ</th>
-                    <th>İşlem</th>
-                  </tr>
-                </thead>
-                <tbody id="rewardsTableBody">
-                  <tr>
-                    <td colspan="9" class="loading-cell">
-                      <i class="fa-solid fa-spinner fa-spin"></i> Ödül listesi yükleniyor...
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
         </div>
-      </section>
-    </main>
-  </div>
 
-  <div class="toast-container" id="toastContainer"></div>
-  <script src="app.js"></script>
+        <!-- RECENT ORDERS FOR REWARD SELECTION -->
+        <div class="card table-card">
+            <div class="table-header">
+                <div class="table-title">🛍️ Son Sipariş Veren Müşteriler (Hızlı Ödül & Silme)</div>
+            </div>
+
+            <div class="table-responsive">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>SİPARİŞ ID</th>
+                            <th>MÜŞTERİ ADI</th>
+                            <th>TELEFON</th>
+                            <th>TOPLAM TUTAR</th>
+                            <th>INSTAGRAM SENDER ID</th>
+                            <th>DURUM</th>
+                            <th>İŞLEM</th>
+                        </tr>
+                    </thead>
+                    <tbody id="rewardOrdersTableBody">
+                        <tr>
+                            <td colspan="7" style="text-align:center;padding:40px;color:#6b7280;">
+                                Sipariş verileri yükleniyor...
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- DEFINED REWARDS TABLE -->
+        <div class="card table-card">
+            <div class="table-header">
+                <div class="table-title">🎁 Tanımlanmış VIP Sadakat Ödülleri</div>
+            </div>
+
+            <div class="table-responsive">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>MÜŞTERİ / SENDER ID</th>
+                            <th>ÖDÜL KODU</th>
+                            <th>İNDİRİM</th>
+                            <th>HAK EDİŞ TUTARI</th>
+                            <th>KULLANIM DURUMU</th>
+                            <th>TANIMLAMA TARİHİ</th>
+                        </tr>
+                    </thead>
+                    <tbody id="rewardsTableBody">
+                        <tr>
+                            <td colspan="7" style="text-align:center;padding:40px;color:#6b7280;">
+                                Ödül listesi yükleniyor...
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+    </section>
+</main>
+</div>
+
+<div class="toast-container" id="toastContainer"></div>
+
+<script src="app.js"></script>
+<script>
+  function toggleSidebar(){
+    document.getElementById("sidebar").classList.toggle("open");
+  }
+  lucide.createIcons();
+</script>
 </body>
 </html>

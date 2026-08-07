@@ -3,101 +3,200 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Yeni Ürün Girişi - BARON'S SILLAGE</title>
-  
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <title>CommerceOS — Yeni Ürün Girişi</title>
+
+  <script src="https://unpkg.com/lucide@latest"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <div class="app-container">
-    <header class="navbar">
-      <div class="logo-area">
-        <div class="logo-icon"><i class="fa-solid fa-crown"></i></div>
-        <div>
-          <h1 class="logo-title">BARON'S SILLAGE</h1>
-          <span class="logo-subtitle">Enterprise Admin & Inventory Panel</span>
-        </div>
-      </div>
 
-      <div class="sync-badge-container">
-        <div class="sync-badge" id="syncStatusBadge">
-          <span class="pulse-dot"></span>
-          <i class="fa-brands fa-google"></i>
-          <span>Live SQLite & Sheet Sync</span>
+<div class="layout">
+
+<!-- SIDEBAR -->
+<aside class="sidebar" id="sidebar">
+    <a href="index.html" class="logo">
+        <div class="logo-mark">
+            <i data-lucide="shopping-bag" size="18"></i>
         </div>
-        <button class="btn btn-secondary btn-icon" id="btnToggleSound" title="Bildirim Seslerini Aç/Kapat"><i class="fa-solid fa-bell"></i></button>
-        <button class="btn btn-secondary btn-icon" id="btnRefreshData" title="Verileri Yenile"><i class="fa-solid fa-arrows-rotate"></i></button>
-      </div>
+        Commerce<span>OS</span>
+    </a>
+
+    <div class="section-title">ANA MENÜ</div>
+
+    <a href="index.html" class="nav-item">
+        <i data-lucide="layout-dashboard"></i>
+        Dashboard & Stok
+    </a>
+
+    <a href="orders.html" class="nav-item">
+        <i data-lucide="shopping-cart"></i>
+        Siparişler
+        <span class="nav-badge" id="ordersBadgeCount">0</span>
+    </a>
+
+    <a href="new-product.html" class="nav-item active">
+        <i data-lucide="package"></i>
+        Yeni Ürün Ekle
+    </a>
+
+    <a href="campaigns.html" class="nav-item">
+        <i data-lucide="badge-percent"></i>
+        Kampanyalar
+    </a>
+
+    <a href="rewards.html" class="nav-item">
+        <i data-lucide="star"></i>
+        VIP Ödüller
+    </a>
+
+    <div class="section-title">YÖNETİM & AI</div>
+
+    <a href="ai-product.html" class="nav-item">
+        <i data-lucide="sparkles"></i>
+        F.R.I.D.A.Y. AI Copilot
+    </a>
+
+    <a href="settings.html" class="nav-item">
+        <i data-lucide="settings"></i>
+        Ayarlar & Kargo
+    </a>
+
+    <div class="sidebar-bottom">
+        <div class="store-card">
+            <div class="store-avatar">N</div>
+            <div class="store-info">
+                <strong>Nova Store</strong>
+                <small>BARON'S SILLAGE</small>
+            </div>
+            <i data-lucide="chevron-down" size="15" style="margin-left:auto;color:#9ca3af"></i>
+        </div>
+    </div>
+</aside>
+
+<!-- MAIN -->
+<main class="main">
+
+    <!-- TOPBAR -->
+    <header class="topbar">
+        <div style="display:flex;align-items:center;gap:10px">
+            <button class="icon-button mobile-menu" onclick="toggleSidebar()">
+                <i data-lucide="menu"></i>
+            </button>
+
+            <div class="search">
+                <i data-lucide="search" size="15"></i>
+                <input type="text" placeholder="Ürün veya kategori ara...">
+                <span style="font-size:9px;color:#9ca3af">⌘ K</span>
+            </div>
+        </div>
+
+        <div class="top-actions">
+            <div class="sync-badge" id="syncStatusBadge" style="margin-right:10px;">
+                <span class="pulse-dot"></span>
+                <span>Live SQLite & Sheet Sync</span>
+            </div>
+
+            <button class="icon-button" id="btnToggleSound" title="Bildirim Sesleri">
+                <i data-lucide="bell" size="17"></i>
+                <span class="notification-dot"></span>
+            </button>
+
+            <button class="icon-button" id="btnRefreshData" title="Verileri Yenile">
+                <i data-lucide="refresh-cw" size="17"></i>
+            </button>
+
+            <div class="user">
+                <div class="avatar">EM</div>
+                <div class="user-text">
+                    <strong>Emre İşcenkal</strong>
+                    <span>Administrator</span>
+                </div>
+                <i data-lucide="chevron-down" size="13"></i>
+            </div>
+        </div>
     </header>
 
-    <main class="main-content">
-      <section class="controls-bar glass-card">
-        <div class="tabs">
-          <a href="index.html" class="tab-btn"><i class="fa-solid fa-tags"></i> Ürün & Stok Listesi</a>
-          <a href="orders.html" class="tab-btn"><i class="fa-solid fa-receipt"></i> Siparişler <span class="badge" id="ordersBadgeCount">0</span></a>
-          <a href="new-product.html" class="tab-btn active"><i class="fa-solid fa-plus-circle"></i> Yeni Ürün Girişi</a>
-          <a href="campaigns.html" class="tab-btn"><i class="fa-solid fa-bullhorn"></i> 🎉 Kampanyalar</a>
-          <a href="rewards.html" class="tab-btn"><i class="fa-solid fa-gift"></i> 💎 VIP Sadakat Ödülleri</a>
-          <a href="settings.html" class="tab-btn"><i class="fa-solid fa-truck"></i> 🚚 Fiyat & Kargo Ayarları</a>
-          <a href="ai-product.html" class="tab-btn btn-ai-tab"><i class="fa-solid fa-wand-magic-sparkles"></i> ✨ Gemini AI ile Ürün Ekle</a>
-        </div>
-      </section>
+    <!-- CONTENT -->
+    <section class="content">
 
-      <section class="tab-content active" id="newProductTab">
-        <div class="card glass-card form-card">
-          <div class="card-header">
-            <h3><i class="fa-solid fa-box-archive"></i> Manuel Ürün & Stok Girişi</h3>
-          </div>
-          <div class="card-body">
+        <div class="page-header">
+            <div class="page-title">
+                <h1>Manuel Yeni Ürün Girişi</h1>
+                <p>Envanterinize manuel olarak yeni bir ürün veya beden varyantı ekleyin.</p>
+            </div>
+        </div>
+
+        <!-- FORM CARD -->
+        <div class="card table-card">
+            <div class="table-header">
+                <div class="table-title">📦 Ürün Bilgileri ve Stok Ayarları</div>
+            </div>
+
             <form id="newProductForm">
-              <div class="form-grid">
-                <div class="form-group">
-                  <label for="shortCode">Kısa Kod (Örn: KGMLW)</label>
-                  <input type="text" id="shortCode" placeholder="Örn: KGMLW" required style="text-transform: uppercase;">
-                </div>
-                <div class="form-group">
-                  <label for="sizeInput">Beden / Numara (Örn: M veya 41)</label>
-                  <input type="text" id="sizeInput" placeholder="Örn: M" required style="text-transform: uppercase;">
-                </div>
-                <div class="form-group">
-                  <label for="productCode">Ürün Kodu (Otomatik Üretilir)</label>
-                  <input type="text" id="productCode" placeholder="Örn: KGMLW-M" style="text-transform: uppercase;">
-                  <small class="field-hint" id="autoCodePreview">Önizleme: KGMLW-M</small>
-                </div>
-                <div class="form-group">
-                  <label for="productName">Ürün İsmi</label>
-                  <input type="text" id="productName" placeholder="Örn: KUMAŞ GÖMLEK" required>
-                </div>
-                <div class="form-group">
-                  <label for="colorInput">Renk</label>
-                  <input type="text" id="colorInput" placeholder="Örn: BEYAZ" required>
-                </div>
-                <div class="form-group">
-                  <label for="stockInput">Başlangıç Stok Adedi</label>
-                  <input type="number" id="stockInput" min="0" placeholder="Örn: 10" required>
-                </div>
-                <div class="form-group">
-                  <label for="categoryInput">Kategori</label>
-                  <input type="text" id="categoryInput" placeholder="Örn: GÖMLEK">
-                </div>
-              </div>
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label>Kısa Kod (Örn: S)</label>
+                        <input type="text" id="shortCode" placeholder="Örn: S" required>
+                    </div>
 
-              <div class="form-actions">
-                <button type="submit" class="btn btn-primary btn-glow" id="btnSubmitProduct">
-                  <i class="fa-solid fa-cloud-arrow-up"></i> Ürünü Kaydet
-                </button>
-              </div>
+                    <div class="form-group">
+                        <label>Beden / Ölçü (Örn: M, L, XL, 50ml)</label>
+                        <input type="text" id="sizeInput" placeholder="Örn: M" required>
+                    </div>
+
+                    <div class="form-group full-width">
+                        <label>Otomatik Ürün Kodu Önizlemesi</label>
+                        <input type="text" id="productCode" readonly style="background:#f3f4f6; font-weight:700; color:#4f46e5;">
+                    </div>
+
+                    <div class="form-group">
+                        <label>Ürün İsmi</label>
+                        <input type="text" id="productName" placeholder="Örn: Sillage Noir Perfume" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Renk / Varyant</label>
+                        <input type="text" id="colorInput" placeholder="Örn: Siyah" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Başlangıç Stok Adedi</label>
+                        <input type="number" id="stockInput" placeholder="100" min="0" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Fiyat (TL)</label>
+                        <input type="number" id="priceInput" placeholder="299" min="0" required>
+                    </div>
+
+                    <div class="form-group full-width">
+                        <label>Kategori</label>
+                        <input type="text" id="categoryInput" placeholder="Örn: Parfüm / Erkek" required>
+                    </div>
+                </div>
+
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary">
+                        <i data-lucide="plus" size="14"></i>
+                        Ürünü Kaydet & Yayınla
+                    </button>
+                </div>
             </form>
-          </div>
         </div>
-      </section>
-    </main>
-  </div>
 
-  <div class="toast-container" id="toastContainer"></div>
-  <script src="app.js"></script>
+    </section>
+</main>
+</div>
+
+<div class="toast-container" id="toastContainer"></div>
+
+<script src="app.js"></script>
+<script>
+  function toggleSidebar(){
+    document.getElementById("sidebar").classList.toggle("open");
+  }
+  lucide.createIcons();
+</script>
 </body>
 </html>

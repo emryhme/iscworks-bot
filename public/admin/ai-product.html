@@ -3,96 +3,186 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Gemini AI ile Ürün Ekle - BARON'S SILLAGE</title>
-  
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <title>CommerceOS — F.R.I.D.A.Y. AI Copilot</title>
+
+  <script src="https://unpkg.com/lucide@latest"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <div class="app-container">
-    <header class="navbar">
-      <div class="logo-area">
-        <div class="logo-icon"><i class="fa-solid fa-crown"></i></div>
-        <div>
-          <h1 class="logo-title">BARON'S SILLAGE</h1>
-          <span class="logo-subtitle">Enterprise Admin & Inventory Panel</span>
-        </div>
-      </div>
 
-      <div class="sync-badge-container">
-        <div class="sync-badge" id="syncStatusBadge">
-          <span class="pulse-dot"></span>
-          <i class="fa-brands fa-google"></i>
-          <span>Live SQLite & Sheet Sync</span>
+<div class="layout">
+
+<!-- SIDEBAR -->
+<aside class="sidebar" id="sidebar">
+    <a href="index.html" class="logo">
+        <div class="logo-mark">
+            <i data-lucide="shopping-bag" size="18"></i>
         </div>
-        <button class="btn btn-secondary btn-icon" id="btnToggleSound" title="Bildirim Seslerini Aç/Kapat"><i class="fa-solid fa-bell"></i></button>
-        <button class="btn btn-secondary btn-icon" id="btnRefreshData" title="Verileri Yenile"><i class="fa-solid fa-arrows-rotate"></i></button>
-      </div>
+        Commerce<span>OS</span>
+    </a>
+
+    <div class="section-title">ANA MENÜ</div>
+
+    <a href="index.html" class="nav-item">
+        <i data-lucide="layout-dashboard"></i>
+        Dashboard & Stok
+    </a>
+
+    <a href="orders.html" class="nav-item">
+        <i data-lucide="shopping-cart"></i>
+        Siparişler
+        <span class="nav-badge" id="ordersBadgeCount">0</span>
+    </a>
+
+    <a href="new-product.html" class="nav-item">
+        <i data-lucide="package"></i>
+        Yeni Ürün Ekle
+    </a>
+
+    <a href="campaigns.html" class="nav-item">
+        <i data-lucide="badge-percent"></i>
+        Kampanyalar
+    </a>
+
+    <a href="rewards.html" class="nav-item">
+        <i data-lucide="star"></i>
+        VIP Ödüller
+    </a>
+
+    <div class="section-title">YÖNETİM & AI</div>
+
+    <a href="ai-product.html" class="nav-item active">
+        <i data-lucide="sparkles"></i>
+        F.R.I.D.A.Y. AI Copilot
+    </a>
+
+    <a href="settings.html" class="nav-item">
+        <i data-lucide="settings"></i>
+        Ayarlar & Kargo
+    </a>
+
+    <div class="sidebar-bottom">
+        <div class="store-card">
+            <div class="store-avatar">N</div>
+            <div class="store-info">
+                <strong>Nova Store</strong>
+                <small>BARON'S SILLAGE</small>
+            </div>
+            <i data-lucide="chevron-down" size="15" style="margin-left:auto;color:#9ca3af"></i>
+        </div>
+    </div>
+</aside>
+
+<!-- MAIN -->
+<main class="main">
+
+    <!-- TOPBAR -->
+    <header class="topbar">
+        <div style="display:flex;align-items:center;gap:10px">
+            <button class="icon-button mobile-menu" onclick="toggleSidebar()">
+                <i data-lucide="menu"></i>
+            </button>
+
+            <div class="search">
+                <i data-lucide="search" size="15"></i>
+                <input type="text" placeholder="AI komut geçmişi ara...">
+                <span style="font-size:9px;color:#9ca3af">⌘ K</span>
+            </div>
+        </div>
+
+        <div class="top-actions">
+            <div class="sync-badge" id="syncStatusBadge" style="margin-right:10px;">
+                <span class="pulse-dot"></span>
+                <span>Gemini AI Active</span>
+            </div>
+
+            <button class="icon-button" id="btnToggleSound" title="Bildirim Sesleri">
+                <i data-lucide="bell" size="17"></i>
+                <span class="notification-dot"></span>
+            </button>
+
+            <button class="icon-button" id="btnRefreshData" title="Verileri Yenile">
+                <i data-lucide="refresh-cw" size="17"></i>
+            </button>
+
+            <div class="user">
+                <div class="avatar">EM</div>
+                <div class="user-text">
+                    <strong>Emre İşcenkal</strong>
+                    <span>Administrator</span>
+                </div>
+                <i data-lucide="chevron-down" size="13"></i>
+            </div>
+        </div>
     </header>
 
-    <main class="main-content">
-      <section class="controls-bar glass-card">
-        <div class="tabs">
-          <a href="index.html" class="tab-btn"><i class="fa-solid fa-tags"></i> Ürün & Stok Listesi</a>
-          <a href="orders.html" class="tab-btn"><i class="fa-solid fa-receipt"></i> Siparişler <span class="badge" id="ordersBadgeCount">0</span></a>
-          <a href="new-product.html" class="tab-btn"><i class="fa-solid fa-plus-circle"></i> Yeni Ürün Girişi</a>
-          <a href="campaigns.html" class="tab-btn"><i class="fa-solid fa-bullhorn"></i> 🎉 Kampanyalar</a>
-          <a href="rewards.html" class="tab-btn"><i class="fa-solid fa-gift"></i> 💎 VIP Sadakat Ödülleri</a>
-          <a href="settings.html" class="tab-btn"><i class="fa-solid fa-truck"></i> 🚚 Fiyat & Kargo Ayarları</a>
-          <a href="ai-product.html" class="tab-btn btn-ai-tab active"><i class="fa-solid fa-robot"></i> ✨ Yapay Zekadan Destek Al</a>
+    <!-- CONTENT -->
+    <section class="content">
+
+        <div class="page-header">
+            <div class="page-title">
+                <h1>F.R.I.D.A.Y. AI Yönetim Asistanı</h1>
+                <p>Yapay zeka ile stok düzenleyin, fiyat güncelleyin, ürün ekleyin ve canlı sipariş sorgulayın.</p>
+            </div>
         </div>
-      </section>
 
-      <section class="tab-content active" id="aiProductTab">
-        <div class="card glass-card form-card ai-card" style="max-width:900px; margin:0 auto;">
-          <div class="card-header" style="display:flex; align-items:center; justify-content:space-between;">
-            <h3><i class="fa-solid fa-robot text-gold"></i> F.R.I.D.A.Y. Yönetim & Asistan Copilot</h3>
-            <span class="status-badge in-stock"><i class="fa-solid fa-circle text-green" style="font-size:8px;"></i> Canlı AI Bağlantısı</span>
-          </div>
-          <div class="card-body" style="padding:1.5rem;">
-            <p class="ai-hint-text" style="color:#94a3b8; font-size:0.9rem; margin-bottom:1.2rem;">
-              Patron, mağazanızla ilgili herhangi bir emri Türkçe yazabilirsiniz: <strong>Stok güncelleme, fiyat değiştirme, sipariş sorgulama veya yeni ürün ekleme!</strong>
-            </p>
-
-            <!-- Quick Action Pills -->
-            <div style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:1.2rem;" id="aiQuickActions">
-              <button class="btn btn-sm btn-secondary" onclick="setAiPrompt('Tüm ürünlerimizi ve stok durumlarını listele')">🏷️ Ürünleri Listele / Ara</button>
-              <button class="btn btn-sm btn-secondary" onclick="setAiPrompt('KGMLW-M ürününün stok adedini 50 yap')">📦 Stok Güncelle</button>
-              <button class="btn btn-sm btn-secondary" onclick="setAiPrompt('KGMLW-M fiyatını 450 TL olarak ayarla')">💰 Fiyat Güncelle</button>
-              <button class="btn btn-sm btn-secondary" onclick="setAiPrompt('Son verilen siparişleri listele')">🛍️ Sipariş Sorgula</button>
-              <button class="btn btn-sm btn-secondary" onclick="setAiPrompt('Siyah M beden Erkek Polo Tişört ekle, fiyatı 399 TL stok 25 adet olsun')">✨ Yeni Ürün Ekle</button>
+        <!-- AI CHAT CARD -->
+        <div class="card table-card">
+            <div class="table-header">
+                <div class="table-title">✨ Canlı Yapay Zeka Sohbet & Komuta Merkezi</div>
             </div>
 
-            <!-- Chat Window -->
-            <div id="aiAdminChatWindow" style="background:#0f172a; border:1px solid #334155; border-radius:12px; height:420px; overflow-y:auto; padding:1.25rem; display:flex; flex-direction:column; gap:12px; margin-bottom:1.2rem;">
-              <div style="display:flex; gap:10px; align-items:flex-start;">
-                <div style="width:36px; height:36px; border-radius:50%; background:linear-gradient(135deg, #a855f7, #6366f1); display:flex; align-items:center; justify-content:center; color:#fff; font-size:16px;">
-                  <i class="fa-solid fa-robot"></i>
+            <div style="padding:20px;">
+                <!-- Chat Message Window -->
+                <div id="aiAdminChatWindow" style="height:380px; overflow-y:auto; border:1px solid #e5e7eb; background:#f9fafb; border-radius:10px; padding:1.25rem; display:flex; flex-direction:column; gap:12px; margin-bottom:1.25rem;">
+                    <!-- Friday Intro Bubble -->
+                    <div style="display:flex; gap:10px; align-items:flex-start;">
+                        <div style="width:36px; height:36px; border-radius:50%; background:#111827; display:flex; align-items:center; justify-content:center; color:#ff9900; font-size:16px;">
+                            <i class="fa-solid fa-robot"></i>
+                        </div>
+                        <div style="background:#ffffff; color:#111827; padding:0.85rem 1.1rem; border-radius:12px; border-top-left-radius:2px; max-width:80%; font-size:0.92rem; line-height:1.5; border:1px solid #e5e7eb; box-shadow:0 2px 8px rgba(0,0,0,0.04);">
+                            Merhaba Patron! Ben F.R.I.D.A.Y. 🤖<br>
+                            Mağazanızdaki stokları güncellemek, fiyat değiştirmek, siparişleri sorgulamak veya veritabanındaki ürünleri listelemek için bana emredebilirsiniz. Size nasıl yardımcı olabilirim?
+                        </div>
+                    </div>
                 </div>
-                <div style="background:#1e293b; color:#f8fafc; padding:0.85rem 1.1rem; border-radius:12px; border-top-left-radius:2px; max-width:80%; font-size:0.92rem; line-height:1.5; border:1px solid #334155;">
-                  Merhaba Sayın Tony Stark (Patron)! 🤖 Ben F.R.I.D.A.Y. Mağaza Yönetim Asistanınızım.<br><br>
-                  Bugün hangi işlemi yapmamı istersiniz? Stok düzenleme, fiyat güncelleme, sipariş sorgulama veya yeni ürün ekleme emirlerinizi bekliyorum!
-                </div>
-              </div>
-            </div>
 
-            <!-- Input Area -->
-            <div style="display:flex; gap:10px;">
-              <textarea id="aiAdminChatInput" rows="2" placeholder="Örn: KGMLW-M fiyatını 450 TL yap ve stoğunu 50 adede çıkar..." style="flex:1; background:#0f172a; border:1px solid #475569; border-radius:10px; color:#f8fafc; padding:0.75rem; font-family:inherit; font-size:0.92rem; resize:none;"></textarea>
-              <button class="btn btn-primary btn-glow" id="btnSendAdminChat" style="padding:0 1.5rem; display:flex; align-items:center; gap:8px;">
-                <i class="fa-solid fa-paper-plane"></i> Gönder
-              </button>
+                <!-- Quick Action Pills -->
+                <div style="margin-bottom:1.25rem;">
+                    <span style="font-size:11px; font-weight:700; color:#6b7280; display:block; margin-bottom:8px;">⚡ Hızlı Komut Şablonları:</span>
+                    <div style="display:flex; flex-wrap:wrap; gap:8px;">
+                        <button class="btn btn-secondary btn-sm" onclick="setAiPrompt('Tüm ürünleri ve mevcut stok seviyelerini listele')">🏷️ Ürünleri Listele / Ara</button>
+                        <button class="btn btn-secondary btn-sm" onclick="setAiPrompt('BARONS-01 kodlu ürünün stok miktarını 50 yap')">📦 Stok Güncelle</button>
+                        <button class="btn btn-secondary btn-sm" onclick="setAiPrompt('BARONS-01 kodlu ürünün fiyatını 350 TL yap')">💰 Fiyat Güncelle</button>
+                        <button class="btn btn-secondary btn-sm" onclick="setAiPrompt('Son siparişleri ve durumlarını göster')">🛍️ Sipariş Sorgula</button>
+                        <button class="btn btn-secondary btn-sm" onclick="setAiPrompt('Siyah Parfüm XL beden 450 TL olarak yeni ürün ekle')">✨ Yeni Ürün Ekle</button>
+                    </div>
+                </div>
+
+                <!-- Input Box -->
+                <div style="display:flex; gap:10px;">
+                    <textarea id="aiAdminChatInput" rows="2" placeholder="F.R.I.D.A.Y.'a emrinizi yazın (Örn: BARONS-01 fiyatını 399 TL yap)..." style="flex:1; padding:0.75rem 1rem; border-radius:8px; border:1px solid #e5e7eb; font-size:0.9rem; outline:none; resize:none;"></textarea>
+                    <button class="btn btn-primary" id="btnSendAdminChat" style="padding:0 1.5rem;">
+                        <i data-lucide="send" size="16"></i>
+                        Gönder
+                    </button>
+                </div>
             </div>
-          </div>
         </div>
-      </section>
-    </main>
-  </div>
 
-  <div class="toast-container" id="toastContainer"></div>
-  <script src="app.js"></script>
+    </section>
+</main>
+</div>
+
+<div class="toast-container" id="toastContainer"></div>
+
+<script src="app.js"></script>
+<script>
+  function toggleSidebar(){
+    document.getElementById("sidebar").classList.toggle("open");
+  }
+  lucide.createIcons();
+</script>
 </body>
 </html>

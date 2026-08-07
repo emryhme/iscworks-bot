@@ -3,176 +3,340 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Ürünler & Stok Yönetimi - BARON'S SILLAGE</title>
-  
-  <!-- Google Fonts: Plus Jakarta Sans & Inter -->
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-  
-  <!-- FontAwesome Icons -->
+  <title>CommerceOS — Mağaza & Stok Dashboard</title>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-  
+
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <div class="app-container">
-    <!-- Navbar Layout -->
-    <header class="navbar">
-      <div class="logo-area">
-        <div class="logo-icon">
-          <i class="fa-solid fa-crown"></i>
-        </div>
-        <div>
-          <h1 class="logo-title">BARON'S SILLAGE</h1>
-          <span class="logo-subtitle">Enterprise Admin & Inventory Panel</span>
-        </div>
-      </div>
 
-      <div class="sync-badge-container">
-        <div class="sync-badge" id="syncStatusBadge">
-          <span class="pulse-dot"></span>
-          <i class="fa-brands fa-google"></i>
-          <span>Live SQLite & Sheet Sync</span>
+<div class="layout">
+
+<!-- SIDEBAR -->
+<aside class="sidebar" id="sidebar">
+    <a href="index.html" class="logo">
+        <div class="logo-mark">
+            <i data-lucide="shopping-bag" size="18"></i>
         </div>
-        <button class="btn btn-secondary btn-icon" id="btnToggleSound" title="Bildirim Seslerini Aç/Kapat">
-          <i class="fa-solid fa-bell"></i>
-        </button>
-        <button class="btn btn-secondary btn-icon" id="btnRefreshData" title="Verileri Yenile">
-          <i class="fa-solid fa-arrows-rotate"></i>
-        </button>
-      </div>
+        Commerce<span>OS</span>
+    </a>
+
+    <div class="section-title">ANA MENÜ</div>
+
+    <a href="index.html" class="nav-item active">
+        <i data-lucide="layout-dashboard"></i>
+        Dashboard & Stok
+    </a>
+
+    <a href="orders.html" class="nav-item">
+        <i data-lucide="shopping-cart"></i>
+        Siparişler
+        <span class="nav-badge" id="ordersBadgeCount">0</span>
+    </a>
+
+    <a href="new-product.html" class="nav-item">
+        <i data-lucide="package"></i>
+        Yeni Ürün Ekle
+    </a>
+
+    <a href="campaigns.html" class="nav-item">
+        <i data-lucide="badge-percent"></i>
+        Kampanyalar
+    </a>
+
+    <a href="rewards.html" class="nav-item">
+        <i data-lucide="star"></i>
+        VIP Ödüller
+    </a>
+
+    <div class="section-title">YÖNETİM & AI</div>
+
+    <a href="ai-product.html" class="nav-item">
+        <i data-lucide="sparkles"></i>
+        F.R.I.D.A.Y. AI Copilot
+    </a>
+
+    <a href="settings.html" class="nav-item">
+        <i data-lucide="settings"></i>
+        Ayarlar & Kargo
+    </a>
+
+    <div class="sidebar-bottom">
+        <div class="store-card">
+            <div class="store-avatar">N</div>
+            <div class="store-info">
+                <strong>Nova Store</strong>
+                <small>BARON'S SILLAGE</small>
+            </div>
+            <i data-lucide="chevron-down" size="15" style="margin-left:auto;color:#9ca3af"></i>
+        </div>
+    </div>
+</aside>
+
+<!-- MAIN -->
+<main class="main">
+
+    <!-- TOPBAR -->
+    <header class="topbar">
+        <div style="display:flex;align-items:center;gap:10px">
+            <button class="icon-button mobile-menu" onclick="toggleSidebar()">
+                <i data-lucide="menu"></i>
+            </button>
+
+            <div class="search">
+                <i data-lucide="search" size="15"></i>
+                <input type="text" id="searchInput" placeholder="Sipariş, ürün kodu veya müşteri ara...">
+                <span style="font-size:9px;color:#9ca3af">⌘ K</span>
+            </div>
+        </div>
+
+        <div class="top-actions">
+            <div class="sync-badge" id="syncStatusBadge" style="margin-right:10px;">
+                <span class="pulse-dot"></span>
+                <span>Live SQLite & Sheet Sync</span>
+            </div>
+
+            <button class="icon-button" id="btnToggleSound" title="Bildirim Sesleri">
+                <i data-lucide="bell" size="17"></i>
+                <span class="notification-dot"></span>
+            </button>
+
+            <button class="icon-button" id="btnRefreshData" title="Verileri Yenile">
+                <i data-lucide="refresh-cw" size="17"></i>
+            </button>
+
+            <div class="user">
+                <div class="avatar">EM</div>
+                <div class="user-text">
+                    <strong>Emre İşcenkal</strong>
+                    <span>Administrator</span>
+                </div>
+                <i data-lucide="chevron-down" size="13"></i>
+            </div>
+        </div>
     </header>
 
-    <!-- Main Content Area -->
-    <main class="main-content">
-      
-      <!-- Metric Cards Grid -->
-      <section class="metrics-grid">
-        <div class="metric-card glass-card">
-          <div class="metric-icon purple">
-            <i class="fa-solid fa-boxes-stacked"></i>
-          </div>
-          <div class="metric-info">
-            <span class="metric-label">Toplam Ürün Kodu</span>
-            <h2 class="metric-value" id="statTotalProducts">--</h2>
-            <span class="metric-sub text-purple"><i class="fa-solid fa-sheet-plastic"></i> Google Sheet Verisi</span>
-          </div>
-        </div>
+    <!-- CONTENT -->
+    <section class="content">
 
-        <div class="metric-card glass-card">
-          <div class="metric-icon blue">
-            <i class="fa-solid fa-warehouse"></i>
-          </div>
-          <div class="metric-info">
-            <span class="metric-label">Toplam Stok Miktarı</span>
-            <h2 class="metric-value" id="statTotalStock">--</h2>
-            <span class="metric-sub text-blue"><i class="fa-solid fa-chart-simple"></i> Anlık Adet</span>
-          </div>
-        </div>
-
-        <div class="metric-card glass-card">
-          <div class="metric-icon green">
-            <i class="fa-solid fa-bag-shopping"></i>
-          </div>
-          <div class="metric-info">
-            <span class="metric-label">Toplam Sipariş</span>
-            <h2 class="metric-value" id="statTotalOrders">--</h2>
-            <span class="metric-sub text-green"><i class="fa-solid fa-arrow-trend-up"></i> Canlı Satışlar</span>
-          </div>
-        </div>
-
-        <div class="metric-card glass-card">
-          <div class="metric-icon gold">
-            <i class="fa-solid fa-wand-magic-sparkles"></i>
-          </div>
-          <div class="metric-info">
-            <span class="metric-label">Yapay Zeka İşlemi</span>
-            <a href="ai-product.html" class="btn btn-primary btn-sm btn-glow mt-1">
-              <i class="fa-solid fa-wand-magic-sparkles"></i> Gemini AI ile Ekle
-            </a>
-          </div>
-        </div>
-      </section>
-
-      <!-- Navigation Bar Links -->
-      <section class="controls-bar glass-card">
-        <div class="tabs">
-          <a href="index.html" class="tab-btn active">
-            <i class="fa-solid fa-tags"></i> Ürün & Stok Listesi
-          </a>
-          <a href="orders.html" class="tab-btn">
-            <i class="fa-solid fa-receipt"></i> Siparişler
-            <span class="badge" id="ordersBadgeCount">0</span>
-          </a>
-          <a href="new-product.html" class="tab-btn">
-            <i class="fa-solid fa-plus-circle"></i> Yeni Ürün Girişi
-          </a>
-          <a href="campaigns.html" class="tab-btn">
-            <i class="fa-solid fa-bullhorn"></i> 🎉 Kampanyalar
-          </a>
-          <a href="rewards.html" class="tab-btn">
-            <i class="fa-solid fa-gift"></i> 💎 VIP Sadakat Ödülleri
-          </a>
-          <a href="settings.html" class="tab-btn">
-            <i class="fa-solid fa-truck"></i> 🚚 Fiyat & Kargo Ayarları
-          </a>
-          <a href="ai-product.html" class="tab-btn btn-ai-tab">
-            <i class="fa-solid fa-wand-magic-sparkles"></i> ✨ Gemini AI ile Ürün Ekle
-          </a>
-        </div>
-
-        <div class="search-box">
-          <i class="fa-solid fa-magnifying-glass"></i>
-          <input type="text" id="searchInput" placeholder="Kodu, ismi, rengi veya kategoriyi ara...">
-        </div>
-      </section>
-
-      <!-- Content: Ürün & Stok Listesi -->
-      <section class="tab-content active" id="productsTab">
-        <div class="card glass-card">
-          <div class="card-header" style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:1rem;">
-            <h3><i class="fa-solid fa-table-list"></i> Google Sheet Stok & Ürün Yönetimi</h3>
-            <div style="display:flex; align-items:center; gap:0.75rem;">
-              <span class="table-count" id="productsTableCount">0 ürün listelendi</span>
-              <button class="btn btn-success btn-glow btn-sm" id="btnSaveAllPricesAndStocks" onclick="saveAllPricesAndStocks()">
-                <i class="fa-solid fa-floppy-disk"></i> 💾 Değişiklikleri Toplu Kaydet
-              </button>
+        <div class="page-header">
+            <div class="page-title">
+                <h1>Dashboard & Stok Yönetimi</h1>
+                <p>Mağazanızın canlı performansına ve stok verilerine genel bakış.</p>
             </div>
-          </div>
-          <div class="table-responsive">
-            <table class="data-table" id="productsTable">
-              <thead>
-                <tr>
-                  <th>KISA KOD</th>
-                  <th>ÜRÜN KODU</th>
-                  <th>ÜRÜN İSMİ</th>
-                  <th>RENK</th>
-                  <th>NUMARA</th>
-                  <th>STOK</th>
-                  <th>FİYAT (TL)</th>
-                  <th>KATEGORİ</th>
-                  <th>İşlem</th>
-                </tr>
-              </thead>
-              <tbody id="productsTableBody">
-                <tr>
-                  <td colspan="9" class="loading-cell">
-                    <i class="fa-solid fa-spinner fa-spin"></i> Stok verileri SQLite ve Google Sheet ile senkronize ediliyor...
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
+
+            <div class="header-actions">
+                <button class="btn" id="btnSaveAllPricesAndStocks" onclick="saveAllPricesAndStocks()">
+                    <i data-lucide="save" size="14"></i>
+                    Toplu Kaydet
+                </button>
+
+                <a href="ai-product.html" class="btn btn-primary">
+                    <i data-lucide="sparkles" size="14"></i>
+                    AI Copilot Destek Al
+                </a>
+            </div>
         </div>
-      </section>
 
-    </main>
-  </div>
+        <!-- KPI -->
+        <div class="kpi-grid">
+            <div class="card kpi">
+                <div class="kpi-top">
+                    <span class="kpi-label">TOPLAM ÜRÜN KODU</span>
+                    <div class="kpi-icon orange">
+                        <i data-lucide="package" size="16"></i>
+                    </div>
+                </div>
+                <div class="kpi-value" id="statTotalProducts">--</div>
+                <div class="kpi-bottom">
+                    <span class="up">↑ Google Sheet</span>
+                    <span class="muted">canlı envanter</span>
+                </div>
+            </div>
 
-  <!-- Toast Notification Container -->
-  <div class="toast-container" id="toastContainer"></div>
+            <div class="card kpi">
+                <div class="kpi-top">
+                    <span class="kpi-label">TOPLAM STOK ADEDİ</span>
+                    <div class="kpi-icon blue">
+                        <i data-lucide="boxes" size="16"></i>
+                    </div>
+                </div>
+                <div class="kpi-value" id="statTotalStock">--</div>
+                <div class="kpi-bottom">
+                    <span class="up">↑ Anlık Adet</span>
+                    <span class="muted">depo durumu</span>
+                </div>
+            </div>
 
-  <script src="app.js"></script>
+            <div class="card kpi">
+                <div class="kpi-top">
+                    <span class="kpi-label">TOPLAM SİPARİŞ</span>
+                    <div class="kpi-icon green">
+                        <i data-lucide="shopping-bag" size="16"></i>
+                    </div>
+                </div>
+                <div class="kpi-value" id="statTotalOrders">--</div>
+                <div class="kpi-bottom">
+                    <span class="up">↑ Live Satışlar</span>
+                    <span class="muted">sipariş kaydı</span>
+                </div>
+            </div>
+
+            <div class="card kpi">
+                <div class="kpi-top">
+                    <span class="kpi-label">YAPAY ZEKA İŞLEMİ</span>
+                    <div class="kpi-icon purple">
+                        <i data-lucide="sparkles" size="16"></i>
+                    </div>
+                </div>
+                <div class="kpi-value">F.R.I.D.A.Y.</div>
+                <div class="kpi-bottom">
+                    <span class="up">✓ 7/24 Aktif</span>
+                    <span class="muted">AI asistanı</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- CHARTS -->
+        <div class="grid-main">
+            <div class="card chart-card">
+                <div class="card-header">
+                    <div>
+                        <div class="card-title">Satış Performansı</div>
+                        <div class="card-subtitle">Son 30 günlük satış ve sipariş trendi</div>
+                    </div>
+                    <select class="select">
+                        <option>Son 30 gün</option>
+                        <option>Son 7 gün</option>
+                        <option>Son 12 ay</option>
+                    </select>
+                </div>
+                <div class="chart-container">
+                    <canvas id="salesChart"></canvas>
+                </div>
+            </div>
+
+            <div class="card chart-card">
+                <div class="card-header">
+                    <div>
+                        <div class="card-title">Satış Kanalları</div>
+                        <div class="card-subtitle">Kanallara göre gelir dağılımı</div>
+                    </div>
+                </div>
+                <div class="channel-list">
+                    <div class="channel">
+                        <div class="channel-icon"><i data-lucide="instagram" size="16"></i></div>
+                        <div class="channel-info">
+                            <strong>Instagram DM Bot</strong>
+                            <span>Canlı Sipariş & AI</span>
+                            <div class="progress"><div style="width:76%"></div></div>
+                        </div>
+                        <div class="channel-price">76.4%</div>
+                    </div>
+                    <div class="channel">
+                        <div class="channel-icon"><i data-lucide="globe" size="16"></i></div>
+                        <div class="channel-info">
+                            <strong>Online Mağaza</strong>
+                            <span>Web Siparişleri</span>
+                            <div class="progress"><div style="width:45%"></div></div>
+                        </div>
+                        <div class="channel-price">18.0%</div>
+                    </div>
+                    <div class="channel">
+                        <div class="channel-icon"><i data-lucide="store" size="16"></i></div>
+                        <div class="channel-info">
+                            <strong>Manuel Satıcı Tanımları</strong>
+                            <span>VIP Ödül & Form</span>
+                            <div class="progress"><div style="width:27%"></div></div>
+                        </div>
+                        <div class="channel-price">5.6%</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- PRODUCTS TABLE -->
+        <div class="card table-card">
+            <div class="table-header">
+                <div>
+                    <div class="table-title">Ürün & Stok Yönetimi</div>
+                    <span style="font-size:10px;color:#6b7280;" id="productsTableCount">0 ürün listelendi</span>
+                </div>
+                <button class="btn btn-primary btn-sm" onclick="saveAllPricesAndStocks()">
+                    <i data-lucide="save" size="13"></i> Toplu Kaydet
+                </button>
+            </div>
+
+            <div class="table-responsive">
+                <table id="productsTable">
+                    <thead>
+                        <tr>
+                            <th>KISA KOD</th>
+                            <th>ÜRÜN KODU</th>
+                            <th>ÜRÜN İSMİ</th>
+                            <th>RENK</th>
+                            <th>NUMARA</th>
+                            <th>STOK</th>
+                            <th>FİYAT (TL)</th>
+                            <th>KATEGORİ</th>
+                            <th>İŞLEM</th>
+                        </tr>
+                    </thead>
+                    <tbody id="productsTableBody">
+                        <tr>
+                            <td colspan="9" style="text-align:center;padding:40px;color:#6b7280;">
+                                Stok verileri yükleniyor...
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+    </section>
+</main>
+</div>
+
+<div class="toast-container" id="toastContainer"></div>
+
+<script src="app.js"></script>
+<script>
+  function toggleSidebar(){
+    document.getElementById("sidebar").classList.toggle("open");
+  }
+  lucide.createIcons();
+
+  // Initialize Sales Chart
+  const ctx = document.getElementById("salesChart");
+  if(ctx){
+    new Chart(ctx,{
+        type:"line",
+        data:{
+            labels:["10 Tem","14 Tem","18 Tem","22 Tem","26 Tem","30 Tem","3 Ağu","7 Ağu"],
+            datasets:[
+                {
+                    label:"Satış (TL)",
+                    data:[9200,14200,12600,16500,19400,24100,26700,28900],
+                    borderWidth:2,
+                    tension:.4,
+                    fill:true,
+                    backgroundColor:"rgba(255,153,0,.08)",
+                    borderColor:"#ff9900",
+                    pointRadius:0
+                }
+            ]
+        },
+        options:{
+            responsive:true,
+            maintainAspectRatio:false,
+            plugins:{legend:{display:false}},
+            scales:{x:{grid:{display:false}},y:{grid:{color:"#f0f0f0"}}}
+        }
+    });
+  }
+</script>
 </body>
 </html>
