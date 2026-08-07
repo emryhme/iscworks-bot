@@ -4,10 +4,15 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = __importDefault(require("express"));
+const path_1 = __importDefault(require("path"));
+const axios_1 = __importDefault(require("axios"));
 const env_1 = require("./config/env");
 const webhook_controller_1 = require("./controllers/webhook.controller");
 const order_service_1 = require("./services/order.service");
 const stock_service_1 = require("./services/stock.service");
+const ai_service_1 = require("./services/ai.service");
+const gemini_service_1 = require("./services/gemini.service");
+const regex_util_1 = require("./utils/regex.util");
 const db_1 = require("./database/db");
 // Veritabanını Uygulama Başlarken Anında Teyit Et
 (0, db_1.initDatabase)();
@@ -46,16 +51,16 @@ const basicAuth = (req, res, next) => {
     }
 };
 // Yönetim Paneli ve Dashboard (Şifreli)
-app.use('/admin', basicAuth, express_1.default.static(path.join(__dirname, '../public/admin')));
+app.use('/admin', basicAuth, express_1.default.static(path_1.default.join(__dirname, '../public/admin')));
 app.get('/admin', basicAuth, (req, res) => {
-    res.sendFile(path.join(__dirname, '../public/admin/index.html'));
+    res.sendFile(path_1.default.join(__dirname, '../public/admin/index.html'));
 });
 app.use('/', (req, res, next) => {
     if (req.path === '/webhook/instagram' || req.path.startsWith('/webhook') || req.path.startsWith('/api')) {
         return next();
     }
     return basicAuth(req, res, next);
-}, express_1.default.static(path.join(__dirname, '../public')));
+}, express_1.default.static(path_1.default.join(__dirname, '../public')));
 // Müşteri Sadakat Ödülleri API (user_rewards)
 app.get('/api/rewards', (req, res) => {
     try {
@@ -189,7 +194,7 @@ app.post('/api/chat', async (req, res) => {
     if (!senderId || !message) {
         return res.status(400).json({ error: 'senderId and message required' });
     }
-    const result = await AIService.processMessage(senderId, message);
+    const result = await ai_service_1.AIService.processMessage(senderId, message);
     res.json({ success: true, reply: result.reply, tokens: result.tokens });
 });
 // n8n Entegrasyon Uç Noktası (Instagram Meta -> n8n -> Backend)
@@ -201,7 +206,7 @@ app.post('/api/n8n/chat', async (req, res) => {
         }
         let finalMessage = message || '';
         if (attachmentTitle) {
-            const extractedCode = extractProductCode(attachmentTitle);
+            const extractedCode = (0, regex_util_1.extractProductCode)(attachmentTitle);
             if (extractedCode) {
                 finalMessage = `${extractedCode}\n\nMüşteri bu ürünü sipariş etmek istiyor. Lütfen ürünün stok durumunu, beden seçeneklerini kontrol ederek müşteriye yardımcı ol.`;
             }
@@ -213,8 +218,8 @@ app.post('/api/n8n/chat', async (req, res) => {
         if (callbackUrl) {
             res.json({ success: true, status: 'processing', message: 'Yanıt hazırlanıyor, Webhook adresine yollanacak.' });
             // Arka planda AI yanıtını üretip Webhook'a yolla
-            AIService.processMessage(senderId, finalMessage).then(result => {
-                axios.post(callbackUrl, {
+            ai_service_1.AIService.processMessage(senderId, finalMessage).then(result => {
+                axios_1.default.post(callbackUrl, {
                     success: true,
                     senderId,
                     reply: result.reply,
@@ -224,7 +229,7 @@ app.post('/api/n8n/chat', async (req, res) => {
             return;
         }
         // Senkron Yanıt Modu (Standart)
-        const result = await AIService.processMessage(senderId, finalMessage);
+        const result = await ai_service_1.AIService.processMessage(senderId, finalMessage);
         res.json({
             success: true,
             senderId,
@@ -432,7 +437,7 @@ app.post('/api/ai/create-product', async (req, res) => {
         if (!prompt || typeof prompt !== 'string' || prompt.trim() === '') {
             return res.status(400).json({ success: false, error: 'Lütfen ürün komut metni giriniz.' });
         }
-        const result = await GeminiService.createProductFromPrompt(prompt.trim());
+        const result = await gemini_service_1.GeminiService.createProductFromPrompt(prompt.trim());
         if (result.success && result.products && result.products.length > 0) {
             res.json({
                 success: true,
@@ -450,8 +455,6 @@ app.post('/api/ai/create-product', async (req, res) => {
         res.status(500).json({ success: false, error: err.message || 'Yapay zeka sunucu hatası' });
     }
 });
-// Veritabanını Başlat (SQLite Migration & Seed)
-(0, db_1.initDatabase)();
 // Sunucuyu Başlat
 app.listen(env_1.env.port, () => {
     console.log(`
