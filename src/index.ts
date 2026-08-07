@@ -95,8 +95,8 @@ app.post('/api/rewards', (req, res) => {
     const minAmt = Number(minQualifyingAmount) || 2000;
 
     // Müşteri Adını Veritabanındaki Son Siparişinden Çek
-    const lastOrder = db.prepare('SELECT customer_name FROM orders WHERE sender_id = ? ORDER BY id DESC LIMIT 1').get(sId) as any;
-    const customerNameDisplay = (lastOrder && lastOrder.customer_name) ? lastOrder.customer_name.trim() : 'Müşterimiz';
+    const lastOrder = db.prepare('SELECT first_name, last_name FROM orders WHERE sender_id = ? ORDER BY id DESC LIMIT 1').get(sId) as any;
+    const customerNameDisplay = lastOrder ? `${lastOrder.first_name || ''} ${lastOrder.last_name || ''}`.trim() || 'Müşterimiz' : 'Müşterimiz';
 
     const stmt = db.prepare(`
       INSERT INTO user_rewards (sender_id, reward_code, discount_percent, min_qualifying_amount, is_used)
@@ -108,10 +108,10 @@ app.post('/api/rewards', (req, res) => {
 
     // Müşteriye Instagram DM Bildirimi Gönder
     FacebookService.sendMessage(sId, dmNotice).catch(err => {
-      console.error('[Reward DM Error]:', err.message);
+      console.error('[Manual Reward DM Error]:', err.message);
     });
 
-    res.json({ success: true, message: `VIP Sadakat Ödülü başarıyla kaydedildi ve ${sId} kullanıcısına DM bildirimi gönderildi!` });
+    res.json({ success: true, message: `Müşteri (${sId}) için %${percent} VIP indirim tanımlandı.` });
   } catch (e: any) {
     res.status(500).json({ success: false, error: e.message });
   }
@@ -171,25 +171,41 @@ app.delete('/api/campaigns/:id', (req, res) => {
 // Sistem Ayarları & Kargo Fiyatı API
 app.get('/api/settings', (req, res) => {
   try {
-    const settings = db.prepare('SELECT * FROM settings').all();
-    res.json({ success: true, settings });
+    const rows = db.prepare('SELECT * FROM settings').all() as any[];
+    const settingsObj: Record<string, string> = {};
+    for (const r of rows) {
+      if (r && r.key) {
+        settingsObj[r.key] = r.value || '';
+      }
+    }
+    res.json({ success: true, settings: settingsObj, settingsList: rows });
   } catch (e: any) {
-    res.status(500).json({ error: e.message });
+    res.status(500).json({ success: false, error: e.message, settings: {} });
   }
 });
 
 app.post('/api/settings', (req, res) => {
   try {
-    const { shippingFee, freeShippingThreshold } = req.body;
+    const { key, value, settings, shippingFee, freeShippingThreshold } = req.body;
+    
+    if (key && value !== undefined) {
+      db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)').run(String(key), String(value));
+    }
     if (shippingFee !== undefined) {
       db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES ("shipping_fee", ?)').run(String(shippingFee));
     }
     if (freeShippingThreshold !== undefined) {
       db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES ("free_shipping_threshold", ?)').run(String(freeShippingThreshold));
     }
-    res.json({ success: true, message: 'Kargo ayarları güncellendi.' });
+    if (settings && typeof settings === 'object') {
+      for (const [k, v] of Object.entries(settings)) {
+        db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)').run(String(k), String(v));
+      }
+    }
+
+    res.json({ success: true, message: 'Ayarlar güncellendi.' });
   } catch (e: any) {
-    res.status(500).json({ error: e.message });
+    res.status(500).json({ success: false, error: e.message });
   }
 });
 
