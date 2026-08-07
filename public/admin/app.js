@@ -701,23 +701,161 @@ async function handleAiProductSubmit() {
 
 // Sipariş Durumu Güncelleme (OK veya DEC)
 async function updateOrderStatus(orderId, status) {
+  if (status === 'DEC') {
+    openRejectionModal(orderId);
+    return;
+  }
+
   try {
     const res = await fetch(`${API_BASE}/api/orders/status`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ orderId, status })
+      body: JSON.stringify({ orderId, status: 'OK' })
     });
     const data = await res.json();
 
     if (data.success) {
-      const statusText = status === 'OK' ? 'ONAYLANDI' : 'REDDEDİLDİ';
-      showToast(`✅ Sipariş ${orderId} durumu '${statusText}' olarak güncellendi.`, 'success');
+      showToast(`✅ Sipariş ${orderId} onaylandı! Müşteriye bildirim gönderildi.`, 'success');
       fetchData();
     } else {
       showToast(`❌ Hata: ${data.error || 'Sipariş durumu güncellenemedi.'}`, 'error');
     }
   } catch (err) {
     showToast('Sipariş güncellenirken sunucu hatası oluştu.', 'error');
+  }
+}
+
+// Rejection Modal Dynamic Engine
+function getOrCreateRejectionModal() {
+  let modal = document.getElementById('rejectionModal');
+  if (modal) return modal;
+
+  modal = document.createElement('div');
+  modal.id = 'rejectionModal';
+  modal.style.cssText = `
+    position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+    background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(10px);
+    display: none; align-items: center; justify-content: center; z-index: 9999;
+  `;
+
+  modal.innerHTML = `
+    <div style="background: linear-gradient(135deg, #1e293b, #0f172a); border: 1px solid #334155; border-radius: 16px; width: 90%; max-width: 520px; padding: 2rem; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.7); animation: modalFadeIn 0.3s ease;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.5rem; border-bottom:1px solid #334155; padding-bottom:1rem;">
+        <h3 style="color:#f43f5e; margin:0; font-size:1.25rem; display:flex; align-items:center; gap:8px;">
+          <i class="fa-solid fa-circle-xmark"></i> Siparişi Reddet & Müşteriye Bildir
+        </h3>
+        <button id="btnCloseRejectionModal" style="background:none; border:none; color:#94a3b8; font-size:1.5rem; cursor:pointer;">&times;</button>
+      </div>
+
+      <p style="color:#cbd5e1; font-size:0.9rem; margin-bottom:1.2rem;" id="rejectionModalSubtitle">
+        Siparişi reddetme nedeninizi seçin. Müşterinin Instagram hesabına doğrudan DM mesajı olarak gönderilecektir.
+      </p>
+
+      <div style="margin-bottom:1.2rem;">
+        <label style="display:block; color:#94a3b8; font-size:0.85rem; font-weight:600; margin-bottom:0.5rem;">
+          📋 İptal / Red Sebebi Şablonu Seçin:
+        </label>
+        <select id="rejectionReasonSelect" style="width:100%; padding:0.75rem; border-radius:8px; border:1px solid #475569; background:#0f172a; color:#f8fafc; font-size:0.9rem; font-weight:500;">
+          <option value="stok">📦 Stok Tükenmesi (Ürün / Beden Tükendi)</option>
+          <option value="adres">📍 Eksik / Anlaşılmayan Teslimat Adresi</option>
+          <option value="odeme">💳 Ödeme / Dekont Doğrulaması Başarısız</option>
+          <option value="iletisim">📞 Müşteri ile İletişim Kurulamadı</option>
+          <option value="ozel">✏️ Özel Nedeni Kendim Yazacağım</option>
+        </select>
+      </div>
+
+      <div style="margin-bottom:1.5rem;">
+        <label style="display:block; color:#94a3b8; font-size:0.85rem; font-weight:600; margin-bottom:0.5rem;">
+          💬 Müşteriye Gidecek Mesaj Önizlemesi:
+        </label>
+        <textarea id="rejectionReasonText" rows="4" style="width:100%; padding:0.75rem; border-radius:8px; border:1px solid #475569; background:#0f172a; color:#f8fafc; font-size:0.88rem; font-family:inherit; resize:vertical;"></textarea>
+      </div>
+
+      <div style="display:flex; justify-content:flex-end; gap:12px;">
+        <button id="btnCancelRejection" class="btn btn-sm" style="background:#334155; color:#f8fafc; padding:0.6rem 1.2rem; border-radius:8px; border:none; cursor:pointer;">Vazgeç</button>
+        <button id="btnConfirmRejection" class="btn btn-sm btn-delete" style="padding:0.6rem 1.2rem; border-radius:8px; cursor:pointer;">
+          <i class="fa-solid fa-paper-plane"></i> Reddet & DM Yolla
+        </button>
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(modal);
+
+  const reasonTemplates = {
+    stok: 'Üzülerek bildiririz ki sipariş ettiğiniz ürün/beden stoklarımızda kalmadığı için siparişiniz onaylanamamıştır. Anlayışınız için teşekkür ederiz.',
+    adres: 'Girdiğiniz teslimat adresi veya iletişim bilgileri eksik/anlaşılmasız olduğu için siparişiniz işleme alınamamıştır. Lütfen güncel bilgilerinizle tekrar iletişime geçiniz.',
+    odeme: 'Siparişinize ait ödeme doğrulaması gerçekleştirilemediği için siparişiniz işleme alınamamıştır.',
+    iletisim: 'Sipariş teyidi için sizinle iletişim kurulamadığından siparişiniz iptal edilmiştir.',
+    ozel: ''
+  };
+
+  const select = document.getElementById('rejectionReasonSelect');
+  const textarea = document.getElementById('rejectionReasonText');
+  const btnClose = document.getElementById('btnCloseRejectionModal');
+  const btnCancel = document.getElementById('btnCancelRejection');
+
+  if (select && textarea) {
+    textarea.value = reasonTemplates.stok;
+    select.addEventListener('change', (e) => {
+      const val = e.target.value;
+      if (val === 'ozel') {
+        textarea.value = '';
+        textarea.focus();
+      } else {
+        textarea.value = reasonTemplates[val] || '';
+      }
+    });
+  }
+
+  const closeModal = () => { modal.style.display = 'none'; };
+  if (btnClose) btnClose.onclick = closeModal;
+  if (btnCancel) btnCancel.onclick = closeModal;
+
+  return modal;
+}
+
+function openRejectionModal(orderId) {
+  const modal = getOrCreateRejectionModal();
+  const subtitle = document.getElementById('rejectionModalSubtitle');
+  const btnConfirm = document.getElementById('btnConfirmRejection');
+  const textarea = document.getElementById('rejectionReasonText');
+
+  if (subtitle) subtitle.textContent = `Sipariş #${orderId} için red sebebi seçin. Müşterinin Instagram hesabına doğrudan DM mesajı olarak gönderilecektir.`;
+  modal.style.display = 'flex';
+
+  if (btnConfirm) {
+    btnConfirm.onclick = async () => {
+      const reason = textarea ? textarea.value.trim() : '';
+      if (!reason) {
+        showToast('Lütfen müşteriye gönderilecek red nedenini yazın veya seçin.', 'error');
+        return;
+      }
+
+      btnConfirm.disabled = true;
+      btnConfirm.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Gönderiliyor...`;
+
+      try {
+        const res = await fetch(`${API_BASE}/api/orders/status`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ orderId, status: 'DEC', reason })
+        });
+        const data = await res.json();
+        if (data.success) {
+          showToast(`✅ Sipariş ${orderId} reddedildi ve müşteriye DM bildirimi yollandı.`, 'success');
+          modal.style.display = 'none';
+          fetchData();
+        } else {
+          showToast(`❌ Hata: ${data.error || 'Sipariş reddedilemedi'}`, 'error');
+        }
+      } catch (e) {
+        showToast('Sunucu bağlantı hatası oluştu.', 'error');
+      } finally {
+        btnConfirm.disabled = false;
+        btnConfirm.innerHTML = `<i class="fa-solid fa-paper-plane"></i> Reddet & DM Yolla`;
+      }
+    };
   }
 }
 

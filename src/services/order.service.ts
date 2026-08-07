@@ -4,6 +4,7 @@ import { db } from '../database/db';
 import { StockService } from './stock.service';
 import { GoogleSheetsService } from './google-sheets.service';
 import { TelegramService } from './telegram.service';
+import { FacebookService } from './facebook.service';
 
 export interface OrderData {
   customerName: string;
@@ -188,9 +189,9 @@ export class OrderService {
   }
 
   /**
-   * Sipariş Onay / Red İşlemi (Sipariş Reddedilirse (DEC) Stoğu +1 İade Eder, OK yapılırsa alıcıya onay mesajı yollar!)
+   * Sipariş Onay / Red İşlemi (Sipariş Reddedilirse (DEC) Stoğu +1 İade Eder, Red sebebini Instagram DM gönderir!)
    */
-  public static async updateOrderStatus(orderId: string, status: 'OK' | 'DEC'): Promise<boolean> {
+  public static async updateOrderStatus(orderId: string, status: 'OK' | 'DEC', reason?: string): Promise<boolean> {
     try {
       const existingOrder = db.prepare(`SELECT * FROM orders WHERE order_id = ?`).get(orderId) as any;
       if (!existingOrder) {
@@ -208,10 +209,23 @@ export class OrderService {
       if (result.changes > 0) {
         console.log(`[OrderService SQLite] ✅ Sipariş (${orderId}) Durumu Güncellendi: ${prevStatus} -> ${status}`);
 
-        // 1. SİPARİŞ REDDEDİLDİYSE (DEC): Stoğu +1 İade Et!
+        // 1. SİPARİŞ REDDEDİLDİYSE (DEC): Stoğu +1 İade Et & Müşteriye Red Sebebini DM Gönder!
         if (status === 'DEC' && prevStatus !== 'DEC') {
           console.log(`[OrderService] 🔄 Sipariş reddedildi, ${targetProductCode} (${existingOrder.size}) stoğuna +${qty} iade ediliyor...`);
           await StockService.restoreStock(targetProductCode, qty, existingOrder.size);
+
+          const senderId = existingOrder.sender_id;
+          if (senderId) {
+            const customerName = `${existingOrder.first_name || ''} ${existingOrder.last_name || ''}`.trim() || 'Müşterimiz';
+            const defaultReason = 'Siparişiniz operasyonel nedenlerle onaylanamamıştır.';
+            const cleanReason = reason && reason.trim() ? reason.trim() : defaultReason;
+
+            const dmMessage = ` Sayın ${customerName},\n\nSiparişiniz (#${orderId}) maalesef onaylanamamıştır.\n\nİptal / Red Nedeni:\n${cleanReason}\n\nAnlayışınız için teşekkür eder, keyifli günler dileriz. 🌸`;
+
+            FacebookService.sendMessage(senderId, dmMessage).catch(err => {
+              console.error('[Order Rejection DM Error]:', err.message);
+            });
+          }
         }
         // 2. Sipariş ONAYLANDIYSA (OK): Müşteriye "Siparişiniz Onaylandı" Mesajı Gönder!
         else if (status === 'OK') {

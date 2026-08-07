@@ -369,21 +369,21 @@ app.post('/api/products/bulk-update', (req, res) => {
 // Sipariş Onay / Red İşlemi (Google Sheet DURUM = OK veya DEC güncellemesi)
 app.post('/api/orders/status', async (req, res) => {
   try {
-    const { orderId, status } = req.body;
+    const { orderId, status, reason } = req.body;
     if (!orderId || !status || (status !== 'OK' && status !== 'DEC')) {
       return res.status(400).json({ success: false, error: 'orderId ve geçerli bir status (OK veya DEC) gereklidir' });
     }
 
-    const success = await OrderService.updateOrderStatus(orderId, status);
+    const success = await OrderService.updateOrderStatus(orderId, status, reason);
     if (success) {
       res.json({
         success: true,
-        message: `Sipariş ${orderId} durumu '${status}' olarak Google Sheets'e kaydedildi.`,
+        message: `Sipariş ${orderId} durumu '${status}' olarak güncellendi.`,
         orderId,
         status
       });
     } else {
-      res.status(500).json({ success: false, error: 'Sipariş durumu Google Sheets üzerinde güncellenemedi.' });
+      res.status(500).json({ success: false, error: 'Sipariş durumu veritabanında güncellenemedi.' });
     }
   } catch (err: any) {
     console.error('[API /api/orders/status Error]:', err);
