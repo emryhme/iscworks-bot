@@ -26,11 +26,38 @@ app.use((req, res, next) => {
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-app.use(express.static(path.join(__dirname, '../public')));
 
-// Admin Panel Statik Dosyaları Sun
-const adminPanelPath = path.resolve(process.cwd(), '../admin-panel');
-app.use('/admin', express.static(adminPanelPath));
+// HTTP Basic Auth Middleware (Yönetim Koruması)
+const ADMIN_USER = process.env.ADMIN_USER || 'patron';
+const ADMIN_PASS = process.env.ADMIN_PASS || 'tonystark2026!';
+
+const basicAuth = (req: express.Request, res: express.Response, next: express.NextFunction) => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader) {
+    res.setHeader('WWW-Authenticate', 'Basic realm="iscworks bot Admin Panel"');
+    return res.status(401).send('🔒 Yetkisiz Erişim: Lütfen patron kullanıcı adı ve şifrenizi girin.');
+  }
+
+  const auth = Buffer.from(authHeader.split(' ')[1], 'base64').toString().split(':');
+  const user = auth[0];
+  const pass = auth[1];
+
+  if (user === ADMIN_USER && pass === ADMIN_PASS) {
+    return next();
+  } else {
+    res.setHeader('WWW-Authenticate', 'Basic realm="iscworks bot Admin Panel"');
+    return res.status(401).send('❌ Hatalı kullanıcı adı veya şifre.');
+  }
+};
+
+// Yönetim Paneli ve Dashboard (Şifreli)
+app.use('/admin', basicAuth, express.static(path.resolve(process.cwd(), '../admin-panel')));
+app.use('/', (req, res, next) => {
+  if (req.path === '/webhook/instagram' || req.path.startsWith('/webhook')) {
+    return next();
+  }
+  return basicAuth(req, res, next);
+}, express.static(path.join(__dirname, '../public')));
 
 // Web Chat & Simulator API End-point'i
 app.post('/api/chat', async (req, res) => {
