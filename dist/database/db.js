@@ -114,6 +114,14 @@ function initDatabase() {
         exports.db.exec(`ALTER TABLE orders ADD COLUMN sender_id TEXT DEFAULT '';`);
     }
     catch (e) { }
+    try {
+        exports.db.exec(`ALTER TABLE campaigns ADD COLUMN start_date TEXT DEFAULT NULL;`);
+    }
+    catch (e) { }
+    try {
+        exports.db.exec(`ALTER TABLE campaigns ADD COLUMN end_date TEXT DEFAULT NULL;`);
+    }
+    catch (e) { }
     // İndeksler (Sorgu Hızlandırma)
     exports.db.exec(`
     CREATE INDEX IF NOT EXISTS idx_products_code ON products(product_code);

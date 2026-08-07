@@ -707,30 +707,43 @@ async function fetchCampaigns() {
   try {
     const res = await fetch(`${API_BASE}/api/campaigns`);
     if (!res.ok) {
-      tableBody.innerHTML = `<tr><td colspan="6" style="text-align:center; padding: 1.5rem; color: #ef4444;">Kampanyalar alınamadı (${res.status}).</td></tr>`;
+      tableBody.innerHTML = `<tr><td colspan="7" style="text-align:center; padding: 1.5rem; color: #ef4444;">Kampanyalar alınamadı (${res.status}).</td></tr>`;
       return;
     }
     const data = await res.json();
     if (data && data.success && Array.isArray(data.campaigns)) {
       if (data.campaigns.length === 0) {
-        tableBody.innerHTML = `<tr><td colspan="6" style="text-align:center; padding: 1.5rem; color: #94a3b8;">Henüz aktif bir kampanya eklenmemiş. Yeni kampanya ekleyebilirsiniz.</td></tr>`;
+        tableBody.innerHTML = `<tr><td colspan="7" style="text-align:center; padding: 1.5rem; color: #94a3b8;">Henüz aktif bir kampanya eklenmemiş. Yeni kampanya ekleyebilirsiniz.</td></tr>`;
         return;
       }
-      tableBody.innerHTML = data.campaigns.map(c => `
-        <tr>
-          <td>#${c.id}</td>
-          <td><strong>${escapeHtml(c.title)}</strong></td>
-          <td>${escapeHtml(c.description)}</td>
-          <td><span class="code-tag">${escapeHtml(c.code || '-')}</span></td>
-          <td><strong class="text-green">%${c.discount_percent || 0}</strong></td>
-          <td>
-            <button class="btn btn-sm btn-delete" onclick="deleteCampaign(${c.id})"><i class="fa-solid fa-trash-can"></i> Sil</button>
-          </td>
-        </tr>
-      `).join('');
+      tableBody.innerHTML = data.campaigns.map(c => {
+        let endDateBadge = '<span class="status-badge in-stock">Süresiz</span>';
+        if (c.end_date) {
+          const isExpired = new Date(c.end_date) < new Date(new Date().setHours(0,0,0,0));
+          if (isExpired) {
+            endDateBadge = `<span class="status-badge out-stock">⏳ ${c.end_date} (Süresi Doldu)</span>`;
+          } else {
+            endDateBadge = `<span class="status-badge low-stock">📅 Son: ${c.end_date}</span>`;
+          }
+        }
+
+        return `
+          <tr>
+            <td>#${c.id}</td>
+            <td><strong>${escapeHtml(c.title)}</strong></td>
+            <td>${escapeHtml(c.description)}</td>
+            <td><span class="code-tag">${escapeHtml(c.code || '-')}</span></td>
+            <td><strong class="text-green">%${c.discount_percent || 0}</strong></td>
+            <td>${endDateBadge}</td>
+            <td>
+              <button class="btn btn-sm btn-delete" onclick="deleteCampaign(${c.id})"><i class="fa-solid fa-trash-can"></i> Sil</button>
+            </td>
+          </tr>
+        `;
+      }).join('');
     }
   } catch (e) {
-    tableBody.innerHTML = `<tr><td colspan="6" style="text-align:center; padding: 1.5rem; color: #ef4444;">Bağlantı hatası: ${escapeHtml(e.message)}</td></tr>`;
+    tableBody.innerHTML = `<tr><td colspan="7" style="text-align:center; padding: 1.5rem; color: #ef4444;">Bağlantı hatası: ${escapeHtml(e.message)}</td></tr>`;
   }
 }
 
@@ -741,6 +754,8 @@ async function handleCampaignSubmit(e) {
   const codeElem = document.getElementById('campCode');
   const percentElem = document.getElementById('campPercent');
   const descElem = document.getElementById('campDesc');
+  const startDateElem = document.getElementById('campStartDate');
+  const endDateElem = document.getElementById('campEndDate');
 
   if (!titleElem || !descElem) {
     showToast('Lütfen başlık ve açıklama alanlarını doldurun.', 'error');
@@ -751,7 +766,9 @@ async function handleCampaignSubmit(e) {
     title: titleElem.value.trim(),
     code: codeElem ? codeElem.value.trim().toUpperCase() : '',
     discountPercent: percentElem ? (Number(percentElem.value) || 0) : 0,
-    description: descElem.value.trim()
+    description: descElem.value.trim(),
+    startDate: startDateElem ? startDateElem.value : null,
+    endDate: endDateElem ? endDateElem.value : null
   };
 
   if (!payload.title || !payload.description) {

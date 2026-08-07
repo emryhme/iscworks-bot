@@ -85,16 +85,16 @@ app.get('/api/campaigns', (req, res) => {
 });
 app.post('/api/campaigns', (req, res) => {
     try {
-        const { title, description, code, discountPercent, discountAmount, minOrderAmount } = req.body;
+        const { title, description, code, discountPercent, discountAmount, minOrderAmount, startDate, endDate } = req.body;
         const stmt = db_1.db.prepare(`
-      INSERT INTO campaigns (title, description, code, discount_percent, discount_amount, min_order_amount, active)
-      VALUES (?, ?, ?, ?, ?, ?, 1)
+      INSERT INTO campaigns (title, description, code, discount_percent, discount_amount, min_order_amount, start_date, end_date, active)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)
     `);
-        stmt.run(title, description, code || '', discountPercent || 0, discountAmount || 0, minOrderAmount || 0);
+        stmt.run(title, description, code || '', discountPercent || 0, discountAmount || 0, minOrderAmount || 0, startDate || null, endDate || null);
         res.json({ success: true, message: 'Kampanya başarıyla oluşturuldu.' });
     }
     catch (e) {
-        res.status(500).json({ error: e.message });
+        res.status(500).json({ success: false, error: e.message });
     }
 });
 app.delete('/api/campaigns/:id', (req, res) => {

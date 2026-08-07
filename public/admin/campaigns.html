@@ -70,6 +70,14 @@
                   <label>Açıklama / Bot Notu</label>
                   <input type="text" id="campDesc" placeholder="Müşteriye uygulanacak indirim açıklaması" required>
                 </div>
+                <div class="form-group">
+                  <label>Başlangıç Tarihi</label>
+                  <input type="date" id="campStartDate">
+                </div>
+                <div class="form-group">
+                  <label>Bitiş / Son Kullanma Tarihi</label>
+                  <input type="date" id="campEndDate">
+                </div>
               </div>
               <div class="form-actions">
                 <button type="submit" class="btn btn-primary btn-glow">🎉 Kampanyayı Başlat</button>
@@ -86,11 +94,12 @@
                     <th>Açıklama</th>
                     <th>Kod</th>
                     <th>İndirim</th>
+                    <th>Bitiş Tarihi</th>
                     <th>İşlem</th>
                   </tr>
                 </thead>
                 <tbody id="campaignsTableBody">
-                  <tr><td colspan="6" style="text-align:center;">Kampanyalar yükleniyor...</td></tr>
+                  <tr><td colspan="7" style="text-align:center;">Kampanyalar yükleniyor...</td></tr>
                 </tbody>
               </table>
             </div>

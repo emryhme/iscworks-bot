@@ -98,6 +98,8 @@ export function initDatabase() {
   try { db.exec(`ALTER TABLE orders ADD COLUMN discount REAL NOT NULL DEFAULT 0;`); } catch (e) {}
   try { db.exec(`ALTER TABLE orders ADD COLUMN total_price REAL NOT NULL DEFAULT 0;`); } catch (e) {}
   try { db.exec(`ALTER TABLE orders ADD COLUMN sender_id TEXT DEFAULT '';`); } catch (e) {}
+  try { db.exec(`ALTER TABLE campaigns ADD COLUMN start_date TEXT DEFAULT NULL;`); } catch (e) {}
+  try { db.exec(`ALTER TABLE campaigns ADD COLUMN end_date TEXT DEFAULT NULL;`); } catch (e) {}
 
   // İndeksler (Sorgu Hızlandırma)
   db.exec(`

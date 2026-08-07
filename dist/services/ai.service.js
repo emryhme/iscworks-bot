@@ -462,8 +462,12 @@ Stok sorgulama, sepete ekleme ve sipariş kayıt ajansın.
         try {
             await this.extractSessionDataWithAI(senderId, userMessage, apiKey);
             const ctx = this.getSessionContext(senderId);
-            // Veritabanından Aktif Kampanyaları ve Kişiye Özel VIP İndirim Ödülünü Çek
-            const activeCampaigns = db_1.db.prepare('SELECT title, description, code FROM campaigns WHERE active = 1').all();
+            // Veritabanından Aktif ve Süresi Dolmamış Kampanyaları Çek
+            const activeCampaigns = db_1.db.prepare(`
+        SELECT title, description, code, start_date, end_date 
+        FROM campaigns 
+        WHERE active = 1 AND (end_date IS NULL OR end_date = '' OR end_date >= DATE('now'))
+      `).all();
             const shippingSetting = db_1.db.prepare("SELECT value FROM settings WHERE key = 'shipping_fee'").get();
             const thresholdSetting = db_1.db.prepare("SELECT value FROM settings WHERE key = 'free_shipping_threshold'").get();
             const loyaltyThresholdSetting = db_1.db.prepare("SELECT value FROM settings WHERE key = 'loyalty_threshold'").get();
