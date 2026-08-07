@@ -1,25 +1,30 @@
 :root {
-  --bg-primary: #0b0f19;
-  --bg-secondary: #111827;
-  --bg-card: rgba(17, 24, 39, 0.7);
-  --bg-card-hover: rgba(31, 41, 55, 0.8);
+  /* Amazon Seller Central Signature Command Console Palette */
+  --bg-primary: #0f141e;          /* Amazon Deep Navy Command Background */
+  --bg-secondary: #131921;        /* Amazon Navbar Dark Navy */
+  --bg-card: #192231;             /* Amazon Console Card Surface */
+  --bg-card-hover: #222d3f;       /* Amazon Hover Card Highlight */
   
-  --border-color: rgba(255, 255, 255, 0.08);
-  --border-active: rgba(99, 102, 241, 0.4);
+  --border-color: #2b3648;        /* Amazon Console Crisp Border */
+  --border-active: #ff9900;       /* Amazon Signature Amber/Orange Border */
   
-  --text-main: #f3f4f6;
-  --text-muted: #9ca3af;
+  --text-main: #f3f4f6;           /* Amazon Bright Text */
+  --text-muted: #9ca3af;          /* Amazon Subtext */
   --text-dim: #6b7280;
   
-  --primary: #6366f1;
-  --primary-hover: #4f46e5;
-  --primary-glow: rgba(99, 102, 241, 0.35);
+  --primary: #ff9900;             /* Amazon Signature Orange */
+  --primary-hover: #e68a00;
+  --primary-glow: rgba(255, 153, 0, 0.35);
 
-  --accent-purple: #a855f7;
-  --accent-blue: #3b82f6;
-  --accent-green: #10b981;
-  --accent-gold: #f59e0b;
-  --accent-danger: #ef4444;
+  --amazon-yellow: #ffd814;      /* Amazon Buy-Box Action Yellow */
+  --amazon-yellow-hover: #f7ca00;
+  --amazon-yellow-text: #0f1111;
+
+  --accent-purple: #c084fc;
+  --accent-blue: #38bdf8;
+  --accent-green: #008a00;
+  --accent-gold: #febd69;
+  --accent-danger: #b12704;
 
   --font-family: 'Plus Jakarta Sans', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
   --transition-fast: 0.2s cubic-bezier(0.4, 0, 0.2, 1);
@@ -35,9 +40,9 @@
 body {
   background-color: var(--bg-primary);
   background-image: 
-    radial-gradient(at 0% 0%, rgba(99, 102, 241, 0.15) 0px, transparent 50%),
-    radial-gradient(at 100% 0%, rgba(168, 85, 247, 0.12) 0px, transparent 50%),
-    radial-gradient(at 50% 100%, rgba(16, 185, 129, 0.08) 0px, transparent 50%);
+    radial-gradient(at 0% 0%, rgba(255, 153, 0, 0.12) 0px, transparent 50%),
+    radial-gradient(at 100% 0%, rgba(56, 189, 248, 0.08) 0px, transparent 50%),
+    radial-gradient(at 50% 100%, rgba(0, 138, 0, 0.06) 0px, transparent 50%);
   background-attachment: fixed;
   color: var(--text-main);
   font-family: var(--font-family);
@@ -47,33 +52,34 @@ body {
 }
 
 .app-container {
-  max-width: 1400px;
+  max-width: 1440px;
   margin: 0 auto;
   padding: 20px 28px 60px 28px;
 }
 
-/* Glassmorphism Cards */
+/* Glassmorphism Amazon Console Cards */
 .glass-card {
   background: var(--bg-card);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
   border: 1px solid var(--border-color);
-  border-radius: 16px;
-  box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.5);
+  border-radius: 12px;
+  box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.6);
   transition: var(--transition-normal);
 }
 
-/* Header / Navbar */
+/* Amazon Header / Navbar */
 .navbar {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 16px 24px;
-  background: rgba(17, 24, 39, 0.85);
+  padding: 16px 28px;
+  background: var(--bg-secondary);
   backdrop-filter: blur(20px);
   border: 1px solid var(--border-color);
-  border-radius: 20px;
+  border-radius: 14px;
   margin-bottom: 24px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.4);
 }
 
 .logo-area {
@@ -83,31 +89,29 @@ body {
 }
 
 .logo-icon {
-  width: 46px;
-  height: 46px;
-  border-radius: 14px;
-  background: linear-gradient(135deg, #6366f1 0%, #a855f7 100%);
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #ff9900 0%, #febd69 100%);
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 22px;
-  color: #ffffff;
-  box-shadow: 0 4px 20px rgba(99, 102, 241, 0.4);
+  color: #0f1111;
+  box-shadow: 0 4px 20px rgba(255, 153, 0, 0.4);
 }
 
 .logo-title {
   font-size: 20px;
   font-weight: 800;
   letter-spacing: -0.5px;
-  background: linear-gradient(135deg, #ffffff 0%, #cbd5e1 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
+  color: #ffffff;
 }
 
 .logo-subtitle {
   font-size: 12px;
-  color: var(--text-muted);
-  font-weight: 500;
+  color: var(--accent-gold);
+  font-weight: 600;
   display: block;
 }
 
@@ -121,8 +125,8 @@ body {
   display: flex;
   align-items: center;
   gap: 10px;
-  background: rgba(16, 185, 129, 0.1);
-  border: 1px solid rgba(16, 185, 129, 0.3);
+  background: rgba(0, 138, 0, 0.15);
+  border: 1px solid rgba(0, 138, 0, 0.35);
   color: #34d399;
   padding: 8px 16px;
   border-radius: 30px;
@@ -151,7 +155,7 @@ body {
   }
 }
 
-/* Metric Cards */
+/* Amazon Metric Cards */
 .metrics-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
@@ -164,17 +168,19 @@ body {
   align-items: center;
   gap: 20px;
   padding: 22px;
+  border-left: 4px solid var(--primary);
 }
 
 .metric-card:hover {
   border-color: var(--border-active);
   transform: translateY(-2px);
+  background: var(--bg-card-hover);
 }
 
 .metric-icon {
   width: 56px;
   height: 56px;
-  border-radius: 16px;
+  border-radius: 14px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -182,16 +188,18 @@ body {
   flex-shrink: 0;
 }
 
-.metric-icon.purple { background: rgba(168, 85, 247, 0.15); color: #c084fc; border: 1px solid rgba(168, 85, 247, 0.3); }
-.metric-icon.blue { background: rgba(59, 130, 246, 0.15); color: #60a5fa; border: 1px solid rgba(59, 130, 246, 0.3); }
-.metric-icon.green { background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3); }
-.metric-icon.gold { background: rgba(245, 158, 11, 0.15); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.3); }
+.metric-icon.purple { background: rgba(255, 153, 0, 0.15); color: #febd69; border: 1px solid rgba(255, 153, 0, 0.3); }
+.metric-icon.blue { background: rgba(56, 189, 248, 0.15); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.3); }
+.metric-icon.green { background: rgba(0, 138, 0, 0.15); color: #34d399; border: 1px solid rgba(0, 138, 0, 0.3); }
+.metric-icon.gold { background: rgba(255, 216, 20, 0.15); color: #ffd814; border: 1px solid rgba(255, 216, 20, 0.3); }
 
 .metric-label {
   font-size: 13px;
   color: var(--text-muted);
-  font-weight: 500;
+  font-weight: 600;
   display: block;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
 .metric-value {
@@ -248,9 +256,10 @@ body {
 }
 
 .tab-btn.active {
-  background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
-  color: #ffffff;
-  box-shadow: 0 4px 15px rgba(99, 102, 241, 0.3);
+  background: linear-gradient(135deg, #ff9900 0%, #e68a00 100%);
+  color: #0f1111;
+  font-weight: 700;
+  box-shadow: 0 4px 15px rgba(255, 153, 0, 0.4);
 }
 
 .badge {
@@ -531,21 +540,25 @@ body {
 }
 
 .btn-primary {
-  background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
-  color: #ffffff;
+  background: linear-gradient(135deg, #ffd814 0%, #f7ca00 100%);
+  color: #0f1111;
+  font-weight: 700;
+  box-shadow: 0 4px 14px rgba(255, 216, 20, 0.3);
 }
 
 .btn-primary:hover {
-  background: linear-gradient(135deg, #4f46e5 0%, #4338ca 100%);
+  background: linear-gradient(135deg, #f7ca00 0%, #e2b300 100%);
+  color: #0f1111;
   transform: translateY(-1px);
+  box-shadow: 0 6px 18px rgba(255, 216, 20, 0.5);
 }
 
 .btn-glow {
-  box-shadow: 0 4px 20px rgba(99, 102, 241, 0.4);
+  box-shadow: 0 4px 20px rgba(255, 216, 20, 0.4);
 }
 
 .btn-glow:hover {
-  box-shadow: 0 6px 25px rgba(99, 102, 241, 0.6);
+  box-shadow: 0 6px 25px rgba(255, 216, 20, 0.6);
 }
 
 .btn-secondary {
