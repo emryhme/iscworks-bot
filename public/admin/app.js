@@ -353,6 +353,12 @@ function renderProductsTable() {
         <td>${escapeHtml(p.color || '-')}</td>
         <td><span class="size-pill">${escapeHtml(p.size || '-')}</span></td>
         <td>${stockBadge}</td>
+        <td>
+          <div style="display:flex; align-items:center; gap:4px;">
+            <input type="number" id="price_${escapeHtml(p.productCode)}" value="${p.price || 299}" style="width:75px; padding:4px 6px; border-radius:6px; border:1px solid #475569; background:#0f172a; color:#4ade80; font-weight:700;" />
+            <button class="btn btn-sm btn-stock" onclick="updateProductPrice('${escapeHtml(p.productCode)}')">💾</button>
+          </div>
+        </td>
         <td><small class="text-muted">${escapeHtml(p.category || '-')}</small></td>
         <td>
           <div class="action-btn-group">
@@ -367,6 +373,34 @@ function renderProductsTable() {
       </tr>
     `;
   }).join('');
+}
+
+// Ürün Fiyatı Güncelleme (API)
+async function updateProductPrice(productCode) {
+  const priceInput = document.getElementById(`price_${productCode}`);
+  if (!priceInput) return;
+  const newPrice = Number(priceInput.value);
+  if (isNaN(newPrice) || newPrice < 0) {
+    showToast('Geçersiz fiyat girdiniz.', 'error');
+    return;
+  }
+
+  try {
+    const res = await fetch(`${API_BASE}/api/products/price`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ productCode, price: newPrice })
+    });
+    const data = await res.json();
+    if (data.success) {
+      showToast(`✅ ${productCode} fiyatı ${newPrice} TL olarak kaydedildi.`, 'success');
+      fetchStocks();
+    } else {
+      showToast(data.error || 'Fiyat güncellenemedi.', 'error');
+    }
+  } catch (e) {
+    showToast('Fiyat güncellenirken sunucu hatası oluştu.', 'error');
+  }
 }
 
 // Render Orders Table

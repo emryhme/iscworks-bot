@@ -237,6 +237,32 @@ app.post('/api/products', async (req, res) => {
   }
 });
 
+// Ürün Fiyatı Güncelleme (SQLite & Admin Panel)
+app.post('/api/products/price', (req, res) => {
+  try {
+    const { productCode, price } = req.body;
+    if (!productCode || price === undefined) {
+      return res.status(400).json({ success: false, error: 'productCode ve price zorunludur.' });
+    }
+
+    const numPrice = Number(price);
+    if (isNaN(numPrice) || numPrice < 0) {
+      return res.status(400).json({ success: false, error: 'Geçersiz fiyat.' });
+    }
+
+    const stmt = db.prepare('UPDATE products SET price = ?, updated_at = CURRENT_TIMESTAMP WHERE product_code = ? OR short_code = ?');
+    const result = stmt.run(numPrice, productCode, productCode);
+
+    if (result.changes > 0) {
+      res.json({ success: true, message: `Ürün (${productCode}) fiyatı ${numPrice} TL olarak güncellendi.` });
+    } else {
+      res.status(404).json({ success: false, error: 'Ürün bulunamadı.' });
+    }
+  } catch (e: any) {
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
 // Sipariş Onay / Red İşlemi (Google Sheet DURUM = OK veya DEC güncellemesi)
 app.post('/api/orders/status', async (req, res) => {
   try {
