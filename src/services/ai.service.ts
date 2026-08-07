@@ -5,6 +5,7 @@ import { env } from '../config/env';
 import { StockService } from './stock.service';
 import { OrderService } from './order.service';
 import { TelegramService } from './telegram.service';
+import { FacebookService } from './facebook.service';
 import { extractProductCode } from '../utils/regex.util';
 import { db } from '../database/db';
 
@@ -305,6 +306,10 @@ Yalnızca aşağıdaki JSON yapısını döndür (bilinmeyen alanlar için null 
               VALUES (?, ?, 20.0, ?)
             `).run(senderId, rewardCode, loyaltyThreshold);
             earnedNewLoyaltyReward = true;
+
+            // Instagram DM Otomatik Bildirimi Gönder
+            const autoDmText = `🎉 TEBRİKLER! ${loyaltyThreshold} TL ve üzeri siparişiniz için hesabınıza (Instagram ID: ${senderId}) tanımlı BIR DAHA Kİ SİPARİŞİNİZDE GEÇERLİ %20 VIP İNDİRİM HAKKI tanımlandı! Bir sonraki siparişinizde otomatik uygulanacaktır. 🎁✨`;
+            FacebookService.sendMessage(senderId, autoDmText).catch(e => console.error('[Auto Reward DM Error]:', e.message));
           }
 
           const combinedProductCode = ctx.cart.map(i => `${i.productCode} (${i.size}) x${i.quantity}`).join(', ');
