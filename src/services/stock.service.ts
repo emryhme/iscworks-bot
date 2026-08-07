@@ -7,6 +7,7 @@ export interface ProductStockRow {
   name: string;        // ÜRÜN İSMİ (Örn: KUMAŞ GÖMLEK)
   color: string;       // RENK (Örn: BEYAZ)
   size: string;        // NUMARA/BEDEN (Örn: M)
+  price: number;       // FİYAT (Örn: 299)
   stock: number;       // STOK (Örn: 5)
   category: string;    // KATEGORİ (Örn: GÖMLEK)
 }
@@ -21,7 +22,7 @@ export class StockService {
   public static async fetchAllSheetRows(): Promise<ProductStockRow[]> {
     try {
       const stmt = db.prepare(`
-        SELECT short_code as shortCode, product_code as productCode, name, color, size, stock, category
+        SELECT short_code as shortCode, product_code as productCode, name, color, size, price, stock, category
         FROM products
         ORDER BY id ASC
       `);

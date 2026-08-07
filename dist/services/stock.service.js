@@ -13,7 +13,7 @@ class StockService {
     static async fetchAllSheetRows() {
         try {
             const stmt = db_1.db.prepare(`
-        SELECT short_code as shortCode, product_code as productCode, name, color, size, stock, category
+        SELECT short_code as shortCode, product_code as productCode, name, color, size, price, stock, category
         FROM products
         ORDER BY id ASC
       `);
