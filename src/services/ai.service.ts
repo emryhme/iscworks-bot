@@ -8,6 +8,14 @@ import { TelegramService } from './telegram.service';
 import { extractProductCode } from '../utils/regex.util';
 import { db } from '../database/db';
 
+export interface CartItem {
+  productCode: string;
+  productName: string;
+  size: string;
+  quantity: number;
+  unitPrice: number;
+}
+
 interface SessionContext {
   history: BaseMessage[];
   productCode?: string;
@@ -16,10 +24,11 @@ interface SessionContext {
   customerName?: string;
   customerPhone?: string;
   address?: string;
+  cart: CartItem[];
 }
 
 /**
- * n8n Multi-Agent Hiyerarşisi ve Akıllı Hafıza Korumalı LangChain JS Servisi
+ * n8n Multi-Agent Hiyerarşisi ve Akıllı Hafıza Korumalı LangChain JS Servisi (Sepet Destekli)
  */
 export class AIService {
   private static sessions: Map<string, SessionContext> = new Map();
@@ -30,9 +39,11 @@ export class AIService {
 
   private static getSessionContext(senderId: string): SessionContext {
     if (!this.sessions.has(senderId)) {
-      this.sessions.set(senderId, { history: [] });
+      this.sessions.set(senderId, { history: [], cart: [] });
     }
-    return this.sessions.get(senderId)!;
+    const ctx = this.sessions.get(senderId)!;
+    if (!ctx.cart) ctx.cart = [];
+    return ctx;
   }
 
   /**
@@ -100,7 +111,7 @@ Yalnızca aşağıdaki JSON yapısını döndür (bilinmeyen alanlar için null 
   private static createLeafTools(senderId: string) {
     const ctx = this.getSessionContext(senderId);
 
-    // STOK Tool (Sadece Beden VE Adet biliniyorsa çalışır)
+    // STOK Tool
     const stokTool = new DynamicTool({
       name: 'STOK',
       description: 'Ürün kodu, BEDEN ve ADET bilgisi mevcutsa stok kontrolü yapar.',
@@ -130,51 +141,127 @@ Yalnızca aşağıdaki JSON yapısını döndür (bilinmeyen alanlar için null 
       }
     });
 
-    // KAYIT Tool (5 BİLGİ TAMAMLANMADAN SİPARİŞ OLUŞTURMAZ!)
-    const kayitTool = new DynamicTool({
-      name: 'KAYIT',
-      description: 'SADECE 5 BİLGİ (İsim, Telefon, Adres, Beden, Adet) EKSİKSİZ TAMAMLANDIĞINDA SİPARİŞİ OLUŞTURUR.',
+    // SEPETE_EKLE Tool
+    const sepeteEkleTool = new DynamicTool({
+      name: 'SEPETE_EKLE',
+      description: 'Müşterinin istediği ürünü, bedenini ve adetini sepete ekler. JSON: {"productCode":"...","size":"...","quantity":1}',
       func: async (input: string) => {
         try {
           let data: any = {};
-          try {
-            data = typeof input === 'object' ? input : JSON.parse(input);
-          } catch {
-            data = {};
+          try { data = typeof input === 'object' ? input : JSON.parse(input); } catch { data = {}; }
+
+          const pCode = (data.productCode || ctx.productCode || 'KGMLW').toUpperCase();
+          const pSize = (data.size || ctx.size || 'M').toUpperCase();
+          const pQty = Number(data.quantity) || ctx.quantity || 1;
+
+          // Veritabanından Ürün Fiyatını Çek
+          const prod = db.prepare('SELECT * FROM products WHERE product_code = ? OR short_code = ?').get(pCode, pCode) as any;
+          const unitPrice = prod?.price || 299;
+          const productName = prod?.name || pCode;
+
+          // Stok Kontrolü
+          const stockRes = await StockService.checkStock(pCode);
+          if (!stockRes.inStock) {
+            return JSON.stringify({ success: false, message: `${productName} (${pSize}) stokta tükendiği için sepete eklenemedi.` });
           }
+
+          // Sepete Ekle Veya Adet Güncelle
+          const existingIdx = ctx.cart.findIndex(i => i.productCode === pCode && i.size === pSize);
+          if (existingIdx >= 0) {
+            ctx.cart[existingIdx].quantity += pQty;
+          } else {
+            ctx.cart.push({
+              productCode: pCode,
+              productName: productName,
+              size: pSize,
+              quantity: pQty,
+              unitPrice: unitPrice
+            });
+          }
+
+          const cartSubtotal = ctx.cart.reduce((sum, item) => sum + (item.unitPrice * item.quantity), 0);
+
+          return JSON.stringify({
+            success: true,
+            message: `${productName} (Beden: ${pSize}, Adet: ${pQty}) sepete eklendi!`,
+            cartItemCount: ctx.cart.length,
+            cartTotalItems: ctx.cart.reduce((sum, i) => sum + i.quantity, 0),
+            cartSubtotal: cartSubtotal,
+            cart: ctx.cart
+          });
+        } catch (e: any) {
+          return JSON.stringify({ error: e.message });
+        }
+      }
+    });
+
+    // SEPET_GORUNTULE Tool
+    const sepetGoruntuleTool = new DynamicTool({
+      name: 'SEPET_GORUNTULE',
+      description: 'Müşterinin sepetindeki tüm ürünleri ve ara toplamı listeler.',
+      func: async () => {
+        if (!ctx.cart || ctx.cart.length === 0) {
+          return JSON.stringify({ cartEmpty: true, message: 'Sepetiniz şu an boş.' });
+        }
+        const cartSubtotal = ctx.cart.reduce((sum, item) => sum + (item.unitPrice * item.quantity), 0);
+        return JSON.stringify({
+          cartEmpty: false,
+          cart: ctx.cart,
+          cartSubtotal: cartSubtotal
+        });
+      }
+    });
+
+    // KAYIT Tool (Toplu Sepet Siparişi Veya Tekli Sipariş)
+    const kayitTool = new DynamicTool({
+      name: 'KAYIT',
+      description: 'Müşterinin 5 Bilgisi (İsim, Tel, Adres, Ürünler, Adet) Tamamlandıysa Toplu Siparişi Oluşturur.',
+      func: async (input: string) => {
+        try {
+          let data: any = {};
+          try { data = typeof input === 'object' ? input : JSON.parse(input); } catch { data = {}; }
 
           const customerName = data.customerName || ctx.customerName;
           const customerPhone = data.customerPhone || ctx.customerPhone;
           const address = data.address || ctx.address;
-          const size = data.size || ctx.size;
-          const quantity = Number(data.quantity) || ctx.quantity || 1;
-          const productCode = data.productCode || ctx.productCode || 'KGMLW';
 
-          // 🔒 KATI KURAL: 5 BİLGİ EKSİKSİZ Mİ?
+          // Eğer sepette ürün yoksa mevcut ürünü sepete ekle
+          if (!ctx.cart || ctx.cart.length === 0) {
+            const pCode = (data.productCode || ctx.productCode || 'KGMLW').toUpperCase();
+            const pSize = (data.size || ctx.size || 'M').toUpperCase();
+            const pQty = Number(data.quantity) || ctx.quantity || 1;
+            const prod = db.prepare('SELECT * FROM products WHERE product_code = ? OR short_code = ?').get(pCode, pCode) as any;
+            ctx.cart.push({
+              productCode: pCode,
+              productName: prod?.name || pCode,
+              size: pSize,
+              quantity: pQty,
+              unitPrice: prod?.price || 299
+            });
+          }
+
+          // 🔒 KATI KURAL: Müşteri İsim, Telefon ve Adres Eksiksiz mi?
           const missingFields: string[] = [];
           if (!customerName || customerName.trim().length <= 1) missingFields.push('İsim Soyisim');
           if (!customerPhone || customerPhone.trim().length < 10) missingFields.push('Telefon Numarası');
           if (!address || address.trim().length < 3) missingFields.push('Teslimat Adresi');
-          if (!size) missingFields.push('Beden (S, M, L, XL vb.)');
-          if (!quantity) missingFields.push('Adet Sayısı');
 
           if (missingFields.length > 0) {
             return JSON.stringify({
               success: false,
               orderCreated: false,
               missingFields: missingFields,
-              message: `Sipariş oluşturulamadı! Eksik bilgiler: ${missingFields.join(', ')}. Lütfen müşteriden bu bilgileri isteyin.`
+              message: `Sipariş oluşturulamadı! Eksik bilgiler: ${missingFields.join(', ')}. Lütfen bu bilgileri müşteriden talep edin.`
             });
           }
 
-          // Fiyat ve Kargo Hesaplaması
-          const productQuery = db.prepare('SELECT * FROM products WHERE product_code = ? OR short_code = ?').get(productCode, productCode) as any;
-          const unitPrice = productQuery?.price || 299;
-          const subtotal = unitPrice * quantity;
+          // Sepetteki Tüm Ürünlerin Toplamını Hesapla
+          const subtotal = ctx.cart.reduce((sum, item) => sum + (item.unitPrice * item.quantity), 0);
+          const totalQuantity = ctx.cart.reduce((sum, item) => sum + item.quantity, 0);
 
           // Ayarlardan Kargo Ücreti
-      const shippingSetting = db.prepare("SELECT value FROM settings WHERE key = 'shipping_fee'").get() as any;
-      const thresholdSetting = db.prepare("SELECT value FROM settings WHERE key = 'free_shipping_threshold'").get() as any;
+          const shippingSetting = db.prepare("SELECT value FROM settings WHERE key = 'shipping_fee'").get() as any;
+          const thresholdSetting = db.prepare("SELECT value FROM settings WHERE key = 'free_shipping_threshold'").get() as any;
           
           let shippingFee = Number(shippingSetting?.value || 49);
           const freeThreshold = Number(thresholdSetting?.value || 1500);
@@ -194,14 +281,18 @@ Yalnızca aşağıdaki JSON yapısını döndür (bilinmeyen alanlar için null 
 
           const totalPrice = Math.max(0, subtotal + shippingFee - discount);
 
+          // Toplu Ürün Kodları ve İsimleri Dizisi
+          const combinedProductCode = ctx.cart.map(i => `${i.productCode} (${i.size}) x${i.quantity}`).join(', ');
+          const combinedProductName = ctx.cart.map(i => `${i.productName} (${i.size})`).join(', ');
+
           const order = await OrderService.createOrder({
             customerName: customerName,
             customerPhone: customerPhone,
             address: address,
-            productCode: productCode,
-            productName: productQuery?.name || productCode,
-            size: size,
-            quantity: quantity,
+            productCode: combinedProductCode,
+            productName: combinedProductName,
+            size: ctx.cart.map(i => i.size).join(','),
+            quantity: totalQuantity,
             senderId: senderId
           });
 
@@ -210,21 +301,28 @@ Yalnızca aşağıdaki JSON yapısını döndür (bilinmeyen alanlar için null 
             UPDATE orders 
             SET unit_price = ?, shipping_fee = ?, discount = ?, total_price = ?
             WHERE order_id = ?
-          `).run(unitPrice, shippingFee, discount, totalPrice, order.orderId);
+          `).run(subtotal / Math.max(1, totalQuantity), shippingFee, discount, totalPrice, order.orderId);
+
+          // Sepetteki her ürün için stok düşümü yap
+          for (const item of ctx.cart) {
+            await StockService.deductStock(item.productCode, item.quantity);
+          }
+
+          const cartSummaryText = ctx.cart.map(i => `• ${i.productName} (${i.size}) - ${i.quantity} adet x ${i.unitPrice} TL`).join('\n');
+
+          // Sipariş tamamlandı, sepeti temizle
+          ctx.cart = [];
 
           return JSON.stringify({
             success: true,
             orderCreated: true,
             orderId: order.orderId,
-            productCode: order.productCode,
-            productName: productQuery?.name || order.productCode,
-            unitPrice,
-            quantity,
+            cartSummary: cartSummaryText,
             subtotal,
             shippingFee,
             discount,
             totalPrice,
-            priceDetails: `Ürün Ara Toplam: ${subtotal.toFixed(2)} TL | Kargo: ${shippingFee === 0 ? 'ÜCRETSİZ' : shippingFee.toFixed(2) + ' TL'} | Kampanya İndirimi: ${discount > 0 ? '-' + discount.toFixed(2) + ' TL' : '0 TL'} | NET TOPLAM: ${totalPrice.toFixed(2)} TL`
+            priceDetails: `Sipariş Özeti:\n${cartSummaryText}\n\nAra Toplam: ${subtotal.toFixed(2)} TL\nKargo: ${shippingFee === 0 ? 'ÜCRETSİZ' : shippingFee.toFixed(2) + ' TL'}\nİndirim: ${discount > 0 ? '-' + discount.toFixed(2) + ' TL' : '0 TL'}\nNET ÖDENECEK TOPLAM: ${totalPrice.toFixed(2)} TL`
           });
         } catch (e: any) {
           return JSON.stringify({ error: e.message });
@@ -232,7 +330,7 @@ Yalnızca aşağıdaki JSON yapısını döndür (bilinmeyen alanlar için null 
       }
     });
 
-    // MESAJ Tool (Telegram Bildirimi)
+    // MESAJ Tool
     const mesajTool = new DynamicTool({
       name: 'MESAJ',
       description: 'İşletme sahibine Telegram üzerinden HTML bildirim yollar.',
@@ -275,7 +373,7 @@ Yalnızca aşağıdaki JSON yapısını döndür (bilinmeyen alanlar için null 
       }
     });
 
-    return { stokTool, kayitTool, mesajTool, guncelleTool };
+    return { stokTool, sepeteEkleTool, sepetGoruntuleTool, kayitTool, mesajTool, guncelleTool };
   }
 
   private static createBilgilendirmeSubAgent(model: ChatOpenAI, mesajTool: DynamicTool) {
@@ -297,19 +395,19 @@ Yalnızca aşağıdaki JSON yapısını döndür (bilinmeyen alanlar için null 
     });
   }
 
-  private static createSiparisSubAgent(model: ChatOpenAI, stokTool: DynamicTool, kayitTool: DynamicTool, bilgilendirmeAgentTool: DynamicTool) {
+  private static createSiparisSubAgent(model: ChatOpenAI, stokTool: DynamicTool, sepeteEkleTool: DynamicTool, sepetGoruntuleTool: DynamicTool, kayitTool: DynamicTool, bilgilendirmeAgentTool: DynamicTool) {
     return new DynamicTool({
       name: 'SIPARIS',
-      description: 'Stok sorgulama ve sipariş kaydı işlemlerini yürütür.',
+      description: 'Stok sorgulama, sepete ekleme ve toplu sipariş kaydı işlemlerini yürütür.',
       func: async (input: string) => {
         const systemPrompt = new SystemMessage(`
 <görev>
-Stok sorgulama ve sipariş kayıt ajansın.
-1. Stok sorgulaması (STOK) yapmak için MÜŞTERİNİN BEDEN VE ADET BELİRTTİĞİNDEN EMİN OL. Beden veya Adet yoksa STOK sorgusu yapma, müşteriden beden ve adet iste.
-2. Sipariş oluşturmak (KAYIT) için İsim, Telefon, Adres, Beden ve Adet bilgilerinin 5'inin de EKSİKSİZ olduğundan emin ol.
+Stok sorgulama, sepete ekleme ve sipariş kayıt ajansın.
+1. Müşteri ürün beğenip sepete eklemek istediğinde SEPETE_EKLE aracını çağır.
+2. Müşteri "isteklerim bu kadar", "siparişi tamamla", "hepsini alayım" dediğinde KAYIT aracını çağır.
 </görev>
 `);
-        const boundModel = model.bindTools([stokTool, kayitTool, bilgilendirmeAgentTool]);
+        const boundModel = model.bindTools([stokTool, sepeteEkleTool, sepetGoruntuleTool, kayitTool, bilgilendirmeAgentTool]);
         let messages: BaseMessage[] = [systemPrompt, new HumanMessage(input)];
         let response = await boundModel.invoke(messages);
         messages.push(response);
@@ -320,6 +418,8 @@ Stok sorgulama ve sipariş kayıt ajansın.
           for (const tc of response.tool_calls) {
             let toolRes = "";
             if (tc.name === 'STOK') toolRes = await stokTool.invoke(JSON.stringify(tc.args));
+            else if (tc.name === 'SEPETE_EKLE') toolRes = await sepeteEkleTool.invoke(JSON.stringify(tc.args));
+            else if (tc.name === 'SEPET_GORUNTULE') toolRes = await sepetGoruntuleTool.invoke(JSON.stringify(tc.args));
             else if (tc.name === 'KAYIT') toolRes = await kayitTool.invoke(JSON.stringify(tc.args));
             else if (tc.name === 'BILGILENDIRME') toolRes = await bilgilendirmeAgentTool.invoke(JSON.stringify(tc.args));
 
@@ -382,7 +482,6 @@ Stok sorgulama ve sipariş kayıt ajansın.
       await this.extractSessionDataWithAI(senderId, userMessage, apiKey);
       const ctx = this.getSessionContext(senderId);
 
-      // Veritabanından Aktif Kampanyaları ve Kargo Ücretlerini Çek
       const activeCampaigns = db.prepare('SELECT title, description, code FROM campaigns WHERE active = 1').all() as any[];
       const shippingSetting = db.prepare("SELECT value FROM settings WHERE key = 'shipping_fee'").get() as any;
       const thresholdSetting = db.prepare("SELECT value FROM settings WHERE key = 'free_shipping_threshold'").get() as any;
@@ -394,15 +493,19 @@ Stok sorgulama ve sipariş kayıt ajansın.
         ? activeCampaigns.map(c => `- ${c.title}: ${c.description} (Kod: ${c.code || 'Yok'})`).join('\n')
         : 'Şu an aktif özel kampanya bulunmamaktadır.';
 
+      const cartText = ctx.cart.length > 0
+        ? ctx.cart.map(i => `• ${i.productName} (${i.size}) x${i.quantity} - ${i.unitPrice * i.quantity} TL`).join('\n')
+        : 'Sepetiniz şu an boş.';
+
       const model = new ChatOpenAI({
         openAIApiKey: apiKey,
         modelName: env.openaiModel || 'gpt-4o',
         temperature: 0.2
       });
 
-      const { stokTool, kayitTool, mesajTool, guncelleTool } = this.createLeafTools(senderId);
+      const { stokTool, sepeteEkleTool, sepetGoruntuleTool, kayitTool, mesajTool, guncelleTool } = this.createLeafTools(senderId);
       const bilgilendirmeAgentTool = this.createBilgilendirmeSubAgent(model, mesajTool);
-      const siparisAgentTool = this.createSiparisSubAgent(model, stokTool, kayitTool, bilgilendirmeAgentTool);
+      const siparisAgentTool = this.createSiparisSubAgent(model, stokTool, sepeteEkleTool, sepetGoruntuleTool, kayitTool, bilgilendirmeAgentTool);
       const stokManAgentTool = this.createStokManSubAgent(model, guncelleTool);
 
       const rootTools = [siparisAgentTool, stokManAgentTool];
@@ -410,35 +513,39 @@ Stok sorgulama ve sipariş kayıt ajansın.
 
       const systemPrompt = new SystemMessage(`
 <görev>
-Sen BARON'S SILLAGE 7/24 Mağaza Müşteri Danışmanısın (F.R.I.D.A.Y.).
+Sen BARON'S SILLAGE 7/24 Mağaza Müşteri Danışmanısın (F.R.I.D.A.Y.). Müşterilerin ürün sorularını yanıtlar, ürünleri SEPETE EKLER ve müşteri "isteklerim bu kadar / siparişi tamamla" dediğinde TOPLU SİPARİŞİ oluşturursun.
 </görev>
 
-<KATI_GÜVENLİK_VE_İŞ_KURALLARI>
-1. 🔒 **STOK SORGULAMA KURALI (BEDEN VE ADET ZORUNLUDUR):**
+<KATI_GÜVENLİK_VE_SEPET_KURALLARI>
+1. 🛒 **SEPET SİSTEMİ (ÇOKLU ÜRÜN DESTEĞİ):**
+   - Müşteri bir ürün seçtiğinde ("bunu sepetime ekle", "KGMLW M beden 1 adet ekle", "başka ürüne de bakacağım") SEPETE_EKLE aracını çağır ve ürünü sepete ekle.
+   - Müşteri "isteklerim bu kadar", "siparişi tamamla", "hepsini alayım", "bu kadar" dediğinde veya tek seferde tüm bilgileri verdiyse KAYIT aracını çağırarak toplu siparişi veritabanına kaydet.
+   - Müşterinin Mevcut Sepet Durumu:
+${cartText}
+
+2. 🔒 **STOK SORGULAMA KURALI (BEDEN VE ADET ZORUNLUDUR):**
    - Müşteri HANGİ BEDEN (S, M, L, XL, 41 vb.) ve KAÇ ADET ilgilendiğini söylemeden STOK SORGULAMASI YAPMA!
    - Eğer müşteri sadece "Gömlek var mı?" veya "KGMLW var mı?" dediyse, nazikçe şöyle sor: "Hangi beden (S, M, L, XL vb.) ve kaç adet düşünüyorsunuz?"
 
-2. 🔒 **SİPARİŞ OLUŞTURMA KURALI (5 BİLGİ TAMAMLANMADAN KESİNLİKLE SİPARİŞ VERME!):**
-   Şu 5 bilgi EKSİKSİZ alınmadan KAYIT/SIPARIS aracını tetikleme ve sipariş oluşturuldu deme:
+3. 🔒 **TOPLU SİPARİŞ OLUŞTURMA KURALI (İSİM, TEL VE ADRES ALINMADAN SİPARİŞ VERME!):**
+   Şu 3 bilgi EKSİKSİZ alınmadan KAYIT/SIPARIS aracını tetikleme ve sipariş oluşturuldu deme:
    ① Müşteri Adı ve Soyadı (${ctx.customerName || '❌ Eksik'})
    ② Telefon Numarası (${ctx.customerPhone || '❌ Eksik'})
    ③ Teslimat Adresi (${ctx.address || '❌ Eksik'})
-   ④ Beden Bilgisi (${ctx.size || '❌ Eksik'})
-   ⑤ Adet Sayısı (${ctx.quantity || '❌ Eksik'})
    Eksik bilgi varsa müşteriden nazikçe bu eksik kalan bilgileri iste!
 
-3. 🎉 **KAMPANYALAR VE DÜKKAN İNDİRİMLERİ:**
+4. 🎉 **KAMPANYALAR VE DÜKKAN İNDİRİMLERİ:**
    Mağazamızın Aktif Kampanyaları:
 ${campaignsText}
 
-4. 🚚 **KARGO ÜCRETİ VE FİYATLANDIRMA:**
+5. 🚚 **KARGO ÜCRETİ VE FİYATLANDIRMA:**
    - Standart Kargo Ücreti: ${shippingFee} TL.
    - ${freeThreshold} TL ve üzeri siparişlerde KARGO ÜCRETSİZDİR!
-   - Ürün fiyatı sorulduğunda veya sipariş özeti verirken ürün fiyatını, kargo ücretini ve varsa kampanya indirimini hesaplayarak toplam tutarı belirt.
+   - Sepet siparişi tamamlandığında sepet ara toplamını, kargo ücretini ve varsa kampanya indirimini hesaplayarak NET TOPLAM TUTARI belirt.
 
-5. 💬 **İNSANİ İLETİŞİM:**
+6. 💬 **İNSANİ İLETİŞİM:**
    Robotik cümleler kullanma. Her mesaj sonuna yapay soru kalıpları koyma. Sıcak ve doğal butik danışmanı gibi konuş.
-</KATI_GÜVENLİK_VE_İŞ_KURALLARI>
+</KATI_GÜVENLİK_VE_SEPET_KURALLARI>
 `);
 
       ctx.history.push(new HumanMessage(userMessage));
