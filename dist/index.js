@@ -48,7 +48,10 @@ const basicAuth = (req, res, next) => {
     }
 };
 // Yönetim Paneli ve Dashboard (Şifreli)
-app.use('/admin', basicAuth, express_1.default.static(path_1.default.resolve(process.cwd(), '../admin-panel')));
+app.use('/admin', basicAuth, express_1.default.static(path_1.default.join(__dirname, '../public')));
+app.get('/admin', basicAuth, (req, res) => {
+    res.sendFile(path_1.default.join(__dirname, '../public/index.html'));
+});
 app.use('/', (req, res, next) => {
     if (req.path === '/webhook/instagram' || req.path.startsWith('/webhook')) {
         return next();
