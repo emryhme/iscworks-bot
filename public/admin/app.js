@@ -1641,3 +1641,174 @@ async function toggleAutoRewardSetting() {
     showToast('Ayar değiştirilemedi.', 'error');
   }
 }
+
+// API & AI Customization Modal Engine
+function getOrCreateSystemSettingsModal() {
+  let modal = document.getElementById('systemSettingsModal');
+  if (modal) return modal;
+
+  modal = document.createElement('div');
+  modal.id = 'systemSettingsModal';
+  modal.style.cssText = `
+    position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+    background: rgba(15, 23, 42, 0.8); backdrop-filter: blur(8px);
+    display: none; align-items: center; justify-content: center; z-index: 99999;
+  `;
+
+  modal.innerHTML = `
+    <div class="card" style="width: 92%; max-width: 650px; padding: 25px; box-shadow: 0 20px 50px rgba(0,0,0,0.3); border: 1px solid var(--border); max-height: 90vh; overflow-y: auto;">
+      <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border); padding-bottom:15px; margin-bottom:20px;">
+        <h3 style="font-size:16px; font-weight:800; display:flex; align-items:center; gap:9px; color:var(--text);">
+          <i class="fa-solid fa-sliders" style="color:var(--primary);"></i> API Ayarları & Yapay Zeka Kişiselleştirme
+        </h3>
+        <button id="btnCloseSystemSettingsModal" style="background:none; border:none; font-size:22px; cursor:pointer; color:var(--muted);">&times;</button>
+      </div>
+
+      <!-- Settings Tabs -->
+      <div style="display:flex; gap:10px; margin-bottom:20px; border-bottom:1px solid var(--border); padding-bottom:10px;">
+        <button class="btn btn-sm btn-primary" id="tabBtnAiCustom" onclick="switchSettingsTab('ai')">
+          🤖 Yapay Zeka Kişiselleştirme
+        </button>
+        <button class="btn btn-sm btn-secondary" id="tabBtnApiConfig" onclick="switchSettingsTab('api')">
+          🔑 API & Webhook Anahtarları
+        </button>
+      </div>
+
+      <!-- Tab 1: AI Customization -->
+      <div id="tabContentAi" style="display:block;">
+        <div class="form-group" style="margin-bottom:14px;">
+          <label>Yapay Zeka Asistan Adı</label>
+          <input type="text" id="sysBotName" placeholder="Örn: F.R.I.D.A.Y." value="F.R.I.D.A.Y.">
+        </div>
+
+        <div class="form-group" style="margin-bottom:14px;">
+          <label>Yapay Zeka Ses Tonu & Kişilik Üslubu</label>
+          <select id="sysBotTone" class="select" style="width:100%; height:40px; font-size:12px;">
+            <option value="luxury">Lüks Parfüm Danışmanı & Saygılı (Önerilen)</option>
+            <option value="friendly">Samimi, Sıcak & Yardımsever</option>
+            <option value="formal">Kurumsal, Kısa & Profesyonel</option>
+            <option value="patron">Patron Asistanı (Tony Stark Özel)</option>
+          </select>
+        </div>
+
+        <div class="form-group" style="margin-bottom:14px;">
+          <label>Özel Sistem Talimatı / Persona Promptu</label>
+          <textarea id="sysBotSystemPrompt" rows="4" style="width:100%; padding:10px; border:1px solid var(--border); border-radius:8px; font-size:12px; outline:none; resize:vertical;" placeholder="Müşterilere verilecek selamlar, öneri stili ve mağaza kuralları..."></textarea>
+        </div>
+      </div>
+
+      <!-- Tab 2: API Keys -->
+      <div id="tabContentApi" style="display:none;">
+        <div class="form-group" style="margin-bottom:14px;">
+          <label>Gemini AI API Key</label>
+          <input type="password" id="sysGeminiApiKey" placeholder="AIzaSy...">
+        </div>
+
+        <div class="form-group" style="margin-bottom:14px;">
+          <label>Instagram / Facebook Page Access Token</label>
+          <input type="password" id="sysFbAccessToken" placeholder="EAA...">
+        </div>
+
+        <div class="form-group" style="margin-bottom:14px;">
+          <label>Google Sheet Spreadsheet ID</label>
+          <input type="text" id="sysGoogleSheetId" placeholder="1BxiMVs0XRra5nFMdAcB...">
+        </div>
+
+        <div class="form-group" style="margin-bottom:14px;">
+          <label>Telegram Bildirim Bot Token & Chat ID</label>
+          <input type="text" id="sysTelegramToken" placeholder="bot_token:chat_id">
+        </div>
+      </div>
+
+      <div style="display:flex; justify-content:flex-end; gap:10px; border-top:1px solid var(--border); padding-top:15px; margin-top:15px;">
+        <button class="btn btn-secondary" onclick="closeSystemSettingsModal()">Vazgeç</button>
+        <button class="btn btn-primary" onclick="saveSystemSettingsModal()">
+          <i class="fa-solid fa-floppy-disk"></i> Ayarları Kaydet
+        </button>
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(modal);
+
+  const btnClose = document.getElementById('btnCloseSystemSettingsModal');
+  if (btnClose) btnClose.onclick = () => closeSystemSettingsModal();
+
+  return modal;
+}
+
+function switchSettingsTab(tabName) {
+  const tabAi = document.getElementById('tabContentAi');
+  const tabApi = document.getElementById('tabContentApi');
+  const btnAi = document.getElementById('tabBtnAiCustom');
+  const btnApi = document.getElementById('tabBtnApiConfig');
+
+  if (tabName === 'ai') {
+    if (tabAi) tabAi.style.display = 'block';
+    if (tabApi) tabApi.style.display = 'none';
+    if (btnAi) { btnAi.className = 'btn btn-sm btn-primary'; }
+    if (btnApi) { btnApi.className = 'btn btn-sm btn-secondary'; }
+  } else {
+    if (tabAi) tabAi.style.display = 'none';
+    if (tabApi) tabApi.style.display = 'block';
+    if (btnAi) { btnAi.className = 'btn btn-sm btn-secondary'; }
+    if (btnApi) { btnApi.className = 'btn btn-sm btn-primary'; }
+  }
+}
+
+function openSystemSettingsModal() {
+  const modal = getOrCreateSystemSettingsModal();
+  modal.style.display = 'flex';
+  loadSystemSettingsIntoModal();
+}
+
+function closeSystemSettingsModal() {
+  const modal = document.getElementById('systemSettingsModal');
+  if (modal) modal.style.display = 'none';
+}
+
+async function loadSystemSettingsIntoModal() {
+  try {
+    const res = await fetch(`${API_BASE}/api/settings`);
+    const data = await res.json();
+    if (data.success && data.settings) {
+      const s = data.settings;
+      if (document.getElementById('sysBotName')) document.getElementById('sysBotName').value = s.bot_name || 'F.R.I.D.A.Y.';
+      if (document.getElementById('sysBotTone')) document.getElementById('sysBotTone').value = s.bot_tone || 'luxury';
+      if (document.getElementById('sysBotSystemPrompt')) document.getElementById('sysBotSystemPrompt').value = s.bot_system_prompt || '';
+      if (document.getElementById('sysGeminiApiKey')) document.getElementById('sysGeminiApiKey').value = s.gemini_api_key || '';
+      if (document.getElementById('sysFbAccessToken')) document.getElementById('sysFbAccessToken').value = s.fb_access_token || '';
+      if (document.getElementById('sysGoogleSheetId')) document.getElementById('sysGoogleSheetId').value = s.google_sheet_id || '';
+      if (document.getElementById('sysTelegramToken')) document.getElementById('sysTelegramToken').value = s.telegram_token || '';
+    }
+  } catch (e) {}
+}
+
+async function saveSystemSettingsModal() {
+  const payload = {
+    bot_name: document.getElementById('sysBotName')?.value || 'F.R.I.D.A.Y.',
+    bot_tone: document.getElementById('sysBotTone')?.value || 'luxury',
+    bot_system_prompt: document.getElementById('sysBotSystemPrompt')?.value || '',
+    gemini_api_key: document.getElementById('sysGeminiApiKey')?.value || '',
+    fb_access_token: document.getElementById('sysFbAccessToken')?.value || '',
+    google_sheet_id: document.getElementById('sysGoogleSheetId')?.value || '',
+    telegram_token: document.getElementById('sysTelegramToken')?.value || ''
+  };
+
+  try {
+    const res = await fetch(`${API_BASE}/api/settings/bulk`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json();
+    if (data.success) {
+      showToast('✅ API Ayarları ve Yapay Zeka Kişiselleştirmesi başarıyla kaydedildi!', 'success');
+      closeSystemSettingsModal();
+    } else {
+      showToast(`❌ Hata: ${data.error || 'Ayarlar kaydedilemedi'}`, 'error');
+    }
+  } catch (e) {
+    showToast('Ayarlar kaydedilirken hata oluştu.', 'error');
+  }
+}
