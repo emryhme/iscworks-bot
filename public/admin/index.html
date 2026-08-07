@@ -111,6 +111,9 @@
           <button class="tab-btn" data-tab="campaignsTab">
             <i class="fa-solid fa-bullhorn"></i> 🎉 Kampanyalar
           </button>
+          <button class="tab-btn" data-tab="rewardsTab">
+            <i class="fa-solid fa-gift"></i> 💎 VIP Sadakat Ödülleri
+          </button>
           <button class="tab-btn" data-tab="settingsTab">
             <i class="fa-solid fa-truck"></i> 🚚 Fiyat & Kargo Ayarları
           </button>
@@ -384,6 +387,42 @@
                 </tbody>
               </table>
             </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Tab Content: VIP Sadakat Ödülleri (%20 İndirim) -->
+      <section class="tab-content" id="rewardsTab">
+        <div class="card glass-card">
+          <div class="card-header">
+            <h3><i class="fa-solid fa-gift"></i> 💎 Kişiye Özel VIP Sadakat ve İndirim Ödülleri</h3>
+            <span class="table-count" id="rewardsTableCount">0 Ödül Listelendi</span>
+          </div>
+          <p style="padding:0 1.5rem; color:#94a3b8; font-size:0.9rem;">
+            Müşterileriniz <strong>2000 TL ve üzeri</strong> alışveriş yaptığında Instagram ID'lerine otomatik olarak <strong>bir sonraki siparişlerinde geçerli %20 VIP İndirim Hakkı</strong> tanımlanır. Müşteri tekrar alışveriş yaptığında bu indirim otomatik olarak sepete uygulanır.
+          </p>
+          <div class="table-responsive" style="margin-top:1rem;">
+            <table class="data-table" id="rewardsTable">
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>INSTAGRAM ID</th>
+                  <th>ÖDÜL KODU</th>
+                  <th>KAZANILAN İNDİRİM</th>
+                  <th>MİN. SİPARİŞ TUTARI</th>
+                  <th>DURUM</th>
+                  <th>KAZANILMA TARİHİ</th>
+                  <th>KULLANILMA TARİHİ</th>
+                </tr>
+              </thead>
+              <tbody id="rewardsTableBody">
+                <tr>
+                  <td colspan="8" class="loading-cell">
+                    <i class="fa-solid fa-spinner fa-spin"></i> Ödül listesi yükleniyor...
+                  </td>
+                </tr>
+              </tbody>
+            </table>
           </div>
         </div>
       </section>

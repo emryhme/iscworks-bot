@@ -223,9 +223,10 @@ async function fetchData() {
   setSyncStatus('loading', 'Senkronize Ediliyor...');
 
   try {
-    const [stocksRes, ordersRes] = await Promise.all([
+    const [stocksRes, ordersRes, rewardsRes] = await Promise.all([
       fetch(`${API_BASE}/api/stocks`).then(r => r.json()).catch(() => null),
-      fetch(`${API_BASE}/api/orders`).then(r => r.json()).catch(() => null)
+      fetch(`${API_BASE}/api/orders`).then(r => r.json()).catch(() => null),
+      fetch(`${API_BASE}/api/rewards`).then(r => r.json()).catch(() => null)
     ]);
 
     if (stocksRes && stocksRes.stocks) {
@@ -238,6 +239,12 @@ async function fetchData() {
       processIncomingOrders(ordersRes.orders);
     } else {
       state.orders = [];
+    }
+
+    if (rewardsRes && rewardsRes.rewards) {
+      state.rewards = rewardsRes.rewards;
+    } else {
+      state.rewards = [];
     }
 
     state.isInitialLoad = false;
@@ -308,6 +315,48 @@ function updateMetrics() {
 function renderTables() {
   renderProductsTable();
   renderOrdersTable();
+  renderRewardsTable();
+}
+
+// Render VIP Sadakat Ödülleri Tablosu (%20 İndirim)
+function renderRewardsTable() {
+  const tableBody = document.getElementById('rewardsTableBody');
+  const tableCount = document.getElementById('rewardsTableCount');
+  if (!tableBody) return;
+
+  const rewards = state.rewards || [];
+  if (tableCount) tableCount.textContent = `${rewards.length} Ödül Listelendi`;
+
+  if (rewards.length === 0) {
+    tableBody.innerHTML = `
+      <tr>
+        <td colspan="8" class="loading-cell">
+          <i class="fa-solid fa-gift"></i> Henüz tanımlanmış bir VIP sadakat ödülü bulunmuyor. 2000 TL üzeri ilk siparişte otomatik oluşturulur!
+        </td>
+      </tr>
+    `;
+    return;
+  }
+
+  tableBody.innerHTML = rewards.map(r => {
+    const isUsed = r.isUsed === 1;
+    const statusBadge = isUsed 
+      ? `<span class="status-badge out-stock">Kullanıldı</span>`
+      : `<span class="status-badge in-stock">🚀 Aktif İndirim</span>`;
+
+    return `
+      <tr>
+        <td>#${r.id}</td>
+        <td><strong class="text-purple">${escapeHtml(r.senderId || '-')}</strong></td>
+        <td><span class="code-tag">${escapeHtml(r.rewardCode || 'VIP20')}</span></td>
+        <td><strong style="color:#4ade80;">%${r.discountPercent || 20} VIP İNDİRİM</strong></td>
+        <td>${r.minQualifyingAmount || 2000} TL</td>
+        <td>${statusBadge}</td>
+        <td><small class="text-muted">${r.createdAt ? new Date(r.createdAt).toLocaleString('tr-TR') : '-'}</small></td>
+        <td><small class="text-muted">${r.usedAt ? new Date(r.usedAt).toLocaleString('tr-TR') : '-'}</small></td>
+      </tr>
+    `;
+  }).join('');
 }
 
 // Render Products Table
