@@ -251,7 +251,7 @@ function processIncomingOrders(newOrdersList) {
   return hasNew;
 }
 
-// Update Top Metric Cards
+// Update Top Metric Cards & Real Analytics
 function updateMetrics() {
   const totalProducts = state.products.length;
   const totalStock = state.products.reduce((acc, p) => acc + (Number(p.stock) || 0), 0);
@@ -266,6 +266,133 @@ function updateMetrics() {
   if (statTotalStock) statTotalStock.textContent = totalStock.toLocaleString('tr-TR');
   if (statTotalOrders) statTotalOrders.textContent = totalOrders.toLocaleString('tr-TR');
   if (ordersBadgeCount) ordersBadgeCount.textContent = totalOrders;
+
+  // 1. Gerçek Satış Kanalları Dağılımını Hesapla
+  calculateRealSalesChannels();
+
+  // 2. En Çok Satılan Ürünler Analitiği Grafiğini Çiz
+  renderTopProductsAnalyticsChart();
+}
+
+function calculateRealSalesChannels() {
+  const channelList = document.getElementById('salesChannelList');
+  if (!channelList) return;
+
+  const orders = state.orders || [];
+  let igCount = 0, igRevenue = 0;
+  let webCount = 0, webRevenue = 0;
+  let totalRevenue = 0;
+
+  orders.forEach(o => {
+    const qty = Number(o.quantity) || 1;
+    const price = Number(o.totalPrice) || (qty * 299);
+    totalRevenue += price;
+
+    if (o.senderId && String(o.senderId).trim() !== '') {
+      igCount++;
+      igRevenue += price;
+    } else {
+      webCount++;
+      webRevenue += price;
+    }
+  });
+
+  const safeTotalRev = totalRevenue > 0 ? totalRevenue : 1;
+  const igPercent = ((igRevenue / safeTotalRev) * 100).toFixed(1);
+  const webPercent = ((webRevenue / safeTotalRev) * 100).toFixed(1);
+
+  channelList.innerHTML = `
+    <div class="channel">
+        <div class="channel-icon"><i class="fa-brands fa-instagram" style="color:#e1306c; font-size:18px;"></i></div>
+        <div class="channel-info">
+            <strong>Instagram DM Otomasyonu (Gemini AI Bot)</strong>
+            <span>${igCount} Sipariş (₺${igRevenue.toLocaleString('tr-TR')} Ciro)</span>
+            <div class="progress"><div style="width:${igPercent}%; background:#e1306c;"></div></div>
+        </div>
+        <div class="channel-price">${igPercent}%</div>
+    </div>
+
+    <div class="channel" style="margin-top:14px;">
+        <div class="channel-icon"><i class="fa-solid fa-globe" style="color:#2563eb; font-size:18px;"></i></div>
+        <div class="channel-info">
+            <strong>Online Mağaza / Web Siparişleri</strong>
+            <span>${webCount} Sipariş (₺${webRevenue.toLocaleString('tr-TR')} Ciro)</span>
+            <div class="progress"><div style="width:${webPercent}%; background:#2563eb;"></div></div>
+        </div>
+        <div class="channel-price">${webPercent}%</div>
+    </div>
+  `;
+}
+
+let topProductsChartInstance = null;
+
+function renderTopProductsAnalyticsChart() {
+  const ctx = document.getElementById('topProductsChart');
+  if (!ctx) return;
+
+  const orders = state.orders || [];
+  const productSalesMap = {};
+
+  orders.forEach(o => {
+    const code = (o.productCode || 'GENEL').toUpperCase();
+    const qty = Number(o.quantity) || 1;
+    const price = Number(o.totalPrice) || (qty * 299);
+
+    if (!productSalesMap[code]) {
+      productSalesMap[code] = { code, qty: 0, revenue: 0 };
+    }
+    productSalesMap[code].qty += qty;
+    productSalesMap[code].revenue += price;
+  });
+
+  const sortedProducts = Object.values(productSalesMap).sort((a, b) => b.qty - a.qty).slice(0, 6);
+
+  if (sortedProducts.length === 0) {
+    sortedProducts.push({ code: 'HENÜZ SİPARİŞ YOK', qty: 0, revenue: 0 });
+  }
+
+  const labels = sortedProducts.map(p => p.code);
+  const quantities = sortedProducts.map(p => p.qty);
+
+  if (topProductsChartInstance) {
+    topProductsChartInstance.destroy();
+  }
+
+  if (window.Chart) {
+    topProductsChartInstance = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: labels,
+        datasets: [{
+          label: 'Satılan Adet',
+          data: quantities,
+          backgroundColor: 'rgba(255, 153, 0, 0.85)',
+          borderColor: '#ff9900',
+          borderWidth: 1.5,
+          borderRadius: 6
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              label: function(context) {
+                const item = sortedProducts[context.dataIndex];
+                return ` Satılan: ${item.qty} adet (Toplam Ciro: ₺${item.revenue.toLocaleString('tr-TR')})`;
+              }
+            }
+          }
+        },
+        scales: {
+          x: { grid: { display: false }, ticks: { font: { size: 10, family: 'Inter' } } },
+          y: { grid: { color: '#f0f0f0' }, ticks: { precision: 0, font: { size: 10, family: 'Inter' } } }
+        }
+      }
+    });
+  }
 }
 
 // Render Products & Orders Tables

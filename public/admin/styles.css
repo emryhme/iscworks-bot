@@ -548,6 +548,30 @@ button, input, select, textarea {
   background: #111827;
 }
 
+/* Compact Orders Table Styling */
+#ordersTable th {
+  padding: 9px 12px !important;
+  font-size: 8.5px !important;
+  letter-spacing: 0.5px !important;
+}
+
+#ordersTable td {
+  padding: 9px 12px !important;
+  font-size: 10.5px !important;
+  line-height: 1.3 !important;
+}
+
+#ordersTable .btn-sm {
+  height: 28px !important;
+  padding: 0 8px !important;
+  font-size: 9.5px !important;
+}
+
+#ordersTable .status, #ordersTable .status-badge {
+  padding: 3px 7px !important;
+  font-size: 8.5px !important;
+}
+
 /* TABLES */
 .table-card {
   overflow: hidden;

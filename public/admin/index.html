@@ -205,54 +205,25 @@
             <div class="card chart-card">
                 <div class="card-header">
                     <div>
-                        <div class="card-title">Satış Performansı & Sipariş Trendi</div>
-                        <div class="card-subtitle">Son 30 günlük mağaza ciro ve sipariş akışı</div>
+                        <div class="card-title">🔥 En Çok Satılan Ürünler & Stok Analitiği</div>
+                        <div class="card-subtitle">Sipariş verilerine göre en çok talep gören ürünler ve satış adetleri</div>
                     </div>
-                    <select class="select">
-                        <option>Son 30 gün</option>
-                        <option>Son 7 gün</option>
-                        <option>Son 12 ay</option>
-                    </select>
                 </div>
                 <div class="chart-container">
-                    <canvas id="salesChart"></canvas>
+                    <canvas id="topProductsChart"></canvas>
                 </div>
             </div>
 
             <div class="card chart-card">
                 <div class="card-header">
                     <div>
-                        <div class="card-title">Satış Kanalları Dağılımı</div>
-                        <div class="card-subtitle">Siparişlerin geldiği kanallar</div>
+                        <div class="card-title">📊 Satış Kanalları Dağılımı (Canlı Veri)</div>
+                        <div class="card-subtitle">Gerçek sipariş kaynağı ve ciro oranları</div>
                     </div>
                 </div>
-                <div class="channel-list">
-                    <div class="channel">
-                        <div class="channel-icon"><i data-lucide="instagram" size="16"></i></div>
-                        <div class="channel-info">
-                            <strong>Instagram DM Otomasyonu</strong>
-                            <span>Gemini AI Bot Siparişleri</span>
-                            <div class="progress"><div style="width:78%"></div></div>
-                        </div>
-                        <div class="channel-price">78.0%</div>
-                    </div>
-                    <div class="channel">
-                        <div class="channel-icon"><i data-lucide="globe" size="16"></i></div>
-                        <div class="channel-info">
-                            <strong>Online Mağaza / Web</strong>
-                            <span>Direkt Siparişler</span>
-                            <div class="progress"><div style="width:16%"></div></div>
-                        </div>
-                        <div class="channel-price">16.0%</div>
-                    </div>
-                    <div class="channel">
-                        <div class="channel-icon"><i data-lucide="gift" size="16"></i></div>
-                        <div class="channel-info">
-                            <strong>VIP Sadakat & Formlar</strong>
-                            <span>Özel Müşteri Tanımları</span>
-                            <div class="progress"><div style="width:6%"></div></div>
-                        </div>
-                        <div class="channel-price">6.0%</div>
+                <div class="channel-list" id="salesChannelList">
+                    <div style="text-align:center; padding:30px; color:#6b7280; font-size:12px;">
+                        <i class="fa-solid fa-spinner fa-spin"></i> Canlı sipariş kanalları hesaplanıyor...
                     </div>
                 </div>
             </div>
