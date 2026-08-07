@@ -78,6 +78,16 @@ app.get('/api/rewards', (req, res) => {
   }
 });
 
+// Kampanyalar GET API
+app.get('/api/campaigns', (req, res) => {
+  try {
+    const campaigns = db.prepare('SELECT * FROM campaigns ORDER BY id DESC').all();
+    res.json({ success: true, campaigns });
+  } catch (e: any) {
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
 app.post('/api/campaigns', (req, res) => {
   try {
     const { title, description, code, discountPercent, discountAmount, minOrderAmount } = req.body;
