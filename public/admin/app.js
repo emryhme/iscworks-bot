@@ -319,9 +319,14 @@ function renderRewardOrdersTable() {
 
   tableBody.innerHTML = orders.map(o => {
     const senderId = o.senderId || 'Bilinmiyor';
-    const priceDisplay = o.totalPrice 
-      ? `<strong class="text-green">${Number(o.totalPrice).toFixed(2)} TL</strong>` 
-      : `<span class="text-muted">-</span>`;
+    const totalPriceNum = Number(o.totalPrice);
+    const qty = Number(o.quantity) || 1;
+    const fallbackPrice = qty * 299;
+
+    let priceDisplay = `<strong class="text-green">${fallbackPrice.toFixed(2)} TL</strong>`;
+    if (!isNaN(totalPriceNum) && totalPriceNum > 0) {
+      priceDisplay = `<strong class="text-green">${totalPriceNum.toFixed(2)} TL</strong>`;
+    }
 
     return `
       <tr style="cursor:pointer;" onclick="selectOrderForReward('${escapeHtml(senderId)}')">
@@ -556,9 +561,14 @@ function renderOrdersTable() {
       statusBadge = `<span class="status-badge danger"><i class="fa-solid fa-xmark"></i> REDDEDİLDİ</span>`;
     }
 
-    const priceDisplay = o.totalPrice 
-      ? `<strong class="text-green">${Number(o.totalPrice).toFixed(2)} TL</strong>` 
-      : `<span class="text-muted">Hesaplanıyor</span>`;
+    const totalPriceNum = Number(o.totalPrice);
+    const qty = Number(o.quantity) || 1;
+    const fallbackPrice = qty * 299;
+
+    let priceDisplay = `<strong class="text-green">${fallbackPrice.toFixed(2)} TL</strong>`;
+    if (!isNaN(totalPriceNum) && totalPriceNum > 0) {
+      priceDisplay = `<strong class="text-green">${totalPriceNum.toFixed(2)} TL</strong>`;
+    }
 
     return `
       <tr>

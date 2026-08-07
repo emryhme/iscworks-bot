@@ -13,6 +13,10 @@ export interface OrderData {
   productName: string;
   size: string;
   quantity: number;
+  unitPrice?: number;
+  shippingFee?: number;
+  discount?: number;
+  totalPrice?: number;
   senderId?: string;
 }
 
@@ -21,6 +25,10 @@ export interface SavedOrder extends OrderData {
   createdAt: string;
   status?: string; // 'BEKLEMEDE' | 'OK' | 'DEC'
   senderId?: string;
+  unitPrice?: number;
+  shippingFee?: number;
+  discount?: number;
+  totalPrice?: number;
 }
 
 /**
@@ -66,10 +74,15 @@ export class OrderService {
     const firstName = nameParts[0] || data.customerName;
     const lastName = nameParts.slice(1).join(' ') || '';
 
+    const unitPrice = data.unitPrice || 0;
+    const shippingFee = data.shippingFee || 0;
+    const discount = data.discount || 0;
+    const totalPrice = data.totalPrice || 0;
+
     try {
       const stmt = db.prepare(`
-        INSERT INTO orders (order_id, first_name, last_name, customer_phone, address, product_code, product_name, size, quantity, status, sender_id, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO orders (order_id, first_name, last_name, customer_phone, address, product_code, product_name, size, quantity, unit_price, shipping_fee, discount, total_price, status, sender_id, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `);
 
       stmt.run(
@@ -82,6 +95,10 @@ export class OrderService {
         data.productName || data.productCode,
         data.size,
         data.quantity,
+        unitPrice,
+        shippingFee,
+        discount,
+        totalPrice,
         status,
         senderId,
         createdAt
@@ -101,8 +118,18 @@ export class OrderService {
     }
 
     return {
-      ...data,
       orderId,
+      customerName: data.customerName,
+      customerPhone: data.customerPhone,
+      address: data.address,
+      productCode: data.productCode,
+      productName: data.productName,
+      size: data.size,
+      quantity: data.quantity,
+      unitPrice,
+      shippingFee,
+      discount,
+      totalPrice,
       createdAt,
       status,
       senderId
@@ -115,7 +142,23 @@ export class OrderService {
   public static async getOrders(): Promise<SavedOrder[]> {
     try {
       const stmt = db.prepare(`
-        SELECT order_id as orderId, first_name, last_name, customer_phone as customerPhone, address, product_code as productCode, product_name as productName, size, quantity, status, sender_id as senderId, created_at as createdAt
+        SELECT 
+          order_id as orderId, 
+          first_name, 
+          last_name, 
+          customer_phone as customerPhone, 
+          address, 
+          product_code as productCode, 
+          product_name as productName, 
+          size, 
+          quantity, 
+          unit_price as unitPrice,
+          shipping_fee as shippingFee,
+          discount,
+          total_price as totalPrice,
+          status, 
+          sender_id as senderId, 
+          created_at as createdAt
         FROM orders
         ORDER BY id DESC
       `);
@@ -130,6 +173,10 @@ export class OrderService {
         productName: r.productName || r.productCode,
         size: r.size,
         quantity: r.quantity,
+        unitPrice: Number(r.unitPrice) || 0,
+        shippingFee: Number(r.shippingFee) || 0,
+        discount: Number(r.discount) || 0,
+        totalPrice: Number(r.totalPrice) || 0,
         createdAt: r.createdAt,
         status: r.status,
         senderId: r.senderId || ''
