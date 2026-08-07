@@ -15,25 +15,24 @@ const telegram_service_1 = require("./telegram.service");
  */
 class OrderService {
     /**
-     * Deterministik Sipariş Numarası Üreticisi (Dakika + Saniye)
-     * Format: ÜRÜN_KODU - BEDEN - TELEFON_SON_3 - DAKİKA_SANİYE
-     * Örn: KGMLW-M-589-4902
+     * Deterministik Temiz Sipariş Numarası Üreticisi
+     * Tekli Ürün Örn: BRN-KGMLW-712-4902
+     * Çoklu/Toplu Sipariş Örn: BRN-ORD-712-4902
      */
     static generateOrderId(productCode, size, phone) {
-        let cleanProductCode = productCode.trim().toUpperCase().replace(/[^A-Z0-9-]/g, '');
-        const cleanSize = size ? size.trim().toUpperCase() : '';
-        const cleanPhone = phone.trim().replace(/\D/g, '');
-        const lastThreePhone = cleanPhone.length >= 3 ? cleanPhone.slice(-3) : cleanPhone.padStart(3, '0');
+        const cleanPhone = (phone || '').trim().replace(/\D/g, '');
+        const lastThreePhone = cleanPhone.length >= 3 ? cleanPhone.slice(-3) : '000';
         const now = new Date();
         const minute = now.getMinutes().toString().padStart(2, '0');
         const second = now.getSeconds().toString().padStart(2, '0');
         const timeStamp = `${minute}${second}`;
-        const endsWithAnySizeRegex = /-(S|M|L|XL|XXL|36|37|38|39|40|41|42|43|44|45)$/i;
-        let codeWithSize = cleanProductCode;
-        if (cleanSize && !endsWithAnySizeRegex.test(cleanProductCode) && !cleanProductCode.endsWith(`-${cleanSize}`)) {
-            codeWithSize = `${cleanProductCode}-${cleanSize}`;
+        const rawCode = (productCode || '').trim();
+        // Çoklu ürün kontrolü (virgül, boşluk veya çok uzun karakter var mı)
+        let baseCode = 'ORD';
+        if (rawCode && !rawCode.includes(',') && !rawCode.includes(' ') && rawCode.length <= 15) {
+            baseCode = rawCode.toUpperCase().replace(/[^A-Z0-9-]/g, '').slice(0, 10);
         }
-        return `${codeWithSize}-${lastThreePhone}-${timeStamp}`;
+        return `BRN-${baseCode}-${lastThreePhone}-${timeStamp}`;
     }
     /**
      * Sipariş oluşturur, deterministik sipariş no basar, stoğu -1 eksiltir ve SQLite + Sheet'e yazar.
