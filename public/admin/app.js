@@ -103,6 +103,11 @@ function setupEventListeners() {
   if (campaignForm) {
     campaignForm.addEventListener('submit', handleCampaignSubmit);
   }
+
+  const rewardForm = document.getElementById('rewardForm');
+  if (rewardForm) {
+    rewardForm.addEventListener('submit', handleRewardSubmit);
+  }
 }
 
 // Web Audio API Tabanlı Hoş İki Tonlu Sipariş Çanı
@@ -284,6 +289,11 @@ function renderRewardsTable() {
         <td>${statusBadge}</td>
         <td><small class="text-muted">${r.createdAt ? new Date(r.createdAt).toLocaleString('tr-TR') : '-'}</small></td>
         <td><small class="text-muted">${r.usedAt ? new Date(r.usedAt).toLocaleString('tr-TR') : '-'}</small></td>
+        <td>
+          <button class="btn btn-sm btn-delete" onclick="deleteReward(${r.id})">
+            <i class="fa-solid fa-trash-can"></i> Sil
+          </button>
+        </td>
       </tr>
     `;
   }).join('');
@@ -807,6 +817,58 @@ async function deleteCampaign(id) {
     }
   } catch (e) {
     showToast('Kampanya silinirken hata oluştu.', 'error');
+  }
+}
+
+// Handle Custom VIP Reward Submit
+async function handleRewardSubmit(e) {
+  e.preventDefault();
+
+  const senderIdElem = document.getElementById('rewardSenderId');
+  const codeElem = document.getElementById('rewardCode');
+  const percentElem = document.getElementById('rewardPercent');
+  const minAmountElem = document.getElementById('rewardMinAmount');
+
+  if (!senderIdElem || !percentElem) return;
+
+  const payload = {
+    senderId: senderIdElem.value.trim(),
+    rewardCode: codeElem ? (codeElem.value.trim().toUpperCase() || 'VIP20') : 'VIP20',
+    discountPercent: Number(percentElem.value) || 20,
+    minQualifyingAmount: minAmountElem ? (Number(minAmountElem.value) || 2000) : 2000
+  };
+
+  try {
+    const res = await fetch(`${API_BASE}/api/rewards`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json();
+    if (res.ok && data.success) {
+      showToast('💎 VIP Sadakat Ödülü başarıyla eklendi!', 'success');
+      const form = document.getElementById('rewardForm');
+      if (form) form.reset();
+      fetchData();
+    } else {
+      showToast(`❌ Hata: ${data.error || 'Eklenemedi'}`, 'error');
+    }
+  } catch (e) {
+    showToast('Ödül eklenirken sunucu hatası oluştu.', 'error');
+  }
+}
+
+async function deleteReward(id) {
+  if (!confirm('Bu VIP ödülünü silmek istediğinize emin misiniz?')) return;
+  try {
+    const res = await fetch(`${API_BASE}/api/rewards/${id}`, { method: 'DELETE' });
+    const data = await res.json();
+    if (data.success) {
+      showToast('✅ VIP Ödülü silindi.', 'success');
+      fetchData();
+    }
+  } catch (e) {
+    showToast('Silme hatası oluştu.', 'error');
   }
 }
 

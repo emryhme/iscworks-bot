@@ -78,6 +78,39 @@ app.get('/api/rewards', (req, res) => {
   }
 });
 
+app.post('/api/rewards', (req, res) => {
+  try {
+    const { senderId, rewardCode, discountPercent, minQualifyingAmount } = req.body;
+    if (!senderId || !discountPercent) {
+      return res.status(400).json({ success: false, error: 'Instagram/Müşteri ID ve İndirim Oranı zorunludur.' });
+    }
+
+    const stmt = db.prepare(`
+      INSERT INTO user_rewards (sender_id, reward_code, discount_percent, min_qualifying_amount, is_used)
+      VALUES (?, ?, ?, ?, 0)
+    `);
+    stmt.run(
+      senderId.trim(),
+      (rewardCode || 'VIP20').trim().toUpperCase(),
+      Number(discountPercent) || 20,
+      Number(minQualifyingAmount) || 2000
+    );
+
+    res.json({ success: true, message: 'VIP Sadakat Ödülü başarıyla kaydedildi!' });
+  } catch (e: any) {
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+app.delete('/api/rewards/:id', (req, res) => {
+  try {
+    db.prepare('DELETE FROM user_rewards WHERE id = ?').run(req.params.id);
+    res.json({ success: true, message: 'VIP Ödülü silindi.' });
+  } catch (e: any) {
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
 // Kampanyalar GET API
 app.get('/api/campaigns', (req, res) => {
   try {

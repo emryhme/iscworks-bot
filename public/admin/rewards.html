@@ -52,31 +52,56 @@
             <h3><i class="fa-solid fa-gift"></i> 💎 Kişiye Özel VIP Sadakat ve İndirim Ödülleri</h3>
             <span class="table-count" id="rewardsTableCount">0 Ödül Listelendi</span>
           </div>
-          <p style="padding:0 1.5rem; color:#94a3b8; font-size:0.9rem;">
-            Müşterileriniz <strong>2000 TL ve üzeri</strong> alışveriş yaptığında Instagram ID'lerine otomatik olarak <strong>bir sonraki siparişlerinde geçerli %20 VIP İndirim Hakkı</strong> tanımlanır. Müşteri tekrar alışveriş yaptığında bu indirim otomatik olarak sepete uygulanır.
-          </p>
-          <div class="table-responsive" style="margin-top:1rem;">
-            <table class="data-table" id="rewardsTable">
-              <thead>
-                <tr>
-                  <th>ID</th>
-                  <th>INSTAGRAM ID</th>
-                  <th>ÖDÜL KODU</th>
-                  <th>KAZANILAN İNDİRİM</th>
-                  <th>MİN. SİPARİŞ TUTARI</th>
-                  <th>DURUM</th>
-                  <th>KAZANILMA TARİHİ</th>
-                  <th>KULLANILMA TARİHİ</th>
-                </tr>
-              </thead>
-              <tbody id="rewardsTableBody">
-                <tr>
-                  <td colspan="8" class="loading-cell">
-                    <i class="fa-solid fa-spinner fa-spin"></i> Ödül listesi yükleniyor...
-                  </td>
-                </tr>
-              </tbody>
-            </table>
+          <div class="card-body">
+            <form id="rewardForm">
+              <div class="form-grid">
+                <div class="form-group">
+                  <label>Instagram ID / Müşteri ID</label>
+                  <input type="text" id="rewardSenderId" placeholder="Örn: 1234567890" required>
+                </div>
+                <div class="form-group">
+                  <label>Ödül Kodu (İsteğe Bağlı)</label>
+                  <input type="text" id="rewardCode" placeholder="Örn: VIP20 veya SPECIAL" style="text-transform:uppercase;">
+                </div>
+                <div class="form-group">
+                  <label>İndirim Oranı (%)</label>
+                  <input type="number" id="rewardPercent" placeholder="20" required min="1" max="100">
+                </div>
+                <div class="form-group">
+                  <label>Kazanılan Min. Sipariş Tutarı (TL)</label>
+                  <input type="number" id="rewardMinAmount" placeholder="2000" min="0">
+                </div>
+              </div>
+              <div class="form-actions">
+                <button type="submit" class="btn btn-primary btn-glow">💎 Müşteriye Ödül Tanımla</button>
+              </div>
+            </form>
+
+            <h4 style="margin-top:2rem; margin-bottom:1rem; color:#f8fafc;"><i class="fa-solid fa-list-check"></i> Tanımlı VIP Ödül Listesi</h4>
+            <div class="table-responsive">
+              <table class="data-table" id="rewardsTable">
+                <thead>
+                  <tr>
+                    <th>ID</th>
+                    <th>INSTAGRAM ID</th>
+                    <th>ÖDÜL KODU</th>
+                    <th>KAZANILAN İNDİRİM</th>
+                    <th>MİN. SİPARİŞ TUTARI</th>
+                    <th>DURUM</th>
+                    <th>KAZANILMA TARİHİ</th>
+                    <th>KULLANILMA TARİHİ</th>
+                    <th>İşlem</th>
+                  </tr>
+                </thead>
+                <tbody id="rewardsTableBody">
+                  <tr>
+                    <td colspan="9" class="loading-cell">
+                      <i class="fa-solid fa-spinner fa-spin"></i> Ödül listesi yükleniyor...
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       </section>
