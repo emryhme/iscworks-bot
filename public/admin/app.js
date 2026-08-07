@@ -621,8 +621,11 @@ function renderOrdersTable() {
             <button class="btn btn-sm btn-success" onclick="updateOrderStatus('${escapeHtml(o.orderId)}', 'OK')">
               <i class="fa-solid fa-check"></i> Onayla
             </button>
-            <button class="btn btn-sm btn-delete" onclick="updateOrderStatus('${escapeHtml(o.orderId)}', 'DEC')">
+            <button class="btn btn-sm btn-warning" style="background:#eab308; color:#000; font-weight:600;" onclick="updateOrderStatus('${escapeHtml(o.orderId)}', 'DEC')">
               <i class="fa-solid fa-xmark"></i> Reddet
+            </button>
+            <button class="btn btn-sm btn-delete" onclick="deleteOrder('${escapeHtml(o.orderId)}')">
+              <i class="fa-solid fa-trash"></i> Sil
             </button>
           </div>
         </td>
@@ -913,8 +916,11 @@ function openOrderDetailsModal(orderId) {
         <button class="btn btn-sm btn-success" onclick="updateOrderStatus('${escapeHtml(order.orderId)}', 'OK'); document.getElementById('orderDetailsModal').style.display='none';">
           <i class="fa-solid fa-check"></i> Siparişi Onayla
         </button>
-        <button class="btn btn-sm btn-delete" onclick="document.getElementById('orderDetailsModal').style.display='none'; openRejectionModal('${escapeHtml(order.orderId)}');">
+        <button class="btn btn-sm btn-warning" style="background:#eab308; color:#000; font-weight:600;" onclick="document.getElementById('orderDetailsModal').style.display='none'; openRejectionModal('${escapeHtml(order.orderId)}');">
           <i class="fa-solid fa-xmark"></i> Siparişi Reddet & DM Yolla
+        </button>
+        <button class="btn btn-sm btn-delete" onclick="document.getElementById('orderDetailsModal').style.display='none'; deleteOrder('${escapeHtml(order.orderId)}');">
+          <i class="fa-solid fa-trash"></i> Siparişi Sil
         </button>
         ${order.senderId ? `
           <button class="btn btn-sm btn-secondary" onclick="document.getElementById('orderDetailsModal').style.display='none'; selectOrderForReward('${escapeHtml(order.senderId)}');">
