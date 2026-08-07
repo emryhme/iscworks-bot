@@ -15,75 +15,44 @@ const state = {
   isFetching: false
 };
 
-// DOM Elements
-const elements = {
-  // Metrics
-  statTotalProducts: document.getElementById('statTotalProducts'),
-  statTotalStock: document.getElementById('statTotalStock'),
-  statTotalOrders: document.getElementById('statTotalOrders'),
-  ordersBadgeCount: document.getElementById('ordersBadgeCount'),
-  
-  // Controls & Tabs
-  tabs: document.querySelectorAll('.tab-btn'),
-  tabContents: document.querySelectorAll('.tab-content'),
-  searchInput: document.getElementById('searchInput'),
-  btnRefreshData: document.getElementById('btnRefreshData'),
-  btnToggleSound: document.getElementById('btnToggleSound'),
-  syncStatusBadge: document.getElementById('syncStatusBadge'),
-  
-  // Tables
-  productsTableBody: document.getElementById('productsTableBody'),
-  ordersTableBody: document.getElementById('ordersTableBody'),
-  rewardsTableBody: document.getElementById('rewardsTableBody'),
-  productsTableCount: document.getElementById('productsTableCount'),
-  ordersTableCount: document.getElementById('ordersTableCount'),
-  rewardsTableCount: document.getElementById('rewardsTableCount'),
-  
-  // Form
-  newProductForm: document.getElementById('newProductForm'),
-  shortCode: document.getElementById('shortCode'),
-  productCode: document.getElementById('productCode'),
-  productName: document.getElementById('productName'),
-  colorInput: document.getElementById('colorInput'),
-  sizeInput: document.getElementById('sizeInput'),
-  stockInput: document.getElementById('stockInput'),
-  categoryInput: document.getElementById('categoryInput'),
-  autoCodePreview: document.getElementById('autoCodePreview'),
-  btnSubmitAiProduct: document.getElementById('btnSubmitAiProduct'),
-  aiProductPrompt: document.getElementById('aiProductPrompt'),
-  aiResultBox: document.getElementById('aiResultBox'),
-  aiResultContent: document.getElementById('aiResultContent'),
-  
-  // Settings & Campaigns Forms
-  settingsForm: document.getElementById('settingsForm'),
-  settingShippingFee: document.getElementById('settingShippingFee'),
-  settingFreeThreshold: document.getElementById('settingFreeThreshold'),
-  campaignForm: document.getElementById('campaignForm'),
-  campaignsTableBody: document.getElementById('campaignsTableBody')
-};
-
 // Initialize Application
 document.addEventListener('DOMContentLoaded', () => {
   setupEventListeners();
   fetchData();
+  fetchCampaigns();
+  fetchSettings();
   
   // Arka planda 10 saniyede bir sessiz kontrol
   setInterval(pollOrdersInBackground, POLL_INTERVAL_MS);
 });
 
-// Setup Event Listeners
+// Setup Event Listeners (Dinamik DOM Seçiciler)
 function setupEventListeners() {
-  if (elements.btnRefreshData) {
-    elements.btnRefreshData.addEventListener('click', () => {
-      showToast('🔄 Veriler tazeleme isteği gönderildi...', 'info');
+  const btnRefreshData = document.getElementById('btnRefreshData');
+  const btnToggleSound = document.getElementById('btnToggleSound');
+  const searchInput = document.getElementById('searchInput');
+  const shortCode = document.getElementById('shortCode');
+  const sizeInput = document.getElementById('sizeInput');
+  const autoCodePreview = document.getElementById('autoCodePreview');
+  const productCode = document.getElementById('productCode');
+  const newProductForm = document.getElementById('newProductForm');
+  const btnSubmitAiProduct = document.getElementById('btnSubmitAiProduct');
+  const settingsForm = document.getElementById('settingsForm');
+  const campaignForm = document.getElementById('campaignForm');
+
+  if (btnRefreshData) {
+    btnRefreshData.addEventListener('click', () => {
+      showToast('🔄 Veriler tazeleniyor...', 'info');
       fetchData();
+      fetchCampaigns();
+      fetchSettings();
     });
   }
 
-  if (elements.btnToggleSound) {
-    elements.btnToggleSound.addEventListener('click', () => {
+  if (btnToggleSound) {
+    btnToggleSound.addEventListener('click', () => {
       state.soundEnabled = !state.soundEnabled;
-      const icon = elements.btnToggleSound.querySelector('i');
+      const icon = btnToggleSound.querySelector('i');
       if (state.soundEnabled) {
         if (icon) icon.className = 'fa-solid fa-bell text-gold';
         showToast('🔔 Sesli sipariş bildirimleri açıldı.', 'success');
@@ -97,43 +66,42 @@ function setupEventListeners() {
     });
   }
 
-  if (elements.searchInput) {
-    elements.searchInput.addEventListener('input', (e) => {
+  if (searchInput) {
+    searchInput.addEventListener('input', (e) => {
       state.searchQuery = e.target.value.toLowerCase().trim();
       renderTables();
     });
   }
 
-  if (elements.shortCode && elements.sizeInput && elements.autoCodePreview) {
+  if (shortCode && sizeInput && autoCodePreview) {
     const updateCodePreview = () => {
-      const sc = (elements.shortCode.value || 'KGMLW').toUpperCase().trim();
-      const sz = (elements.sizeInput.value || 'M').toUpperCase().trim();
+      const sc = (shortCode.value || 'KGMLW').toUpperCase().trim();
+      const sz = (sizeInput.value || 'M').toUpperCase().trim();
       const computedCode = `${sc}-${sz}`;
-      elements.autoCodePreview.textContent = `Önizleme: ${computedCode}`;
-      if (elements.productCode && !elements.productCode.value) {
-        elements.productCode.placeholder = `Örn: ${computedCode}`;
+      autoCodePreview.textContent = `Önizleme: ${computedCode}`;
+      if (productCode && !productCode.value) {
+        productCode.placeholder = `Örn: ${computedCode}`;
       }
     };
-    elements.shortCode.addEventListener('input', updateCodePreview);
-    elements.sizeInput.addEventListener('input', updateCodePreview);
+
+    shortCode.addEventListener('input', updateCodePreview);
+    sizeInput.addEventListener('input', updateCodePreview);
   }
 
-  if (elements.newProductForm) {
-    elements.newProductForm.addEventListener('submit', handleNewProductSubmit);
+  if (newProductForm) {
+    newProductForm.addEventListener('submit', handleNewProductSubmit);
   }
 
-  if (elements.btnSubmitAiProduct) {
-    elements.btnSubmitAiProduct.addEventListener('click', handleAiProductSubmit);
+  if (btnSubmitAiProduct) {
+    btnSubmitAiProduct.addEventListener('click', handleAiProductSubmit);
   }
 
-  if (elements.settingsForm) {
-    elements.settingsForm.addEventListener('submit', handleSettingsSubmit);
-    fetchSettings();
+  if (settingsForm) {
+    settingsForm.addEventListener('submit', handleSettingsSubmit);
   }
 
-  if (elements.campaignForm) {
-    elements.campaignForm.addEventListener('submit', handleCampaignSubmit);
-    fetchCampaigns();
+  if (campaignForm) {
+    campaignForm.addEventListener('submit', handleCampaignSubmit);
   }
 }
 
@@ -175,7 +143,7 @@ function triggerDesktopNotification(order) {
   }
 }
 
-// Fetch Products & Orders from Backend API (Sessiz ve Yumuşak Senkronizasyon)
+// Fetch Products & Orders from Backend API
 async function fetchData() {
   if (state.isFetching) return;
   state.isFetching = true;
@@ -257,17 +225,22 @@ function updateMetrics() {
   const totalStock = state.products.reduce((acc, p) => acc + (Number(p.stock) || 0), 0);
   const totalOrders = state.orders.length;
 
-  if (elements.statTotalProducts) elements.statTotalProducts.textContent = totalProducts.toLocaleString('tr-TR');
-  if (elements.statTotalStock) elements.statTotalStock.textContent = totalStock.toLocaleString('tr-TR');
-  if (elements.statTotalOrders) elements.statTotalOrders.textContent = totalOrders.toLocaleString('tr-TR');
-  if (elements.ordersBadgeCount) elements.ordersBadgeCount.textContent = totalOrders;
+  const statTotalProducts = document.getElementById('statTotalProducts');
+  const statTotalStock = document.getElementById('statTotalStock');
+  const statTotalOrders = document.getElementById('statTotalOrders');
+  const ordersBadgeCount = document.getElementById('ordersBadgeCount');
+
+  if (statTotalProducts) statTotalProducts.textContent = totalProducts.toLocaleString('tr-TR');
+  if (statTotalStock) statTotalStock.textContent = totalStock.toLocaleString('tr-TR');
+  if (statTotalOrders) statTotalOrders.textContent = totalOrders.toLocaleString('tr-TR');
+  if (ordersBadgeCount) ordersBadgeCount.textContent = totalOrders;
 }
 
-// Render Products & Orders Tables (Yazım Sırasında Ekranda Glitch Olmaması İçin Odak Kontrolü)
+// Render Products & Orders Tables
 function renderTables() {
   const activeElem = document.activeElement;
   if (activeElem && (activeElem.tagName === 'INPUT' || activeElem.tagName === 'TEXTAREA') && activeElem.id.startsWith('price_')) {
-    return; // Kullanıcı tam fiyat kutusunda yazıyorsa tabloyu resetleme!
+    return;
   }
 
   renderProductsTable();
@@ -277,12 +250,15 @@ function renderTables() {
 
 // Render VIP Sadakat Ödülleri Tablosu
 function renderRewardsTable() {
-  if (!elements.rewardsTableBody) return;
+  const rewardsTableBody = document.getElementById('rewardsTableBody');
+  const rewardsTableCount = document.getElementById('rewardsTableCount');
+  if (!rewardsTableBody) return;
+
   const rewards = state.rewards || [];
-  if (elements.rewardsTableCount) elements.rewardsTableCount.textContent = `${rewards.length} Ödül Listelendi`;
+  if (rewardsTableCount) rewardsTableCount.textContent = `${rewards.length} Ödül Listelendi`;
 
   if (rewards.length === 0) {
-    elements.rewardsTableBody.innerHTML = `
+    rewardsTableBody.innerHTML = `
       <tr>
         <td colspan="8" class="loading-cell">
           <i class="fa-solid fa-gift"></i> Henüz tanımlanmış bir VIP sadakat ödülü bulunmuyor. 2000 TL üzeri ilk siparişte otomatik oluşturulur!
@@ -292,7 +268,7 @@ function renderRewardsTable() {
     return;
   }
 
-  elements.rewardsTableBody.innerHTML = rewards.map(r => {
+  rewardsTableBody.innerHTML = rewards.map(r => {
     const isUsed = r.isUsed === 1;
     const statusBadge = isUsed 
       ? `<span class="status-badge out-stock">Kullanıldı</span>`
@@ -315,7 +291,10 @@ function renderRewardsTable() {
 
 // Render Products Table
 function renderProductsTable() {
-  if (!elements.productsTableBody) return;
+  const productsTableBody = document.getElementById('productsTableBody');
+  const productsTableCount = document.getElementById('productsTableCount');
+  if (!productsTableBody) return;
+
   const query = state.searchQuery;
   const filtered = state.products.filter(p => {
     const shortCode = (p.shortCode || '').toLowerCase();
@@ -326,10 +305,10 @@ function renderProductsTable() {
     return shortCode.includes(query) || code.includes(query) || name.includes(query) || color.includes(query) || cat.includes(query);
   });
 
-  if (elements.productsTableCount) elements.productsTableCount.textContent = `${filtered.length} ürün listelendi`;
+  if (productsTableCount) productsTableCount.textContent = `${filtered.length} ürün listelendi`;
 
   if (filtered.length === 0) {
-    elements.productsTableBody.innerHTML = `
+    productsTableBody.innerHTML = `
       <tr>
         <td colspan="9" class="loading-cell">
           <i class="fa-solid fa-box-open"></i> Hiç ürün bulunamadı.
@@ -339,7 +318,7 @@ function renderProductsTable() {
     return;
   }
 
-  elements.productsTableBody.innerHTML = filtered.map(p => {
+  productsTableBody.innerHTML = filtered.map(p => {
     const stock = Number(p.stock) || 0;
     let stockBadge = `<span class="status-badge in-stock">${stock} adet</span>`;
 
@@ -468,7 +447,10 @@ async function updateProductPrice(productCode) {
 
 // Render Orders Table
 function renderOrdersTable() {
-  if (!elements.ordersTableBody) return;
+  const ordersTableBody = document.getElementById('ordersTableBody');
+  const ordersTableCount = document.getElementById('ordersTableCount');
+  if (!ordersTableBody) return;
+
   const query = state.searchQuery;
   const filtered = state.orders.filter(o => {
     const id = (o.orderId || '').toLowerCase();
@@ -479,10 +461,10 @@ function renderOrdersTable() {
     return id.includes(query) || sender.includes(query) || name.includes(query) || phone.includes(query) || code.includes(query);
   });
 
-  if (elements.ordersTableCount) elements.ordersTableCount.textContent = `${filtered.length} sipariş listelendi`;
+  if (ordersTableCount) ordersTableCount.textContent = `${filtered.length} sipariş listelendi`;
 
   if (filtered.length === 0) {
-    elements.ordersTableBody.innerHTML = `
+    ordersTableBody.innerHTML = `
       <tr>
         <td colspan="10" class="loading-cell">
           <i class="fa-solid fa-inbox"></i> Sipariş bulunamadı.
@@ -492,7 +474,7 @@ function renderOrdersTable() {
     return;
   }
 
-  elements.ordersTableBody.innerHTML = filtered.map(o => {
+  ordersTableBody.innerHTML = filtered.map(o => {
     const status = (o.status || 'BEKLEMEDE').toUpperCase();
     let statusBadge = `<span class="status-badge pending">${status}</span>`;
 
@@ -536,9 +518,17 @@ function renderOrdersTable() {
 async function handleNewProductSubmit(e) {
   e.preventDefault();
 
-  const shortCodeVal = (elements.shortCode.value || '').toUpperCase().trim();
-  const sizeVal = (elements.sizeInput.value || '').toUpperCase().trim();
-  let computedProductCode = (elements.productCode.value || '').toUpperCase().trim();
+  const shortCode = document.getElementById('shortCode');
+  const sizeInput = document.getElementById('sizeInput');
+  const productCode = document.getElementById('productCode');
+  const productName = document.getElementById('productName');
+  const colorInput = document.getElementById('colorInput');
+  const stockInput = document.getElementById('stockInput');
+  const categoryInput = document.getElementById('categoryInput');
+
+  const shortCodeVal = (shortCode?.value || '').toUpperCase().trim();
+  const sizeVal = (sizeInput?.value || '').toUpperCase().trim();
+  let computedProductCode = (productCode?.value || '').toUpperCase().trim();
 
   if (!computedProductCode && shortCodeVal && sizeVal) {
     computedProductCode = `${shortCodeVal}-${sizeVal}`;
@@ -547,11 +537,11 @@ async function handleNewProductSubmit(e) {
   const payload = {
     shortCode: shortCodeVal,
     productCode: computedProductCode,
-    name: elements.productName.value.trim(),
-    color: elements.colorInput.value.trim(),
+    name: productName?.value.trim() || '',
+    color: colorInput?.value.trim() || '',
     size: sizeVal,
-    stock: Number(elements.stockInput.value) || 0,
-    category: elements.categoryInput.value.trim()
+    stock: Number(stockInput?.value) || 0,
+    category: categoryInput?.value.trim() || ''
   };
 
   const submitBtn = document.getElementById('btnSubmitProduct');
@@ -567,7 +557,8 @@ async function handleNewProductSubmit(e) {
 
     if (data.success) {
       showToast(`✅ ${payload.name} (${payload.productCode}) kaydedildi!`, 'success');
-      elements.newProductForm.reset();
+      const form = document.getElementById('newProductForm');
+      if (form) form.reset();
       fetchData();
     } else {
       showToast(`❌ Hata: ${data.error || 'Kaydedilemedi'}`, 'error');
@@ -581,14 +572,21 @@ async function handleNewProductSubmit(e) {
 
 // Handle Gemini AI Product Submit
 async function handleAiProductSubmit() {
-  const promptText = (elements.aiProductPrompt.value || '').trim();
+  const promptInput = document.getElementById('aiProductPrompt');
+  const submitBtn = document.getElementById('btnSubmitAiProduct');
+  const aiResultBox = document.getElementById('aiResultBox');
+  const aiResultContent = document.getElementById('aiResultContent');
+
+  const promptText = (promptInput?.value || '').trim();
   if (!promptText) {
     showToast('Lütfen yapay zekaya bir ürün açıklaması yazın.', 'error');
     return;
   }
 
-  elements.btnSubmitAiProduct.disabled = true;
-  elements.btnSubmitAiProduct.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Gemini AI Analiz Ediyor...`;
+  if (submitBtn) {
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Gemini AI Analiz Ediyor...`;
+  }
 
   try {
     const res = await fetch(`${API_BASE}/api/ai/create-product`, {
@@ -600,9 +598,11 @@ async function handleAiProductSubmit() {
 
     if (data.success) {
       showToast(`✨ ${data.message || 'Ürünler AI tarafından kaydedildi!'}`, 'success');
-      elements.aiResultBox.style.display = 'block';
-      elements.aiResultContent.textContent = JSON.stringify(data, null, 2);
-      elements.aiProductPrompt.value = '';
+      if (aiResultBox && aiResultContent) {
+        aiResultBox.style.display = 'block';
+        aiResultContent.textContent = JSON.stringify(data, null, 2);
+      }
+      if (promptInput) promptInput.value = '';
       fetchData();
     } else {
       showToast(`❌ AI Hatası: ${data.error || 'İşlem başarısız'}`, 'error');
@@ -610,8 +610,10 @@ async function handleAiProductSubmit() {
   } catch (err) {
     showToast('Gemini AI bağlantı hatası.', 'error');
   } finally {
-    elements.btnSubmitAiProduct.disabled = false;
-    elements.btnSubmitAiProduct.innerHTML = `<i class="fa-solid fa-robot"></i> Yapay Zeka İle Oluştur ve Kaydet`;
+    if (submitBtn) {
+      submitBtn.disabled = false;
+      submitBtn.innerHTML = `<i class="fa-solid fa-robot"></i> Yapay Zeka İle Oluştur ve Kaydet`;
+    }
   }
 }
 
@@ -657,21 +659,28 @@ async function deleteProduct(productCode) {
 
 // Fetch and Handle Settings
 async function fetchSettings() {
+  const settingShippingFee = document.getElementById('settingShippingFee');
+  const settingFreeThreshold = document.getElementById('settingFreeThreshold');
+  if (!settingShippingFee && !settingFreeThreshold) return;
+
   try {
     const res = await fetch(`${API_BASE}/api/settings`);
     if (!res.ok) return;
     const data = await res.json();
     if (data.success && data.settings) {
-      if (elements.settingShippingFee) elements.settingShippingFee.value = data.settings.shipping_fee || '49';
-      if (elements.settingFreeThreshold) elements.settingFreeThreshold.value = data.settings.free_shipping_threshold || '1500';
+      if (settingShippingFee) settingShippingFee.value = data.settings.shipping_fee || '49';
+      if (settingFreeThreshold) settingFreeThreshold.value = data.settings.free_shipping_threshold || '1500';
     }
   } catch (e) {}
 }
 
 async function handleSettingsSubmit(e) {
   e.preventDefault();
-  const shippingFee = elements.settingShippingFee.value;
-  const freeThreshold = elements.settingFreeThreshold.value;
+  const settingShippingFee = document.getElementById('settingShippingFee');
+  const settingFreeThreshold = document.getElementById('settingFreeThreshold');
+
+  const shippingFee = settingShippingFee ? settingShippingFee.value : '49';
+  const freeThreshold = settingFreeThreshold ? settingFreeThreshold.value : '1500';
 
   try {
     const res = await fetch(`${API_BASE}/api/settings`, {
@@ -697,11 +706,14 @@ async function fetchCampaigns() {
 
   try {
     const res = await fetch(`${API_BASE}/api/campaigns`);
-    if (!res.ok) return;
+    if (!res.ok) {
+      tableBody.innerHTML = `<tr><td colspan="6" style="text-align:center; padding: 1.5rem; color: #ef4444;">Kampanyalar alınamadı (${res.status}).</td></tr>`;
+      return;
+    }
     const data = await res.json();
-    if (data.success && Array.isArray(data.campaigns)) {
+    if (data && data.success && Array.isArray(data.campaigns)) {
       if (data.campaigns.length === 0) {
-        tableBody.innerHTML = `<tr><td colspan="6" style="text-align:center; padding: 1.5rem; color: #94a3b8;">Aktif kampanya bulunmuyor.</td></tr>`;
+        tableBody.innerHTML = `<tr><td colspan="6" style="text-align:center; padding: 1.5rem; color: #94a3b8;">Henüz aktif bir kampanya eklenmemiş. Yeni kampanya ekleyebilirsiniz.</td></tr>`;
         return;
       }
       tableBody.innerHTML = data.campaigns.map(c => `
@@ -718,7 +730,7 @@ async function fetchCampaigns() {
       `).join('');
     }
   } catch (e) {
-    console.error('fetchCampaigns error:', e);
+    tableBody.innerHTML = `<tr><td colspan="6" style="text-align:center; padding: 1.5rem; color: #ef4444;">Bağlantı hatası: ${escapeHtml(e.message)}</td></tr>`;
   }
 }
 
@@ -783,9 +795,10 @@ async function deleteCampaign(id) {
 
 // UI Status Badge Helper
 function setSyncStatus(type, message) {
-  if (!elements.syncStatusBadge) return;
-  elements.syncStatusBadge.className = `sync-badge ${type}`;
-  const span = elements.syncStatusBadge.querySelector('span:not(.pulse-dot)');
+  const syncBadge = document.getElementById('syncStatusBadge');
+  if (!syncBadge) return;
+  syncBadge.className = `sync-badge ${type}`;
+  const span = syncBadge.querySelector('span:not(.pulse-dot)');
   if (span) span.textContent = message;
 }
 
