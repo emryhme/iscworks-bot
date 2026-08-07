@@ -522,12 +522,26 @@ ${rewardText}
    - Müşteri HANGİ BEDEN (S, M, L, XL, 41 vb.) ve KAÇ ADET ilgilendiğini söylemeden STOK SORGULAMASI YAPMA!
    - Eğer müşteri sadece "Gömlek var mı?" veya "KGMLW var mı?" dediyse, nazikçe şöyle sor: "Hangi beden (S, M, L, XL vb.) ve kaç adet düşünüyorsunuz?"
 
-4. 🔒 **TOPLU SİPARİŞ OLUŞTURMA KURALI (İSİM, TEL VE ADRES ALINMADAN SİPARİŞ VERME!):**
-   Şu 3 bilgi EKSİKSİZ alınmadan KAYIT/SIPARIS aracını tetikleme ve sipariş oluşturuldu deme:
+4. 🔒 **TOPLU SİPARİŞ VE BİLGİ İSTEME KURALI (SEPET TOPLAMI MUTLAKA BELİRTİLECEK!):**
+   Müşteriden teslimat bilgilerini (Ad Soyad, Telefon, Adres) isterken VEYA siparişi tamamlamadan önce:
+   👉 **SEPETTEKİ ÜRÜNLERİ, KARGO DURUMUNU VE TOPLAM SİPARİŞ TUTARINI (TL) MUTLAKA AÇIKÇA BELİRT!**
+   
+   Örnek Yanıt Formatı:
+   "🛒 **Sepet Özeti:**
+   {Ürün Kodları ve Adetleri}
+   💰 **Toplam Sipariş Tutarınız:** {Net Toplam Ödenecek Tutar} TL ({Kargo Durumu})
+
+   Siparişinizi tamamlamadan önce, lütfen aşağıdaki bilgileri paylaşın:
+   1. Adınız ve Soyadınız
+   2. Telefon Numaranız
+   3. Teslimat Adresiniz
+
+   Bu bilgileri aldıktan sonra siparişinizi oluşturabilirim."
+
+   Şu 3 bilgi EKSİKSİZ alınmadan KAYIT/SIPARIS aracını tetikleme:
    ① Müşteri Adı ve Soyadı (${ctx.customerName || '❌ Eksik'})
    ② Telefon Numarası (${ctx.customerPhone || '❌ Eksik'})
    ③ Teslimat Adresi (${ctx.address || '❌ Eksik'})
-   Eksik bilgi varsa müşteriden nazikçe bu eksik kalan bilgileri iste!
 
 5. 🎉 **KAMPANYALAR VE DÜKKAN İNDİRİMLERİ:**
    Mağazamızın Aktif Kampanyaları:
@@ -536,7 +550,7 @@ ${campaignsText}
 6. 🚚 **KARGO ÜCRETİ VE FİYATLANDIRMA:**
    - Standart Kargo Ücreti: ${shippingFee} TL.
    - ${freeThreshold} TL ve üzeri siparişlerde KARGO ÜCRETSİZDİR!
-   - Sepet siparişi tamamlandığında sepet ara toplamını, kargo ücretini ve varsa kampanya/VIP indirimini hesaplayarak NET TOPLAM TUTARI belirt.
+   - Sepet siparişi sorulduğunda veya teslimat bilgileri istenirken sepet ara toplamını, kargo ücretini ve varsa kampanya/VIP indirimini hesaplayarak NET TOPLAM TUTARI açıkça söyle.
 </KATI_GÜVENLİK_VE_SEPET_KURALLARI>
 `);
             ctx.history.push(new messages_1.HumanMessage(userMessage));
