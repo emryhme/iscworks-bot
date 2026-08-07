@@ -1,8 +1,6 @@
 // BARON'S SILLAGE Admin Control Panel Application Logic
 
-const API_BASE = window.location.origin.includes('3000') || window.location.origin.includes('localhost') 
-  ? window.location.origin 
-  : 'http://localhost:3000';
+const API_BASE = window.location.origin;
 
 const POLL_INTERVAL_MS = 3000; // 3 Saniyede Bir Canlı Arka Plan Kontrolü
 
