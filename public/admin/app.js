@@ -1,18 +1,18 @@
-// BARON'S SILLAGE Admin Control Panel Application Logic
+// BARON'S SILLAGE Admin Control Panel Application Logic (Ultra-Smooth Multi-Page)
 
 const API_BASE = window.location.origin;
-
-const POLL_INTERVAL_MS = 3000; // 3 Saniyede Bir Canlı Arka Plan Kontrolü
+const POLL_INTERVAL_MS = 10000; // 10 Saniyede Bir Arka Plan Kontrolü (Ultra Hafif)
 
 // Global App State
 const state = {
   products: [],
   orders: [],
+  rewards: [],
   knownOrderIds: new Set(),
-  activeTab: 'productsTab',
   searchQuery: '',
   soundEnabled: true,
-  isInitialLoad: true
+  isInitialLoad: true,
+  isFetching: false
 };
 
 // DOM Elements
@@ -29,95 +29,64 @@ const elements = {
   searchInput: document.getElementById('searchInput'),
   btnRefreshData: document.getElementById('btnRefreshData'),
   btnToggleSound: document.getElementById('btnToggleSound'),
-  openNewProductBtn: document.getElementById('openNewProductBtn'),
   syncStatusBadge: document.getElementById('syncStatusBadge'),
   
   // Tables
   productsTableBody: document.getElementById('productsTableBody'),
   ordersTableBody: document.getElementById('ordersTableBody'),
+  rewardsTableBody: document.getElementById('rewardsTableBody'),
   productsTableCount: document.getElementById('productsTableCount'),
   ordersTableCount: document.getElementById('ordersTableCount'),
+  rewardsTableCount: document.getElementById('rewardsTableCount'),
   
-  // Form (7 Headers: KISA KOD, ÜRÜN KODU, ÜRÜN İSMİ, RENK, NUMARA, STOK, KATEGORİ)
+  // Form
   newProductForm: document.getElementById('newProductForm'),
   shortCode: document.getElementById('shortCode'),
   productCode: document.getElementById('productCode'),
   productName: document.getElementById('productName'),
   colorInput: document.getElementById('colorInput'),
   sizeInput: document.getElementById('sizeInput'),
-  stockQuantity: document.getElementById('stockQuantity'),
+  stockInput: document.getElementById('stockInput'),
   categoryInput: document.getElementById('categoryInput'),
   autoCodePreview: document.getElementById('autoCodePreview'),
-  btnSubmitProduct: document.getElementById('btnSubmitProduct'),
-
-  // Gemini AI Tab
-  openAiTabBtn: document.getElementById('openAiTabBtn'),
-  aiPromptInput: document.getElementById('aiPromptInput'),
   btnSubmitAiProduct: document.getElementById('btnSubmitAiProduct'),
-  aiResultCard: document.getElementById('aiResultCard'),
-  aiResultMessage: document.getElementById('aiResultMessage'),
-  aiParsedGrid: document.getElementById('aiParsedGrid'),
-
-  // Toast Container
-  toastContainer: document.getElementById('toastContainer')
+  aiProductPrompt: document.getElementById('aiProductPrompt'),
+  aiResultBox: document.getElementById('aiResultBox'),
+  aiResultContent: document.getElementById('aiResultContent'),
+  
+  // Settings & Campaigns Forms
+  settingsForm: document.getElementById('settingsForm'),
+  settingShippingFee: document.getElementById('settingShippingFee'),
+  settingFreeThreshold: document.getElementById('settingFreeThreshold'),
+  campaignForm: document.getElementById('campaignForm'),
+  campaignsTableBody: document.getElementById('campaignsTableBody')
 };
 
 // Initialize Application
 document.addEventListener('DOMContentLoaded', () => {
   setupEventListeners();
   fetchData();
-
-  // Otomatik Canlı Sipariş Takip Polling (Saniyeler İçinde Yenilemesiz Otomatik Düşer)
+  
+  // Arka planda 10 saniyede bir sessiz kontrol
   setInterval(pollOrdersInBackground, POLL_INTERVAL_MS);
 });
 
-// Event Listeners Registration
+// Setup Event Listeners
 function setupEventListeners() {
-  // Tab Switching
-  elements.tabs.forEach(tab => {
-    tab.addEventListener('click', () => {
-      const tabTarget = tab.getAttribute('data-tab');
-      switchTab(tabTarget);
-    });
-  });
-
-  // Open New Product Tab from Quick Action
-  if (elements.openNewProductBtn) {
-    elements.openNewProductBtn.addEventListener('click', () => {
-      switchTab('newProductTab');
-    });
-  }
-
-  // Open AI Tab from Quick Action Card
-  if (elements.openAiTabBtn) {
-    elements.openAiTabBtn.addEventListener('click', () => {
-      switchTab('aiProductTab');
-    });
-  }
-
-  // Refresh Button
   if (elements.btnRefreshData) {
     elements.btnRefreshData.addEventListener('click', () => {
-      const icon = elements.btnRefreshData.querySelector('i');
-      if (icon) icon.classList.add('fa-spin');
-      fetchData().finally(() => {
-        if (icon) icon.classList.remove('fa-spin');
-      });
+      showToast('🔄 Veriler tazeleme isteği gönderildi...', 'info');
+      fetchData();
     });
   }
 
-  // Notification Sound Toggle & Permission
   if (elements.btnToggleSound) {
     elements.btnToggleSound.addEventListener('click', () => {
       state.soundEnabled = !state.soundEnabled;
       const icon = elements.btnToggleSound.querySelector('i');
-      
       if (state.soundEnabled) {
-        if (icon) icon.className = 'fa-solid fa-bell text-green';
-        showToast('🔔 Sesli sipariş bildirimleri açıldı.', 'info');
-        playNewOrderSound(); // Test sesi
-        
-        // Masaüstü Bildirim İzni İste
+        if (icon) icon.className = 'fa-solid fa-bell text-gold';
+        showToast('🔔 Sesli sipariş bildirimleri açıldı.', 'success');
         if ('Notification' in window && Notification.permission !== 'granted') {
           Notification.requestPermission();
         }
@@ -128,7 +97,6 @@ function setupEventListeners() {
     });
   }
 
-  // Search Input
   if (elements.searchInput) {
     elements.searchInput.addEventListener('input', (e) => {
       state.searchQuery = e.target.value.toLowerCase().trim();
@@ -136,7 +104,6 @@ function setupEventListeners() {
     });
   }
 
-  // Auto Product Code Preview Listener
   if (elements.shortCode && elements.sizeInput && elements.autoCodePreview) {
     const updateCodePreview = () => {
       const sc = (elements.shortCode.value || 'KGMLW').toUpperCase().trim();
@@ -147,23 +114,30 @@ function setupEventListeners() {
         elements.productCode.placeholder = `Örn: ${computedCode}`;
       }
     };
-
     elements.shortCode.addEventListener('input', updateCodePreview);
     elements.sizeInput.addEventListener('input', updateCodePreview);
   }
 
-  // New Product Form Submission (Google Sheet Sync)
   if (elements.newProductForm) {
     elements.newProductForm.addEventListener('submit', handleNewProductSubmit);
   }
 
-  // Gemini AI Submission
   if (elements.btnSubmitAiProduct) {
     elements.btnSubmitAiProduct.addEventListener('click', handleAiProductSubmit);
   }
+
+  if (elements.settingsForm) {
+    elements.settingsForm.addEventListener('submit', handleSettingsSubmit);
+    fetchSettings();
+  }
+
+  if (elements.campaignForm) {
+    elements.campaignForm.addEventListener('submit', handleCampaignSubmit);
+    fetchCampaigns();
+  }
 }
 
-// Web Audio API Tabanlı Hoş İki Tonlu Sipariş Çanı (Ses Dosyası Gerektirmeyen Dahili Sentezleyici)
+// Web Audio API Tabanlı Hoş İki Tonlu Sipariş Çanı
 function playNewOrderSound() {
   if (!state.soundEnabled) return;
   try {
@@ -172,83 +146,56 @@ function playNewOrderSound() {
     const gain = audioCtx.createGain();
 
     osc.type = 'sine';
-    osc.frequency.setValueAtTime(587.33, audioCtx.currentTime); // D5 (Re)
-    osc.frequency.exponentialRampToValueAtTime(880, audioCtx.currentTime + 0.15); // A5 (La)
+    osc.frequency.setValueAtTime(587.33, audioCtx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(880, audioCtx.currentTime + 0.15);
 
     gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
     gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.6);
 
     osc.connect(gain);
     gain.connect(audioCtx.destination);
-
     osc.start();
     osc.stop(audioCtx.currentTime + 0.6);
   } catch (e) {
-    console.warn('Audio synthesis error:', e);
+    console.warn('Audio sound error:', e);
   }
 }
 
-// Masaüstü (Tarayıcı) Bildirim Gönderimi
 function triggerDesktopNotification(order) {
-  if (!('Notification' in window) || Notification.permission !== 'granted') return;
+  if (!('Notification' in window)) return;
   try {
-    new Notification('🔔 YENİ SİPARİŞ GELDİ!', {
-      body: `Müşteri: ${order.customerName}\nÜrün: ${order.productCode} (${order.quantity} Adet)`,
-      icon: 'https://cdn-icons-png.flaticon.com/512/3144/3144456.png'
-    });
+    if (Notification.permission === 'granted') {
+      new Notification('🔔 YENİ SİPARİŞ DÜŞTÜ!', {
+        body: `Müşteri: ${order.customerName || 'Bilinmiyor'}\nÜrün: ${order.productCode || ''} (${order.quantity || 1} Adet)\nToplam: ${order.totalPrice || 0} TL`,
+        icon: '/favicon.ico'
+      });
+    }
   } catch (e) {
     console.warn('Desktop notification error:', e);
   }
 }
 
-// Switch Active Tab
-function switchTab(tabId) {
-  state.activeTab = tabId;
-
-  elements.tabs.forEach(btn => {
-    if (btn.getAttribute('data-tab') === tabId) {
-      btn.classList.add('active');
-    } else {
-      btn.classList.remove('active');
-    }
-  });
-
-  elements.tabContents.forEach(content => {
-    if (content.id === tabId) {
-      content.classList.add('active');
-    } else {
-      content.classList.remove('active');
-    }
-  });
-}
-
-// Fetch Products & Orders from Backend API
+// Fetch Products & Orders from Backend API (Sessiz ve Yumuşak Senkronizasyon)
 async function fetchData() {
+  if (state.isFetching) return;
+  state.isFetching = true;
   setSyncStatus('loading', 'Senkronize Ediliyor...');
 
   try {
     const [stocksRes, ordersRes, rewardsRes] = await Promise.all([
-      fetch(`${API_BASE}/api/stocks`).then(r => r.json()).catch(() => null),
-      fetch(`${API_BASE}/api/orders`).then(r => r.json()).catch(() => null),
-      fetch(`${API_BASE}/api/rewards`).then(r => r.json()).catch(() => null)
+      fetch(`${API_BASE}/api/stocks`).then(r => r.ok ? r.json() : null).catch(() => null),
+      fetch(`${API_BASE}/api/orders`).then(r => r.ok ? r.json() : null).catch(() => null),
+      fetch(`${API_BASE}/api/rewards`).then(r => r.ok ? r.json() : null).catch(() => null)
     ]);
 
-    if (stocksRes && stocksRes.stocks) {
+    if (stocksRes && Array.isArray(stocksRes.stocks)) {
       state.products = stocksRes.stocks;
-    } else {
-      state.products = [];
     }
-
-    if (ordersRes && ordersRes.orders) {
+    if (ordersRes && Array.isArray(ordersRes.orders)) {
       processIncomingOrders(ordersRes.orders);
-    } else {
-      state.orders = [];
     }
-
-    if (rewardsRes && rewardsRes.rewards) {
+    if (rewardsRes && Array.isArray(rewardsRes.rewards)) {
       state.rewards = rewardsRes.rewards;
-    } else {
-      state.rewards = [];
     }
 
     state.isInitialLoad = false;
@@ -258,8 +205,9 @@ async function fetchData() {
 
   } catch (error) {
     console.error('Fetch error:', error);
-    setSyncStatus('error', 'Senkronizasyon Hatası');
-    showToast('Backend sunucusuna bağlanılamadı.', 'error');
+    setSyncStatus('error', 'Senkronizasyon Duraklatıldı');
+  } finally {
+    state.isFetching = false;
   }
 }
 
@@ -267,9 +215,10 @@ async function fetchData() {
 async function pollOrdersInBackground() {
   try {
     const res = await fetch(`${API_BASE}/api/orders`);
+    if (!res.ok) return;
     const data = await res.json();
 
-    if (data && data.success && data.orders) {
+    if (data && data.success && Array.isArray(data.orders)) {
       const newOrdersDetected = processIncomingOrders(data.orders);
       if (newOrdersDetected) {
         updateMetrics();
@@ -277,7 +226,7 @@ async function pollOrdersInBackground() {
       }
     }
   } catch (e) {
-    // Arka plan kontrol hataları konsolu kirletmesin
+    // Silent background poll
   }
 }
 
@@ -289,7 +238,6 @@ function processIncomingOrders(newOrdersList) {
     if (order.orderId && !state.knownOrderIds.has(order.orderId)) {
       state.knownOrderIds.add(order.orderId);
 
-      // Sayfa ilk açılışta eski tüm siparişler için ses çalmasın
       if (!state.isInitialLoad) {
         hasNew = true;
         playNewOrderSound();
@@ -309,30 +257,32 @@ function updateMetrics() {
   const totalStock = state.products.reduce((acc, p) => acc + (Number(p.stock) || 0), 0);
   const totalOrders = state.orders.length;
 
-  elements.statTotalProducts.textContent = totalProducts.toLocaleString('tr-TR');
-  elements.statTotalStock.textContent = totalStock.toLocaleString('tr-TR');
-  elements.statTotalOrders.textContent = totalOrders.toLocaleString('tr-TR');
-  elements.ordersBadgeCount.textContent = totalOrders;
+  if (elements.statTotalProducts) elements.statTotalProducts.textContent = totalProducts.toLocaleString('tr-TR');
+  if (elements.statTotalStock) elements.statTotalStock.textContent = totalStock.toLocaleString('tr-TR');
+  if (elements.statTotalOrders) elements.statTotalOrders.textContent = totalOrders.toLocaleString('tr-TR');
+  if (elements.ordersBadgeCount) elements.ordersBadgeCount.textContent = totalOrders;
 }
 
-// Render Products & Orders Tables
+// Render Products & Orders Tables (Yazım Sırasında Ekranda Glitch Olmaması İçin Odak Kontrolü)
 function renderTables() {
+  const activeElem = document.activeElement;
+  if (activeElem && (activeElem.tagName === 'INPUT' || activeElem.tagName === 'TEXTAREA') && activeElem.id.startsWith('price_')) {
+    return; // Kullanıcı tam fiyat kutusunda yazıyorsa tabloyu resetleme!
+  }
+
   renderProductsTable();
   renderOrdersTable();
   renderRewardsTable();
 }
 
-// Render VIP Sadakat Ödülleri Tablosu (%20 İndirim)
+// Render VIP Sadakat Ödülleri Tablosu
 function renderRewardsTable() {
-  const tableBody = document.getElementById('rewardsTableBody');
-  const tableCount = document.getElementById('rewardsTableCount');
-  if (!tableBody) return;
-
+  if (!elements.rewardsTableBody) return;
   const rewards = state.rewards || [];
-  if (tableCount) tableCount.textContent = `${rewards.length} Ödül Listelendi`;
+  if (elements.rewardsTableCount) elements.rewardsTableCount.textContent = `${rewards.length} Ödül Listelendi`;
 
   if (rewards.length === 0) {
-    tableBody.innerHTML = `
+    elements.rewardsTableBody.innerHTML = `
       <tr>
         <td colspan="8" class="loading-cell">
           <i class="fa-solid fa-gift"></i> Henüz tanımlanmış bir VIP sadakat ödülü bulunmuyor. 2000 TL üzeri ilk siparişte otomatik oluşturulur!
@@ -342,7 +292,7 @@ function renderRewardsTable() {
     return;
   }
 
-  tableBody.innerHTML = rewards.map(r => {
+  elements.rewardsTableBody.innerHTML = rewards.map(r => {
     const isUsed = r.isUsed === 1;
     const statusBadge = isUsed 
       ? `<span class="status-badge out-stock">Kullanıldı</span>`
@@ -365,6 +315,7 @@ function renderRewardsTable() {
 
 // Render Products Table
 function renderProductsTable() {
+  if (!elements.productsTableBody) return;
   const query = state.searchQuery;
   const filtered = state.products.filter(p => {
     const shortCode = (p.shortCode || '').toLowerCase();
@@ -375,12 +326,12 @@ function renderProductsTable() {
     return shortCode.includes(query) || code.includes(query) || name.includes(query) || color.includes(query) || cat.includes(query);
   });
 
-  elements.productsTableCount.textContent = `${filtered.length} ürün listelendi`;
+  if (elements.productsTableCount) elements.productsTableCount.textContent = `${filtered.length} ürün listelendi`;
 
   if (filtered.length === 0) {
     elements.productsTableBody.innerHTML = `
       <tr>
-        <td colspan="8" class="loading-cell">
+        <td colspan="9" class="loading-cell">
           <i class="fa-solid fa-box-open"></i> Hiç ürün bulunamadı.
         </td>
       </tr>
@@ -517,6 +468,7 @@ async function updateProductPrice(productCode) {
 
 // Render Orders Table
 function renderOrdersTable() {
+  if (!elements.ordersTableBody) return;
   const query = state.searchQuery;
   const filtered = state.orders.filter(o => {
     const id = (o.orderId || '').toLowerCase();
@@ -524,17 +476,16 @@ function renderOrdersTable() {
     const name = (o.customerName || '').toLowerCase();
     const phone = (o.customerPhone || '').toLowerCase();
     const code = (o.productCode || '').toLowerCase();
-    const status = (o.status || '').toLowerCase();
-    return id.includes(query) || sender.includes(query) || name.includes(query) || phone.includes(query) || code.includes(query) || status.includes(query);
+    return id.includes(query) || sender.includes(query) || name.includes(query) || phone.includes(query) || code.includes(query);
   });
 
-  elements.ordersTableCount.textContent = `${filtered.length} sipariş listelendi`;
+  if (elements.ordersTableCount) elements.ordersTableCount.textContent = `${filtered.length} sipariş listelendi`;
 
   if (filtered.length === 0) {
     elements.ordersTableBody.innerHTML = `
       <tr>
         <td colspan="10" class="loading-cell">
-          <i class="fa-solid fa-clipboard-list"></i> Henüz kayıtlı sipariş bulunmuyor.
+          <i class="fa-solid fa-inbox"></i> Sipariş bulunamadı.
         </td>
       </tr>
     `;
@@ -542,40 +493,37 @@ function renderOrdersTable() {
   }
 
   elements.ordersTableBody.innerHTML = filtered.map(o => {
-    const rawStatus = (o.status || 'BEKLEMEDE').toUpperCase();
-    let statusBadge = `<span class="status-badge pending"><i class="fa-solid fa-clock"></i> BEKLEMEDE</span>`;
-    
-    if (rawStatus === 'OK') {
-      statusBadge = `<span class="status-badge ok"><i class="fa-solid fa-check-double"></i> OK</span>`;
-    } else if (rawStatus === 'DEC') {
-      statusBadge = `<span class="status-badge dec"><i class="fa-solid fa-xmark"></i> DEC</span>`;
+    const status = (o.status || 'BEKLEMEDE').toUpperCase();
+    let statusBadge = `<span class="status-badge pending">${status}</span>`;
+
+    if (status === 'OK' || status === 'ONAYLANDI') {
+      statusBadge = `<span class="status-badge success"><i class="fa-solid fa-check"></i> ONAYLANDI</span>`;
+    } else if (status === 'DEC' || status === 'REDDEDİLMEDİ') {
+      statusBadge = `<span class="status-badge danger"><i class="fa-solid fa-xmark"></i> REDDEDİLDİ</span>`;
     }
 
-    const senderTag = o.senderId 
-      ? `<span class="code-tag" style="font-size: 11px; background: rgba(59, 130, 246, 0.15); color: #93c5fd; border-color: rgba(59, 130, 246, 0.3);"><i class="fa-solid fa-user-astronaut"></i> ${escapeHtml(o.senderId)}</span>`
-      : `<span class="text-muted" style="font-size: 11px;">-</span>`;
+    const priceDisplay = o.totalPrice 
+      ? `<strong class="text-green">${Number(o.totalPrice).toFixed(2)} TL</strong>` 
+      : `<span class="text-muted">Hesaplanıyor</span>`;
 
     return `
       <tr>
-        <td><span class="order-id-tag">${escapeHtml(o.orderId)}</span></td>
-        <td>${senderTag}</td>
-        <td><small class="text-muted">${escapeHtml(o.createdAt || 'Bugün')}</small></td>
-        <td><strong>${escapeHtml(o.customerName)}</strong></td>
-        <td><i class="fa-solid fa-phone text-muted" style="font-size: 11px;"></i> ${escapeHtml(o.customerPhone)}</td>
-        <td><span class="code-tag">${escapeHtml(o.productCode)}</span></td>
-        <td><strong>${o.quantity || 1}</strong> adet</td>
-        <td><small class="text-muted">${escapeHtml(o.address || 'Belirtilmedi')}</small></td>
+        <td><strong class="text-purple">${escapeHtml(o.orderId || '-')}</strong></td>
+        <td><strong>${escapeHtml(o.customerName || '-')}</strong></td>
+        <td><span class="code-tag">${escapeHtml(o.customerPhone || '-')}</span></td>
+        <td><small class="text-muted">${escapeHtml(o.address || '-')}</small></td>
+        <td><span class="size-pill">${escapeHtml(o.productCode || '-')}</span></td>
+        <td><strong>${o.quantity || 1}</strong></td>
+        <td>${priceDisplay}</td>
         <td>${statusBadge}</td>
+        <td><small class="text-muted">${escapeHtml(o.createdAt || '-')}</small></td>
         <td>
           <div class="action-btn-group">
-            <button class="btn btn-sm btn-approve" onclick="updateOrderStatus('${escapeHtml(o.orderId)}', 'OK')" ${rawStatus === 'OK' ? 'disabled' : ''}>
-              <i class="fa-solid fa-check"></i> Onayla (OK)
+            <button class="btn btn-sm btn-success" onclick="updateOrderStatus('${escapeHtml(o.orderId)}', 'OK')">
+              <i class="fa-solid fa-check"></i> Onayla
             </button>
-            <button class="btn btn-sm btn-reject" onclick="updateOrderStatus('${escapeHtml(o.orderId)}', 'DEC')" ${rawStatus === 'DEC' ? 'disabled' : ''}>
-              <i class="fa-solid fa-xmark"></i> Reddet (DEC)
-            </button>
-            <button class="btn btn-sm btn-delete" onclick="deleteOrder('${escapeHtml(o.orderId)}')">
-              <i class="fa-solid fa-trash-can"></i> Sil
+            <button class="btn btn-sm btn-delete" onclick="updateOrderStatus('${escapeHtml(o.orderId)}', 'DEC')">
+              <i class="fa-solid fa-xmark"></i> Reddet
             </button>
           </div>
         </td>
@@ -584,59 +532,91 @@ function renderOrdersTable() {
   }).join('');
 }
 
-// Global Order Status Update Handler (OK / DEC)
-window.updateOrderStatus = async function(orderId, status) {
-  if (status === 'OK') {
-    openConfirmModal(orderId);
+// Handle New Product Submit
+async function handleNewProductSubmit(e) {
+  e.preventDefault();
+
+  const shortCodeVal = (elements.shortCode.value || '').toUpperCase().trim();
+  const sizeVal = (elements.sizeInput.value || '').toUpperCase().trim();
+  let computedProductCode = (elements.productCode.value || '').toUpperCase().trim();
+
+  if (!computedProductCode && shortCodeVal && sizeVal) {
+    computedProductCode = `${shortCodeVal}-${sizeVal}`;
+  }
+
+  const payload = {
+    shortCode: shortCodeVal,
+    productCode: computedProductCode,
+    name: elements.productName.value.trim(),
+    color: elements.colorInput.value.trim(),
+    size: sizeVal,
+    stock: Number(elements.stockInput.value) || 0,
+    category: elements.categoryInput.value.trim()
+  };
+
+  const submitBtn = document.getElementById('btnSubmitProduct');
+  if (submitBtn) submitBtn.disabled = true;
+
+  try {
+    const res = await fetch(`${API_BASE}/api/products`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json();
+
+    if (data.success) {
+      showToast(`✅ ${payload.name} (${payload.productCode}) kaydedildi!`, 'success');
+      elements.newProductForm.reset();
+      fetchData();
+    } else {
+      showToast(`❌ Hata: ${data.error || 'Kaydedilemedi'}`, 'error');
+    }
+  } catch (err) {
+    showToast('Sunucu hatası oluştu.', 'error');
+  } finally {
+    if (submitBtn) submitBtn.disabled = false;
+  }
+}
+
+// Handle Gemini AI Product Submit
+async function handleAiProductSubmit() {
+  const promptText = (elements.aiProductPrompt.value || '').trim();
+  if (!promptText) {
+    showToast('Lütfen yapay zekaya bir ürün açıklaması yazın.', 'error');
     return;
   }
 
-  await executeOrderStatusUpdate(orderId, status);
-};
+  elements.btnSubmitAiProduct.disabled = true;
+  elements.btnSubmitAiProduct.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Gemini AI Analiz Ediyor...`;
 
-// Open Custom Order Approval Confirmation Modal (Emin Misin?)
-function openConfirmModal(orderId) {
-  const order = state.orders.find(o => o.orderId === orderId);
-  const modal = document.getElementById('confirmModal');
-  const body = document.getElementById('confirmModalBody');
-  const btnAccept = document.getElementById('btnAcceptConfirm');
-  const btnCancel = document.getElementById('btnCancelConfirm');
+  try {
+    const res = await fetch(`${API_BASE}/api/ai/create-product`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt: promptText })
+    });
+    const data = await res.json();
 
-  if (!modal || !body || !btnAccept || !btnCancel) return;
-
-  const custName = order ? order.customerName : 'Müşteri';
-  const prodCode = order ? order.productCode : 'Ürün';
-  const phone = order ? order.customerPhone : '-';
-  const qty = order ? (order.quantity || 1) : 1;
-  const address = order ? (order.address || 'Belirtilmedi') : 'Belirtilmedi';
-
-  body.innerHTML = `
-    <div style="margin-bottom: 8px;"><strong>Müşteri Adı:</strong> ${escapeHtml(custName)}</div>
-    <div style="margin-bottom: 8px;"><strong>Sipariş Numarası:</strong> <span class="order-id-tag">${escapeHtml(orderId)}</span></div>
-    <div style="margin-bottom: 8px;"><strong>Ürün Kodu:</strong> <span class="code-tag">${escapeHtml(prodCode)}</span> (${qty} Adet)</div>
-    <div style="margin-bottom: 8px;"><strong>Müşteri Telefon:</strong> ${escapeHtml(phone)}</div>
-    <div><strong>Teslimat Adresi:</strong> ${escapeHtml(address)}</div>
-  `;
-
-  modal.style.display = 'flex';
-
-  const closeModal = () => {
-    modal.style.display = 'none';
-    btnAccept.onclick = null;
-    btnCancel.onclick = null;
-  };
-
-  btnCancel.onclick = () => closeModal();
-
-  btnAccept.onclick = async () => {
-    closeModal();
-    await executeOrderStatusUpdate(orderId, 'OK');
-  };
+    if (data.success) {
+      showToast(`✨ ${data.message || 'Ürünler AI tarafından kaydedildi!'}`, 'success');
+      elements.aiResultBox.style.display = 'block';
+      elements.aiResultContent.textContent = JSON.stringify(data, null, 2);
+      elements.aiProductPrompt.value = '';
+      fetchData();
+    } else {
+      showToast(`❌ AI Hatası: ${data.error || 'İşlem başarısız'}`, 'error');
+    }
+  } catch (err) {
+    showToast('Gemini AI bağlantı hatası.', 'error');
+  } finally {
+    elements.btnSubmitAiProduct.disabled = false;
+    elements.btnSubmitAiProduct.innerHTML = `<i class="fa-solid fa-robot"></i> Yapay Zeka İle Oluştur ve Kaydet`;
+  }
 }
 
-// Execute Order Status Update API Call
-async function executeOrderStatusUpdate(orderId, status) {
-  setSyncStatus('loading', `Sipariş ${status} Yapılıyor...`);
+// Sipariş Durumu Güncelleme (OK veya DEC)
+async function updateOrderStatus(orderId, status) {
   try {
     const res = await fetch(`${API_BASE}/api/orders/status`, {
       method: 'POST',
@@ -644,284 +624,176 @@ async function executeOrderStatusUpdate(orderId, status) {
       body: JSON.stringify({ orderId, status })
     });
     const data = await res.json();
+
     if (data.success) {
-      if (status === 'OK') {
-        showToast(`🎉 Sipariş (${orderId}) onaylandı ve alıcıya "Siparişiniz Onaylandı" mesajı yollandı!`, 'success');
-      } else {
-        showToast(`✅ Sipariş (${orderId}) '${status}' (Reddedildi) olarak güncellendi ve stok +1 iade edildi!`, 'info');
-      }
-      await fetchData();
+      const statusText = status === 'OK' ? 'ONAYLANDI' : 'REDDEDİLDİ';
+      showToast(`✅ Sipariş ${orderId} durumu '${statusText}' olarak güncellendi.`, 'success');
+      fetchData();
     } else {
-      showToast(`❌ Hata: ${data.error || 'Güncelleme başarısız'}`, 'error');
+      showToast(`❌ Hata: ${data.error || 'Sipariş durumu güncellenemedi.'}`, 'error');
     }
   } catch (err) {
-    console.error('Update status error:', err);
-    showToast('Sunucu hatası.', 'error');
-  } finally {
-    setSyncStatus('success', 'Live SQLite & Sheet Sync');
+    showToast('Sipariş güncellenirken sunucu hatası oluştu.', 'error');
   }
 }
 
-// Global Product Stock Update Handler
-window.updateProductStock = async function(productCode, currentStock) {
-  const input = prompt(`'${productCode}' ürünü için yeni stok miktarını giriniz:`, currentStock);
-  if (input === null) return;
+// Ürün Silme
+async function deleteProduct(productCode) {
+  if (!confirm(`${productCode} kodlu ürünü silmek istediğinize emin misiniz?`)) return;
 
-  const newStock = Number(input.trim());
-  if (isNaN(newStock) || newStock < 0) {
-    showToast('Geçerli bir stok miktarı giriniz.', 'error');
-    return;
-  }
-
-  setSyncStatus('loading', 'Stok Güncelleniyor...');
   try {
-    const res = await fetch(`${API_BASE}/api/products/update-stock`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ productCode, newStock })
-    });
+    const res = await fetch(`${API_BASE}/api/products/${productCode}`, { method: 'DELETE' });
     const data = await res.json();
     if (data.success) {
-      showToast(`📦 ${productCode} stoğu ${newStock} olarak güncellendi!`, 'success');
-      await fetchData();
+      showToast(`✅ ${productCode} silindi.`, 'success');
+      fetchData();
     } else {
-      showToast(`❌ Hata: ${data.error || 'Stok güncelleme başarısız'}`, 'error');
+      showToast(`❌ Hata: ${data.error || 'Silinemedi'}`, 'error');
     }
   } catch (err) {
-    console.error('Update stock error:', err);
-    showToast('Sunucu hatası.', 'error');
-  } finally {
-    setSyncStatus('success', 'Live SQLite & Sheet Sync');
+    showToast('Silme işlemi başarısız oldu.', 'error');
   }
-};
+}
 
-// Global Product Delete Handler
-window.deleteProduct = async function(productCode) {
-  if (!confirm(`'${productCode}' ürününü silmek istediğinize emin misiniz?`)) {
-    return;
-  }
-
-  setSyncStatus('loading', 'Ürün Siliniyor...');
+// Fetch and Handle Settings
+async function fetchSettings() {
   try {
-    const res = await fetch(`${API_BASE}/api/products/delete`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ productCode })
-    });
+    const res = await fetch(`${API_BASE}/api/settings`);
+    if (!res.ok) return;
     const data = await res.json();
-    if (data.success) {
-      showToast(`🗑️ ${productCode} ürünü silindi!`, 'success');
-      await fetchData();
-    } else {
-      showToast(`❌ Hata: ${data.error || 'Silme işlemi başarısız'}`, 'error');
+    if (data.success && data.settings) {
+      if (elements.settingShippingFee) elements.settingShippingFee.value = data.settings.shipping_fee || '49';
+      if (elements.settingFreeThreshold) elements.settingFreeThreshold.value = data.settings.free_shipping_threshold || '1500';
     }
-  } catch (err) {
-    console.error('Delete product error:', err);
-    showToast('Sunucu hatası.', 'error');
-  } finally {
-    setSyncStatus('success', 'Live SQLite & Sheet Sync');
-  }
-};
+  } catch (e) {}
+}
 
-// Global Order Delete Handler
-window.deleteOrder = async function(orderId) {
-  if (!confirm(`'${orderId}' numaralı siparişi silmek istediğinize emin misiniz?`)) {
-    return;
-  }
-
-  setSyncStatus('loading', 'Sipariş Siliniyor...');
-  try {
-    const res = await fetch(`${API_BASE}/api/orders/delete`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ orderId })
-    });
-    const data = await res.json();
-    if (data.success) {
-      showToast(`🗑️ Sipariş (${orderId}) silindi!`, 'success');
-      await fetchData();
-    } else {
-      showToast(`❌ Hata: ${data.error || 'Silme işlemi başarısız'}`, 'error');
-    }
-  } catch (err) {
-    console.error('Delete order error:', err);
-    showToast('Sunucu hatası.', 'error');
-  } finally {
-    setSyncStatus('success', 'Live SQLite & Sheet Sync');
-  }
-};
-
-// Handle Form Submission
-async function handleNewProductSubmit(e) {
+async function handleSettingsSubmit(e) {
   e.preventDefault();
-
-  const shortCode = elements.shortCode.value.trim().toUpperCase();
-  const customCode = elements.productCode.value.trim().toUpperCase();
-  const productName = elements.productName.value.trim();
-  const color = elements.colorInput.value.trim();
-  const size = elements.sizeInput.value.trim().toUpperCase();
-  const stock = Number(elements.stockQuantity.value) || 0;
-  const category = elements.categoryInput.value.trim();
-
-  if (!shortCode || !productName || !size) {
-    showToast('Lütfen KISA KOD, ÜRÜN İSMİ ve NUMARA alanlarını doldurunuz.', 'error');
-    return;
-  }
-
-  const btn = elements.btnSubmitProduct;
-  const originalHtml = btn.innerHTML;
-  btn.disabled = true;
-  btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Kaydediliyor...`;
+  const shippingFee = elements.settingShippingFee.value;
+  const freeThreshold = elements.settingFreeThreshold.value;
 
   try {
-    const payload = {
-      shortCode,
-      productCode: customCode || `${shortCode}-${size}`,
-      name: productName,
-      color,
-      size,
-      stock,
-      category
-    };
+    const res = await fetch(`${API_BASE}/api/settings`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ settings: { shipping_fee: shippingFee, free_shipping_threshold: freeThreshold } })
+    });
+    const data = await res.json();
+    if (data.success) {
+      showToast('✅ Kargo fiyat ayarları kaydedildi!', 'success');
+    } else {
+      showToast('❌ Ayarlar kaydedilemedi.', 'error');
+    }
+  } catch (e) {
+    showToast('Ayarlar kaydedilirken hata oluştu.', 'error');
+  }
+}
 
-    const res = await fetch(`${API_BASE}/api/products`, {
+// Fetch and Handle Campaigns
+async function fetchCampaigns() {
+  try {
+    const res = await fetch(`${API_BASE}/api/campaigns`);
+    if (!res.ok) return;
+    const data = await res.json();
+    if (data.success && Array.isArray(data.campaigns) && elements.campaignsTableBody) {
+      if (data.campaigns.length === 0) {
+        elements.campaignsTableBody.innerHTML = `<tr><td colspan="6" style="text-align:center;">Aktif kampanya bulunmuyor.</td></tr>`;
+        return;
+      }
+      elements.campaignsTableBody.innerHTML = data.campaigns.map(c => `
+        <tr>
+          <td>#${c.id}</td>
+          <td><strong>${escapeHtml(c.title)}</strong></td>
+          <td>${escapeHtml(c.description)}</td>
+          <td><span class="code-tag">${escapeHtml(c.code || '-')}</span></td>
+          <td><strong class="text-green">%${c.discount_percent || 0}</strong></td>
+          <td>
+            <button class="btn btn-sm btn-delete" onclick="deleteCampaign(${c.id})"><i class="fa-solid fa-trash-can"></i> Sil</button>
+          </td>
+        </tr>
+      `).join('');
+    }
+  } catch (e) {}
+}
+
+async function handleCampaignSubmit(e) {
+  e.preventDefault();
+  const payload = {
+    title: document.getElementById('campTitle').value,
+    code: document.getElementById('campCode').value,
+    discountPercent: Number(document.getElementById('campPercent').value) || 0,
+    description: document.getElementById('campDesc').value
+  };
+
+  try {
+    const res = await fetch(`${API_BASE}/api/campaigns`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
     });
-
     const data = await res.json();
-
     if (data.success) {
-      showToast(`✅ ${data.productCode} ürünü kaydedildi!`, 'success');
-      elements.newProductForm.reset();
-      elements.autoCodePreview.textContent = 'Önizleme: KGMLW-M';
-      
-      await fetchData();
-      switchTab('productsTab');
+      showToast('🎉 Yeni kampanya başarıyla başlatıldı!', 'success');
+      elements.campaignForm.reset();
+      fetchCampaigns();
+      fetchData();
     } else {
-      showToast(`❌ Hata: ${data.error || 'Ürün ekleme başarısız.'}`, 'error');
+      showToast('❌ Kampanya oluşturulamadı.', 'error');
     }
-
-  } catch (error) {
-    console.error('Submit error:', error);
-    showToast('Sunucuya erişilirken hata oluştu.', 'error');
-  } finally {
-    btn.disabled = false;
-    btn.innerHTML = originalHtml;
+  } catch (e) {
+    showToast('Kampanya oluşturulurken hata oluştu.', 'error');
   }
 }
 
-// Quick AI Prompt Setter
-window.setAiPrompt = function(promptText) {
-  if (elements.aiPromptInput) {
-    elements.aiPromptInput.value = promptText;
-  }
-};
-
-// Handle Gemini AI Product Generation Submit
-async function handleAiProductSubmit() {
-  const prompt = elements.aiPromptInput.value.trim();
-  if (!prompt) {
-    showToast('Lütfen yapay zekanın ayrıştırması için bir ürün tanım metni giriniz.', 'error');
-    return;
-  }
-
-  const btn = elements.btnSubmitAiProduct;
-  const originalHtml = btn.innerHTML;
-  btn.disabled = true;
-  btn.innerHTML = `<i class="fa-solid fa-wand-magic-sparkles fa-spin"></i> Gemini AI Ürün Bilgilerini Çıkarıyor...`;
-
-  setSyncStatus('loading', 'Gemini AI Çalışıyor...');
-  if (elements.aiResultCard) elements.aiResultCard.style.display = 'none';
-
+async function deleteCampaign(id) {
+  if (!confirm('Kampanyayı silmek istediğinize emin misiniz?')) return;
   try {
-    const res = await fetch(`${API_BASE}/api/ai/create-product`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ prompt })
-    });
-
+    const res = await fetch(`${API_BASE}/api/campaigns/${id}`, { method: 'DELETE' });
     const data = await res.json();
-    if (data.success && data.products && data.products.length > 0) {
-      const productsList = data.products;
-      showToast(`✨ ${productsList.length} adet beden varyantı Gemini AI tarafından kaydedildi!`, 'success');
-      
-      if (elements.aiResultMessage) elements.aiResultMessage.textContent = data.message || `${productsList.length} ürün başarıyla eklendi.`;
-      
-      if (elements.aiParsedGrid) {
-        elements.aiParsedGrid.innerHTML = productsList.map(p => `
-          <div class="ai-field-chip" style="margin-bottom: 8px;">
-            <span class="ai-field-label">ÜRÜN KODU: <strong class="text-purple">${escapeHtml(p.productCode)}</strong> | BEDEN: <strong class="size-pill">${escapeHtml(p.size)}</strong> | STOK: <strong class="text-green">${p.stock} adet</strong></span>
-            <div style="font-size: 12px; margin-top: 4px;">
-              <strong>${escapeHtml(p.name)}</strong> (Kısa Kod: ${escapeHtml(p.shortCode)}, Renk: ${escapeHtml(p.color)}, Kategori: ${escapeHtml(p.category)})
-            </div>
-          </div>
-        `).join('');
-      }
-      if (elements.aiResultCard) elements.aiResultCard.style.display = 'block';
-
-      await fetchData();
-    } else {
-      showToast(`❌ Hata: ${data.error || 'Gemini AI ürün oluşturamadı'}`, 'error');
+    if (data.success) {
+      showToast('✅ Kampanya silindi.', 'success');
+      fetchCampaigns();
+      fetchData();
     }
-  } catch (err) {
-    console.error('AI submit error:', err);
-    showToast('Sunucu hatası.', 'error');
-  } finally {
-    btn.disabled = false;
-    btn.innerHTML = originalHtml;
-    setSyncStatus('success', 'Live SQLite & Sheet Sync');
+  } catch (e) {
+    showToast('Kampanya silinirken hata oluştu.', 'error');
   }
 }
 
-// Sync Badge Helper
-function setSyncStatus(type, text) {
+// UI Status Badge Helper
+function setSyncStatus(type, message) {
   if (!elements.syncStatusBadge) return;
-  const badge = elements.syncStatusBadge;
-  const textSpan = badge.querySelector('span:not(.pulse-dot)');
-
-  if (textSpan) textSpan.textContent = text;
-
-  if (type === 'loading') {
-    badge.style.borderColor = 'rgba(245, 158, 11, 0.4)';
-    badge.style.color = '#fbbf24';
-  } else if (type === 'success') {
-    badge.style.borderColor = 'rgba(16, 185, 129, 0.4)';
-    badge.style.color = '#34d399';
-  } else {
-    badge.style.borderColor = 'rgba(239, 68, 68, 0.4)';
-    badge.style.color = '#f87171';
-  }
+  elements.syncStatusBadge.className = `sync-badge ${type}`;
+  const span = elements.syncStatusBadge.querySelector('span:not(.pulse-dot)');
+  if (span) span.textContent = message;
 }
 
-// Toast System Helper
+// Toast Notification Engine
 function showToast(message, type = 'info') {
-  if (!elements.toastContainer) return;
-  
+  const container = document.getElementById('toastContainer');
+  if (!container) return;
+
   const toast = document.createElement('div');
-  toast.className = `toast ${type}`;
+  toast.className = `toast toast-${type}`;
 
   let icon = 'fa-circle-info';
   if (type === 'success') icon = 'fa-circle-check';
-  if (type === 'error') icon = 'fa-triangle-exclamation';
+  if (type === 'error') icon = 'fa-circle-exclamation';
 
   toast.innerHTML = `
-    <i class="fa-solid ${icon}"></i>
-    <span>${escapeHtml(message).replace(/\n/g, '<br>')}</span>
+    <i class="fa-solid ${icon} toast-icon"></i>
+    <div class="toast-message">${escapeHtml(message).replace(/\n/g, '<br>')}</div>
   `;
 
-  elements.toastContainer.appendChild(toast);
-
+  container.appendChild(toast);
   setTimeout(() => {
-    toast.style.opacity = '0';
-    toast.style.transform = 'translateX(100%)';
-    toast.style.transition = 'all 0.3s ease';
+    toast.style.animation = 'fadeOut 0.3s forwards';
     setTimeout(() => toast.remove(), 300);
-  }, 5000);
+  }, 4000);
 }
 
-// Security HTML Sanitizer
+// HTML Escape Utility
 function escapeHtml(str) {
   if (!str) return '';
   return String(str)
