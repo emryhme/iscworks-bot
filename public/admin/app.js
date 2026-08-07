@@ -1,6 +1,6 @@
 // BARON'S SILLAGE Admin Control Panel Application Logic (Ultra-Smooth Multi-Page)
 
-const API_BASE = window.location.origin;
+const API_BASE = '';
 const POLL_INTERVAL_MS = 10000; // 10 Saniyede Bir Arka Plan Kontrolü (Ultra Hafif)
 
 // Global App State
@@ -15,16 +15,20 @@ const state = {
   isFetching: false
 };
 
-// Initialize Application
-document.addEventListener('DOMContentLoaded', () => {
+// Initialize Application Robustly (Supports readyState interactive & complete)
+function initApp() {
   setupEventListeners();
   fetchData();
   fetchCampaigns();
   fetchSettings();
-  
-  // Arka planda 10 saniyede bir sessiz kontrol
   setInterval(pollOrdersInBackground, POLL_INTERVAL_MS);
-});
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initApp);
+} else {
+  initApp();
+}
 
 // Setup Event Listeners (Dinamik DOM Seçiciler)
 function setupEventListeners() {
@@ -199,6 +203,7 @@ async function fetchData() {
   } catch (error) {
     console.error('Fetch error:', error);
     setSyncStatus('error', 'Senkronizasyon Duraklatıldı');
+    renderTables();
   } finally {
     state.isFetching = false;
   }
