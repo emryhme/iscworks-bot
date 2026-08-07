@@ -64,13 +64,17 @@ app.use('/', (req, res, next) => {
   return basicAuth(req, res, next);
 }, express.static(path.join(__dirname, '../public')));
 
-// Kampanyalar API
-app.get('/api/campaigns', (req, res) => {
+// Müşteri Sadakat Ödülleri API (user_rewards)
+app.get('/api/rewards', (req, res) => {
   try {
-    const campaigns = db.prepare('SELECT * FROM campaigns ORDER BY id DESC').all();
-    res.json({ success: true, campaigns });
+    const rewards = db.prepare(`
+      SELECT id, sender_id as senderId, reward_code as rewardCode, discount_percent as discountPercent, min_qualifying_amount as minQualifyingAmount, is_used as isUsed, created_at as createdAt, used_at as usedAt
+      FROM user_rewards
+      ORDER BY id DESC
+    `).all();
+    res.json({ success: true, rewards });
   } catch (e: any) {
-    res.status(500).json({ error: e.message });
+    res.status(500).json({ success: false, error: e.message });
   }
 });
 

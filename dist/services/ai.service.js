@@ -10,7 +10,7 @@ const order_service_1 = require("./order.service");
 const telegram_service_1 = require("./telegram.service");
 const db_1 = require("../database/db");
 /**
- * n8n Multi-Agent Hiyerarşisi ve Akıllı Hafıza Korumalı LangChain JS Servisi (Sepet Destekli)
+ * n8n Multi-Agent Hiyerarşisi ve Akıllı Hafıza Korumalı LangChain JS Servisi (Sepet ve Kişiye Özel İndirim Destekli)
  */
 class AIService {
     static sessions = new Map();
@@ -119,7 +119,7 @@ Yalnızca aşağıdaki JSON yapısını döndür (bilinmeyen alanlar için null 
         // SEPETE_EKLE Tool
         const sepeteEkleTool = new tools_1.DynamicTool({
             name: 'SEPETE_EKLE',
-            description: 'Müşterinin istediği ürünü, bedenini ve adetini sepete ekler. JSON: {"productCode":"...","size":"...","quantity":1}',
+            description: 'Müşterinin istediği ürünü, bedenini ve adetini sepete ekler.',
             func: async (input) => {
                 try {
                     let data = {};
@@ -132,16 +132,13 @@ Yalnızca aşağıdaki JSON yapısını döndür (bilinmeyen alanlar için null 
                     const pCode = (data.productCode || ctx.productCode || 'KGMLW').toUpperCase();
                     const pSize = (data.size || ctx.size || 'M').toUpperCase();
                     const pQty = Number(data.quantity) || ctx.quantity || 1;
-                    // Veritabanından Ürün Fiyatını Çek
                     const prod = db_1.db.prepare('SELECT * FROM products WHERE product_code = ? OR short_code = ?').get(pCode, pCode);
                     const unitPrice = prod?.price || 299;
                     const productName = prod?.name || pCode;
-                    // Stok Kontrolü
                     const stockRes = await stock_service_1.StockService.checkStock(pCode);
                     if (!stockRes.inStock) {
                         return JSON.stringify({ success: false, message: `${productName} (${pSize}) stokta tükendiği için sepete eklenemedi.` });
                     }
-                    // Sepete Ekle Veya Adet Güncelle
                     const existingIdx = ctx.cart.findIndex(i => i.productCode === pCode && i.size === pSize);
                     if (existingIdx >= 0) {
                         ctx.cart[existingIdx].quantity += pQty;
@@ -191,10 +188,10 @@ Yalnızca aşağıdaki JSON yapısını döndür (bilinmeyen alanlar için null 
                 });
             }
         });
-        // KAYIT Tool (Toplu Sepet Siparişi Veya Tekli Sipariş)
+        // KAYIT Tool (Instagram ID'ye Özel Sadakat İndirimi & Ödül Tanımlama Destekli)
         const kayitTool = new tools_1.DynamicTool({
             name: 'KAYIT',
-            description: 'Müşterinin 5 Bilgisi (İsim, Tel, Adres, Ürünler, Adet) Tamamlandıysa Toplu Siparişi Oluşturur.',
+            description: 'Müşterinin 3 Bilgisi (İsim, Tel, Adres) Tamamlandıysa Toplu Siparişi Oluşturur.',
             func: async (input) => {
                 try {
                     let data = {};
@@ -207,7 +204,6 @@ Yalnızca aşağıdaki JSON yapısını döndür (bilinmeyen alanlar için null 
                     const customerName = data.customerName || ctx.customerName;
                     const customerPhone = data.customerPhone || ctx.customerPhone;
                     const address = data.address || ctx.address;
-                    // Eğer sepette ürün yoksa mevcut ürünü sepete ekle
                     if (!ctx.cart || ctx.cart.length === 0) {
                         const pCode = (data.productCode || ctx.productCode || 'KGMLW').toUpperCase();
                         const pSize = (data.size || ctx.size || 'M').toUpperCase();
@@ -221,7 +217,6 @@ Yalnızca aşağıdaki JSON yapısını döndür (bilinmeyen alanlar için null 
                             unitPrice: prod?.price || 299
                         });
                     }
-                    // 🔒 KATI KURAL: Müşteri İsim, Telefon ve Adres Eksiksiz mi?
                     const missingFields = [];
                     if (!customerName || customerName.trim().length <= 1)
                         missingFields.push('İsim Soyisim');
@@ -237,27 +232,50 @@ Yalnızca aşağıdaki JSON yapısını döndür (bilinmeyen alanlar için null 
                             message: `Sipariş oluşturulamadı! Eksik bilgiler: ${missingFields.join(', ')}. Lütfen bu bilgileri müşteriden talep edin.`
                         });
                     }
-                    // Sepetteki Tüm Ürünlerin Toplamını Hesapla
                     const subtotal = ctx.cart.reduce((sum, item) => sum + (item.unitPrice * item.quantity), 0);
                     const totalQuantity = ctx.cart.reduce((sum, item) => sum + item.quantity, 0);
                     // Ayarlardan Kargo Ücreti
                     const shippingSetting = db_1.db.prepare("SELECT value FROM settings WHERE key = 'shipping_fee'").get();
                     const thresholdSetting = db_1.db.prepare("SELECT value FROM settings WHERE key = 'free_shipping_threshold'").get();
+                    const loyaltyThresholdSetting = db_1.db.prepare("SELECT value FROM settings WHERE key = 'loyalty_threshold'").get();
                     let shippingFee = Number(shippingSetting?.value || 49);
                     const freeThreshold = Number(thresholdSetting?.value || 1500);
+                    const loyaltyThreshold = Number(loyaltyThresholdSetting?.value || 2000);
                     if (subtotal >= freeThreshold) {
                         shippingFee = 0; // Ücretsiz Kargo
                     }
-                    // Aktif Kampanyaları Uygula
                     let discount = 0;
-                    const activeCampaigns = db_1.db.prepare('SELECT * FROM campaigns WHERE active = 1').all();
-                    for (const c of activeCampaigns) {
-                        if (c.code === 'BARONS10') {
-                            discount += (subtotal * 0.10); // %10 İndirim
+                    let appliedLoyaltyReward = false;
+                    // 1. Müşterinin Instagram ID'sine tanımlı kullanılmamış %20 VIP Ödülü var mı?
+                    const userReward = db_1.db.prepare('SELECT * FROM user_rewards WHERE sender_id = ? AND is_used = 0 ORDER BY id DESC LIMIT 1').get(senderId);
+                    if (userReward) {
+                        // Müşteriye özel %20VIP İndirimi uygula!
+                        discount = (subtotal * (userReward.discount_percent / 100));
+                        appliedLoyaltyReward = true;
+                        // Ödülü kullanıldı olarak işaretle
+                        db_1.db.prepare('UPDATE user_rewards SET is_used = 1, used_at = CURRENT_TIMESTAMP WHERE id = ?').run(userReward.id);
+                    }
+                    else {
+                        // Standart Aktif Kampanyaları Uygula (Örn BARONS10)
+                        const activeCampaigns = db_1.db.prepare('SELECT * FROM campaigns WHERE active = 1').all();
+                        for (const c of activeCampaigns) {
+                            if (c.code === 'BARONS10') {
+                                discount += (subtotal * 0.10);
+                            }
                         }
                     }
                     const totalPrice = Math.max(0, subtotal + shippingFee - discount);
-                    // Toplu Ürün Kodları ve İsimleri Dizisi
+                    // 2. Bu sipariş 2000 TL ve üzeri ise, Müşterinin Instagram ID'sine BIR DAHA Kİ SİPARİŞİ İÇİN %20 İNDİRİM HAKKI TANIMLA!
+                    let earnedNewLoyaltyReward = false;
+                    if (subtotal >= loyaltyThreshold) {
+                        // Müşteriye yeni %20 VIP Ödülü ver
+                        const rewardCode = `VIP20-${senderId.slice(-4)}`;
+                        db_1.db.prepare(`
+              INSERT INTO user_rewards (sender_id, reward_code, discount_percent, min_qualifying_amount)
+              VALUES (?, ?, 20.0, ?)
+            `).run(senderId, rewardCode, loyaltyThreshold);
+                        earnedNewLoyaltyReward = true;
+                    }
                     const combinedProductCode = ctx.cart.map(i => `${i.productCode} (${i.size}) x${i.quantity}`).join(', ');
                     const combinedProductName = ctx.cart.map(i => `${i.productName} (${i.size})`).join(', ');
                     const order = await order_service_1.OrderService.createOrder({
@@ -270,29 +288,30 @@ Yalnızca aşağıdaki JSON yapısını döndür (bilinmeyen alanlar için null 
                         quantity: totalQuantity,
                         senderId: senderId
                     });
-                    // SQLite Order Fiyat Güncellemesi
                     db_1.db.prepare(`
             UPDATE orders 
             SET unit_price = ?, shipping_fee = ?, discount = ?, total_price = ?
             WHERE order_id = ?
           `).run(subtotal / Math.max(1, totalQuantity), shippingFee, discount, totalPrice, order.orderId);
-                    // Sepetteki her ürün için stok düşümü yap
                     for (const item of ctx.cart) {
                         await stock_service_1.StockService.deductStock(item.productCode, item.quantity);
                     }
                     const cartSummaryText = ctx.cart.map(i => `• ${i.productName} (${i.size}) - ${i.quantity} adet x ${i.unitPrice} TL`).join('\n');
-                    // Sipariş tamamlandı, sepeti temizle
                     ctx.cart = [];
                     return JSON.stringify({
                         success: true,
                         orderCreated: true,
                         orderId: order.orderId,
-                        cartSummary: cartSummaryText,
+                        appliedLoyaltyReward,
+                        earnedNewLoyaltyReward,
                         subtotal,
                         shippingFee,
                         discount,
                         totalPrice,
-                        priceDetails: `Sipariş Özeti:\n${cartSummaryText}\n\nAra Toplam: ${subtotal.toFixed(2)} TL\nKargo: ${shippingFee === 0 ? 'ÜCRETSİZ' : shippingFee.toFixed(2) + ' TL'}\nİndirim: ${discount > 0 ? '-' + discount.toFixed(2) + ' TL' : '0 TL'}\nNET ÖDENECEK TOPLAM: ${totalPrice.toFixed(2)} TL`
+                        priceDetails: `Sipariş Özeti:\n${cartSummaryText}\n\nAra Toplam: ${subtotal.toFixed(2)} TL\nKargo: ${shippingFee === 0 ? 'ÜCRETSİZ' : shippingFee.toFixed(2) + ' TL'}\nİndirim: ${discount > 0 ? '-' + discount.toFixed(2) + ' TL' : '0 TL'}\nNET ÖDENECEK TOPLAM: ${totalPrice.toFixed(2)} TL`,
+                        loyaltyNotice: earnedNewLoyaltyReward
+                            ? `🎉 TEBRİKLER! ${loyaltyThreshold} TL ve üzeri sipariş verdiğiniz için Instagram hesabınıza (ID: ${senderId}) tanımlı BIR DAHA Kİ SİPARİŞİNİZDE GEÇERLİ %20 VIP İNDİRİM HAKKI KAZANDINIZ!`
+                            : ''
                     });
                 }
                 catch (e) {
@@ -443,14 +462,25 @@ Stok sorgulama, sepete ekleme ve sipariş kayıt ajansın.
         try {
             await this.extractSessionDataWithAI(senderId, userMessage, apiKey);
             const ctx = this.getSessionContext(senderId);
+            // Veritabanından Aktif Kampanyaları ve Kişiye Özel VIP İndirim Ödülünü Çek
             const activeCampaigns = db_1.db.prepare('SELECT title, description, code FROM campaigns WHERE active = 1').all();
             const shippingSetting = db_1.db.prepare("SELECT value FROM settings WHERE key = 'shipping_fee'").get();
             const thresholdSetting = db_1.db.prepare("SELECT value FROM settings WHERE key = 'free_shipping_threshold'").get();
+            const loyaltyThresholdSetting = db_1.db.prepare("SELECT value FROM settings WHERE key = 'loyalty_threshold'").get();
+            const userReward = db_1.db.prepare("SELECT * FROM user_rewards WHERE sender_id = ? AND is_used = 0 ORDER BY id DESC LIMIT 1").get(senderId);
             const shippingFee = shippingSetting?.value || '49';
             const freeThreshold = thresholdSetting?.value || '1500';
+            const loyaltyThreshold = loyaltyThresholdSetting?.value || '2000';
+            let rewardText = "";
+            if (userReward) {
+                rewardText = `🎁 **MÜŞTERİNİN İNSTAGRAM HESABINA TANIMLI ÖZEL ÖDÜL:** Müşterinin Instagram hesabına tanımlı %${userReward.discount_percent} VIP İNDİRİM HAKKI vardır! Bu siparişinde müşteri özel %${userReward.discount_percent} VIP indirimi kazanır. Müşteriye bu harika haberi ver!`;
+            }
+            else {
+                rewardText = `💡 **GELECEK SİPARİŞ İNDİRİM HAKKI KAZANMA:** Müşterinin bu siparişi ${loyaltyThreshold} TL ve üzeri olursa, bir sonraki siparişinde geçerli %20 VIP İNDİRİM HAKKI kazanacaktır!`;
+            }
             const campaignsText = activeCampaigns.length > 0
                 ? activeCampaigns.map(c => `- ${c.title}: ${c.description} (Kod: ${c.code || 'Yok'})`).join('\n')
-                : 'Şu an aktif özel kampanya bulunmamaktadır.';
+                : 'Şu an aktif genel kampanya bulunmamaktadır.';
             const cartText = ctx.cart.length > 0
                 ? ctx.cart.map(i => `• ${i.productName} (${i.size}) x${i.quantity} - ${i.unitPrice * i.quantity} TL`).join('\n')
                 : 'Sepetiniz şu an boş.';
@@ -477,28 +507,28 @@ Sen BARON'S SILLAGE 7/24 Mağaza Müşteri Danışmanısın (F.R.I.D.A.Y.). Mü�
    - Müşterinin Mevcut Sepet Durumu:
 ${cartText}
 
-2. 🔒 **STOK SORGULAMA KURALI (BEDEN VE ADET ZORUNLUDUR):**
+2. 🎁 **INSTAGRAM ID'YE ÖZEL VİP İNDİRİM HAKKI SİSTEMİ:**
+${rewardText}
+
+3. 🔒 **STOK SORGULAMA KURALI (BEDEN VE ADET ZORUNLUDUR):**
    - Müşteri HANGİ BEDEN (S, M, L, XL, 41 vb.) ve KAÇ ADET ilgilendiğini söylemeden STOK SORGULAMASI YAPMA!
    - Eğer müşteri sadece "Gömlek var mı?" veya "KGMLW var mı?" dediyse, nazikçe şöyle sor: "Hangi beden (S, M, L, XL vb.) ve kaç adet düşünüyorsunuz?"
 
-3. 🔒 **TOPLU SİPARİŞ OLUŞTURMA KURALI (İSİM, TEL VE ADRES ALINMADAN SİPARİŞ VERME!):**
+4. 🔒 **TOPLU SİPARİŞ OLUŞTURMA KURALI (İSİM, TEL VE ADRES ALINMADAN SİPARİŞ VERME!):**
    Şu 3 bilgi EKSİKSİZ alınmadan KAYIT/SIPARIS aracını tetikleme ve sipariş oluşturuldu deme:
    ① Müşteri Adı ve Soyadı (${ctx.customerName || '❌ Eksik'})
    ② Telefon Numarası (${ctx.customerPhone || '❌ Eksik'})
    ③ Teslimat Adresi (${ctx.address || '❌ Eksik'})
    Eksik bilgi varsa müşteriden nazikçe bu eksik kalan bilgileri iste!
 
-4. 🎉 **KAMPANYALAR VE DÜKKAN İNDİRİMLERİ:**
+5. 🎉 **KAMPANYALAR VE DÜKKAN İNDİRİMLERİ:**
    Mağazamızın Aktif Kampanyaları:
 ${campaignsText}
 
-5. 🚚 **KARGO ÜCRETİ VE FİYATLANDIRMA:**
+6. 🚚 **KARGO ÜCRETİ VE FİYATLANDIRMA:**
    - Standart Kargo Ücreti: ${shippingFee} TL.
    - ${freeThreshold} TL ve üzeri siparişlerde KARGO ÜCRETSİZDİR!
-   - Sepet siparişi tamamlandığında sepet ara toplamını, kargo ücretini ve varsa kampanya indirimini hesaplayarak NET TOPLAM TUTARI belirt.
-
-6. 💬 **İNSANİ İLETİŞİM:**
-   Robotik cümleler kullanma. Her mesaj sonuna yapay soru kalıpları koyma. Sıcak ve doğal butik danışmanı gibi konuş.
+   - Sepet siparişi tamamlandığında sepet ara toplamını, kargo ücretini ve varsa kampanya/VIP indirimini hesaplayarak NET TOPLAM TUTARI belirt.
 </KATI_GÜVENLİK_VE_SEPET_KURALLARI>
 `);
             ctx.history.push(new messages_1.HumanMessage(userMessage));

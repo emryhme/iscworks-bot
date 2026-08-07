@@ -77,10 +77,17 @@ export function initDatabase() {
   `);
 
   // 4. Sistem Ayarları Tablosu (settings - Kargo Fiyatları vb.)
+  // 5. Müşteri Kişiye Özel İndirim Ödülleri Tablosu (user_rewards - Instagram ID'ye özel %20 İndirim)
   db.exec(`
-    CREATE TABLE IF NOT EXISTS settings (
-      key TEXT PRIMARY KEY,
-      value TEXT NOT NULL
+    CREATE TABLE IF NOT EXISTS user_rewards (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      sender_id TEXT NOT NULL,
+      reward_code TEXT NOT NULL,
+      discount_percent REAL NOT NULL DEFAULT 20.0,
+      min_qualifying_amount REAL NOT NULL DEFAULT 2000.0,
+      is_used INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      used_at TEXT DEFAULT NULL
     );
   `);
 
@@ -100,6 +107,7 @@ export function initDatabase() {
     CREATE INDEX IF NOT EXISTS idx_orders_phone ON orders(customer_phone);
     CREATE INDEX IF NOT EXISTS idx_orders_sender ON orders(sender_id);
     CREATE INDEX IF NOT EXISTS idx_campaigns_active ON campaigns(active);
+    CREATE INDEX IF NOT EXISTS idx_rewards_sender ON user_rewards(sender_id);
   `);
 
   // Varsayılan Başlangıç Stok & Kampanya Verilerini Yükle
