@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>BARON'S SILLAGE — Yeni Ürün Girişi</title>
+  <title>BARON'S SILLAGE — API & Yapay Zeka Kişiselleştirme Ayarları</title>
 
   <script src="https://unpkg.com/lucide@latest"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -35,7 +35,7 @@
         <span class="nav-badge" id="ordersBadgeCount">0</span>
     </a>
 
-    <a href="new-product.html" class="nav-item active">
+    <a href="new-product.html" class="nav-item">
         <i data-lucide="package-plus"></i>
         Yeni Ürün Girişi
     </a>
@@ -57,7 +57,7 @@
         F.R.I.D.A.Y. AI Copilot
     </a>
 
-    <a href="api-settings.html" class="nav-item">
+    <a href="api-settings.html" class="nav-item active">
         <i data-lucide="sliders"></i>
         API & AI Kişiselleştirme
     </a>
@@ -91,7 +91,7 @@
 
             <div class="search">
                 <i data-lucide="search" size="15"></i>
-                <input type="text" placeholder="Ürün veya kategori ara...">
+                <input type="text" placeholder="API veya AI ayarı ara...">
                 <span style="font-size:9px;color:#9ca3af">⌘ K</span>
             </div>
         </div>
@@ -111,10 +111,6 @@
                 <i data-lucide="refresh-cw" size="17"></i>
             </button>
 
-            <button class="icon-button" id="btnOpenSystemSettings" title="API & AI Kişiselleştirme Ayarları" onclick="openSystemSettingsModal()">
-                <i data-lucide="sliders" size="17"></i>
-            </button>
-
             <div class="user">
                 <div class="avatar">TS</div>
                 <div class="user-text">
@@ -131,67 +127,81 @@
 
         <div class="page-header">
             <div class="page-title">
-                <h1>Manuel Yeni Ürün Girişi</h1>
-                <p>Envanterinize manuel olarak yeni bir ürün veya beden varyantı ekleyin.</p>
+                <h1>API Ayarları & Yapay Zeka Kişiselleştirme</h1>
+                <p>Gemini AI asistanınızın üslubunu, bot adını, sistem talimatlarını ve API anahtarlarını yönetin.</p>
+            </div>
+
+            <div class="header-actions">
+                <button class="btn btn-primary" onclick="saveSystemSettingsPage()">
+                    <i data-lucide="save" size="14"></i>
+                    Değişiklikleri Kaydet
+                </button>
             </div>
         </div>
 
-        <!-- FORM CARD -->
+        <!-- AI PERSONALIZATION CARD -->
         <div class="card table-card">
             <div class="table-header">
-                <div class="table-title">📦 Ürün Bilgileri ve Stok Ayarları</div>
+                <div class="table-title">🤖 Yapay Zeka Asistan Kişiselleştirme & Persona Ayarları</div>
             </div>
 
-            <form id="newProductForm">
-                <div class="form-grid">
-                    <div class="form-group">
-                        <label>Kısa Kod (Örn: S)</label>
-                        <input type="text" id="shortCode" placeholder="Örn: S" required>
-                    </div>
-
-                    <div class="form-group">
-                        <label>Beden / Ölçü (Örn: M, L, XL, 50ml)</label>
-                        <input type="text" id="sizeInput" placeholder="Örn: M" required>
-                    </div>
-
-                    <div class="form-group full-width">
-                        <label>Otomatik Ürün Kodu Önizlemesi</label>
-                        <input type="text" id="productCode" readonly style="background:#f3f4f6; font-weight:700; color:#ff9900;">
-                    </div>
-
-                    <div class="form-group">
-                        <label>Ürün İsmi</label>
-                        <input type="text" id="productName" placeholder="Örn: BARON'S Noir Perfume" required>
-                    </div>
-
-                    <div class="form-group">
-                        <label>Renk / Varyant</label>
-                        <input type="text" id="colorInput" placeholder="Örn: Siyah" required>
-                    </div>
-
-                    <div class="form-group">
-                        <label>Başlangıç Stok Adedi</label>
-                        <input type="number" id="stockInput" placeholder="100" min="0" required>
-                    </div>
-
-                    <div class="form-group">
-                        <label>Fiyat (TL)</label>
-                        <input type="number" id="priceInput" placeholder="299" min="0" required>
-                    </div>
-
-                    <div class="form-group full-width">
-                        <label>Kategori</label>
-                        <input type="text" id="categoryInput" placeholder="Örn: Parfüm / Erkek" required>
-                    </div>
+            <div class="form-grid">
+                <div class="form-group">
+                    <label>Yapay Zeka Asistan Adı</label>
+                    <input type="text" id="sysBotName" placeholder="Örn: F.R.I.D.A.Y." value="F.R.I.D.A.Y.">
                 </div>
 
-                <div class="form-actions">
-                    <button type="submit" class="btn btn-primary">
-                        <i data-lucide="plus" size="14"></i>
-                        Ürünü Kaydet & Yayınla
-                    </button>
+                <div class="form-group">
+                    <label>Yapay Zeka Ses Tonu & Kişilik Üslubu</label>
+                    <select id="sysBotTone" class="select" style="width:100%; height:40px; font-size:12px;">
+                        <option value="luxury">Lüks Parfüm Danışmanı & Saygılı (Önerilen)</option>
+                        <option value="friendly">Samimi, Sıcak & Yardımsever</option>
+                        <option value="formal">Kurumsal, Kısa & Profesyonel</option>
+                        <option value="patron">Patron Asistanı (Tony Stark Özel)</option>
+                    </select>
                 </div>
-            </form>
+
+                <div class="form-group full-width">
+                    <label>Özel Sistem Talimatı / Persona Promptu (Müşteri Konuşma Kuralları)</label>
+                    <textarea id="sysBotSystemPrompt" rows="4" style="width:100%; padding:10px; border:1px solid var(--border); border-radius:8px; font-size:12px; outline:none; resize:vertical;" placeholder="Müşterilere verilecek selamlar, öneri stili ve mağaza kuralları..."></textarea>
+                </div>
+            </div>
+        </div>
+
+        <!-- API KEYS CARD -->
+        <div class="card table-card">
+            <div class="table-header">
+                <div class="table-title">🔑 API & Webhook Entegrasyon Anahtarları</div>
+            </div>
+
+            <div class="form-grid">
+                <div class="form-group">
+                    <label>Gemini AI API Key</label>
+                    <input type="password" id="sysGeminiApiKey" placeholder="AIzaSy...">
+                </div>
+
+                <div class="form-group">
+                    <label>Instagram / Facebook Page Access Token</label>
+                    <input type="password" id="sysFbAccessToken" placeholder="EAA...">
+                </div>
+
+                <div class="form-group">
+                    <label>Google Sheet Spreadsheet ID</label>
+                    <input type="text" id="sysGoogleSheetId" placeholder="1BxiMVs0XRra5nFMdAcB...">
+                </div>
+
+                <div class="form-group">
+                    <label>Telegram Bildirim Bot Token & Chat ID</label>
+                    <input type="text" id="sysTelegramToken" placeholder="bot_token:chat_id">
+                </div>
+            </div>
+
+            <div class="form-actions">
+                <button type="button" class="btn btn-primary" onclick="saveSystemSettingsPage()">
+                    <i data-lucide="save" size="14"></i>
+                    Tüm Ayarları Kaydet
+                </button>
+            </div>
         </div>
 
     </section>
@@ -206,6 +216,11 @@
     document.getElementById("sidebar").classList.toggle("open");
   }
   lucide.createIcons();
+  document.addEventListener("DOMContentLoaded", () => {
+    if (typeof loadSystemSettingsIntoModal === "function") {
+      loadSystemSettingsIntoModal();
+    }
+  });
 </script>
 </body>
 </html>

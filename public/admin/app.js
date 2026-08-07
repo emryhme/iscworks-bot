@@ -1785,6 +1785,11 @@ async function loadSystemSettingsIntoModal() {
 }
 
 async function saveSystemSettingsModal() {
+  await saveSystemSettingsPage();
+  closeSystemSettingsModal();
+}
+
+async function saveSystemSettingsPage() {
   const payload = {
     bot_name: document.getElementById('sysBotName')?.value || 'F.R.I.D.A.Y.',
     bot_tone: document.getElementById('sysBotTone')?.value || 'luxury',
@@ -1804,7 +1809,6 @@ async function saveSystemSettingsModal() {
     const data = await res.json();
     if (data.success) {
       showToast('✅ API Ayarları ve Yapay Zeka Kişiselleştirmesi başarıyla kaydedildi!', 'success');
-      closeSystemSettingsModal();
     } else {
       showToast(`❌ Hata: ${data.error || 'Ayarlar kaydedilemedi'}`, 'error');
     }
