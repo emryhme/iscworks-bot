@@ -25,6 +25,54 @@ export class WebhookController {
   }
 
   /**
+   * Mağazaya Özel Webhook Doğrulama (GET /api/webhook/:storeSlug)
+   */
+  public static verifyStoreWebhook(req: Request, res: Response): void {
+    const { storeSlug } = req.params;
+    const mode = req.query['hub.mode'];
+    const token = req.query['hub.verify_token'];
+    const challenge = req.query['hub.challenge'];
+
+    console.log(`[WebhookController] 🔍 Store Webhook Doğrulama İsteği (${storeSlug}): token=${token}`);
+
+    if (mode === 'subscribe') {
+      console.log(`[WebhookController] ✅ ${storeSlug} Webhook Doğrulaması Başarılı!`);
+      res.status(200).send(challenge);
+    } else {
+      res.sendStatus(403);
+    }
+  }
+
+  /**
+   * Mağazaya Özel Gelen DM Mesajlarını İşleme (POST /api/webhook/:storeSlug)
+   */
+  public static async handleStoreWebhook(req: Request, res: Response): Promise<void> {
+    const { storeSlug } = req.params;
+    const body = req.body;
+
+    console.log(`[WebhookController] 📩 MAĞAZAYA ÖZEL WEBHOOK PAKETİ GELDİ (${storeSlug}):`);
+    res.status(200).send('EVENT_RECEIVED');
+
+    if (!body || !body.entry) return;
+
+    for (const entry of body.entry || []) {
+      const messagingList = entry.messaging || [];
+      for (const messagingEvent of messagingList) {
+        const senderId = messagingEvent.sender?.id;
+        const message = messagingEvent.message;
+
+        if (!senderId || !message || message.is_echo) continue;
+
+        let incomingText = message.text || '';
+        if (incomingText.trim()) {
+          console.log(`[Store Webhook: ${storeSlug}] 🚀 DM Mesajı İşleniyor (${senderId}): "${incomingText}"`);
+          WebhookController.processAndReply(senderId, incomingText);
+        }
+      }
+    }
+  }
+
+  /**
    * Gelen Instagram / Messenger Mesajlarını İşleme (POST /webhook/instagram)
    */
   public static async handleWebhook(req: Request, res: Response): Promise<void> {

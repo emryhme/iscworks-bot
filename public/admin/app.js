@@ -2627,3 +2627,26 @@ function exportStoreDataToCSV() {
 
   showToast('📥 Mağaza stok verileriniz CSV dosyası olarak indirildi.', 'success');
 }
+
+// MAĞAZAYA ÖZEL WEBHOOK URL HESAPLAMA VE KOPYALAMA
+function loadStoreWebhookDetails() {
+  const input = document.getElementById('storeWebhookUrl');
+  if (!input) return;
+
+  const storeName = getActiveStoreName();
+  const slug = storeName.toLowerCase().replace(/[^a-z0-9]/g, '');
+  const origin = window.location.origin || 'http://34.179.173.204';
+  
+  input.value = `${origin}/api/webhook/${slug || 'magaza'}`;
+}
+
+function copyStoreWebhookUrl() {
+  const input = document.getElementById('storeWebhookUrl');
+  if (!input) return;
+  navigator.clipboard.writeText(input.value);
+  showToast('📋 Mağazanıza özel bağımsız Webhook URL kopyalandı!', 'success');
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  setTimeout(loadStoreWebhookDetails, 100);
+});
