@@ -36,9 +36,11 @@ function checkAuthStatus() {
 function logoutUser() {
   localStorage.removeItem('barons_admin_token');
   localStorage.removeItem('barons_admin_user');
-  showToast('👋 Çıkış yapıldı. Giriş ekranına yönlendiriliyorsunuz...', 'info');
+  localStorage.removeItem('iscworks_master_token');
+  localStorage.removeItem('iscworks_is_master_admin');
+  showToast('👋 Çıkış yapıldı. ISCWORKS ana sayfasına yönlendiriliyorsunuz...', 'info');
   setTimeout(() => {
-    window.location.href = 'login.html';
+    window.location.href = '/';
   }, 600);
 }
 
