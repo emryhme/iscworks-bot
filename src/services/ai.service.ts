@@ -366,6 +366,7 @@ Yalnızca aşağıdaki JSON yapısını döndür (bilinmeyen alanlar için null 
             productName: combinedProductName,
             size: ctx.cart.map(i => i.size).join(','),
             quantity: totalQuantity,
+            unitPrice: subtotal / Math.max(1, totalQuantity), // Cart'tan yetkili birim fiyat ortalaması
             senderId: senderId
           });
 
@@ -375,7 +376,11 @@ Yalnızca aşağıdaki JSON yapısını döndür (bilinmeyen alanlar için null 
             WHERE order_id = ?
           `).run(subtotal / Math.max(1, totalQuantity), shippingFee, discount, totalPrice, order.orderId);
 
-          const cartSummaryText = ctx.cart.map(i => `• ${i.productName} (${i.size}) - ${i.quantity} adet x ${i.unitPrice} TL`).join('\n');
+          // Sipariş onay metni - ctx.cart'taki kesin fiyatlarla üretilir
+          const cartSummaryText = ctx.cart.map(i => {
+            const lineTotal = i.unitPrice * i.quantity;
+            return `• ${i.productName} (${i.size}) x${i.quantity} - ${lineTotal.toLocaleString('tr-TR')} TL`;
+          }).join('\n');
 
           ctx.cart = [];
 

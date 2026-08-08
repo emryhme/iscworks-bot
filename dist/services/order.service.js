@@ -50,11 +50,18 @@ class OrderService {
         const quantity = Math.max(1, Number(data.quantity) || 1);
         // Atomik Veritabanı İşlemi (Transaction-Safe Order & Single Stock Deduction)
         const createOrderTx = db_1.db.transaction(() => {
-            // 1. Ürün Yetkili Fiyatı ve Stok Kontrolü
+            // 1. Ürün Yetkili Fiyatı — önce caller'dan gelen değeri kullan, yoksa DB'den bul
             const pCode = (data.productCode || '').trim();
-            const productObj = db_1.db.prepare('SELECT price, stock FROM products WHERE product_code = ? OR short_code = ?').get(pCode, pCode);
-            if (productObj && productObj.price) {
-                unitPrice = productObj.price;
+            if (!unitPrice || unitPrice <= 0) {
+                // Tek ürün kodu için fiyat ara (birleşik kod değilse)
+                const singleCode = pCode.split(/[,()/\s]/)[0].trim().toUpperCase();
+                const productObj = db_1.db.prepare('SELECT price FROM products WHERE UPPER(product_code) = ? OR UPPER(short_code) = ?').get(singleCode, singleCode);
+                if (productObj && productObj.price > 0) {
+                    unitPrice = productObj.price;
+                }
+                else {
+                    unitPrice = 299; // Varsayılan fiyat
+                }
             }
             const shippingFee = data.shippingFee !== undefined ? data.shippingFee : (unitPrice * quantity >= 1500 ? 0 : 49);
             const discount = data.discount || 0;

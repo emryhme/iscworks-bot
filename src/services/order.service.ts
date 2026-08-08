@@ -79,12 +79,18 @@ export class OrderService {
 
     // Atomik Veritabanı İşlemi (Transaction-Safe Order & Single Stock Deduction)
     const createOrderTx = db.transaction(() => {
-      // 1. Ürün Yetkili Fiyatı ve Stok Kontrolü
+      // 1. Ürün Yetkili Fiyatı — önce caller'dan gelen değeri kullan, yoksa DB'den bul
       const pCode = (data.productCode || '').trim();
-      const productObj = db.prepare('SELECT price, stock FROM products WHERE product_code = ? OR short_code = ?').get(pCode, pCode) as any;
-
-      if (productObj && productObj.price) {
-        unitPrice = productObj.price;
+      
+      if (!unitPrice || unitPrice <= 0) {
+        // Tek ürün kodu için fiyat ara (birleşik kod değilse)
+        const singleCode = pCode.split(/[,()/\s]/)[0].trim().toUpperCase();
+        const productObj = db.prepare('SELECT price FROM products WHERE UPPER(product_code) = ? OR UPPER(short_code) = ?').get(singleCode, singleCode) as any;
+        if (productObj && productObj.price > 0) {
+          unitPrice = productObj.price;
+        } else {
+          unitPrice = 299; // Varsayılan fiyat
+        }
       }
 
       const shippingFee = data.shippingFee !== undefined ? data.shippingFee : (unitPrice * quantity >= 1500 ? 0 : 49);
