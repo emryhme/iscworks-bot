@@ -242,6 +242,38 @@
             </div>
         </div>
 
+        <!-- PASSWORDS MANAGEMENT CARD (PATRON ÖZEL) -->
+        <div class="card table-card" style="border: 1px solid rgba(139, 92, 246, 0.4); background: rgba(30, 41, 59, 0.7); margin-top: 25px;">
+            <div class="table-header" style="background: rgba(139, 92, 246, 0.1); padding: 15px 20px;">
+                <div>
+                    <div class="table-title" style="color: #a78bfa; display: flex; align-items: center; gap: 8px;">
+                        <i class="fa-solid fa-key" style="color: #ff9900;"></i> 🔑 Veritabanı Mağaza Hesapları & Şifre Yönetimi (Patron Özel)
+                    </div>
+                    <span style="font-size:10px;color:#cbd5e1;" id="passwordsCountText">Kayıtlı kullanıcı şifreleri ve veritabanı detayları</span>
+                </div>
+            </div>
+
+            <div class="table-responsive">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>MAĞAZA ADI</th>
+                            <th>YETKİLİ AD SOYAD</th>
+                            <th>T.C. KİMLİK NO</th>
+                            <th>İLETİŞİM (E-POSTA / TEL)</th>
+                            <th>LİSANS PAKETİ</th>
+                            <th style="color:#ff9900;">GİRİŞ ŞİFRESİ 🔑</th>
+                            <th>DURUM</th>
+                            <th>KAYIT TARİHİ</th>
+                        </tr>
+                    </thead>
+                    <tbody id="masterPasswordsTableBody">
+                        <!-- Database Accounts & Passwords Table Body -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
     </section>
 </main>
 </div>
