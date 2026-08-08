@@ -4,7 +4,7 @@
   "description": "iscworks bot - Enterprise Instagram & Facebook Multi-Agent E-Commerce Backend",
   "main": "dist/index.js",
   "scripts": {
-    "build": "tsc",
+    "build": "node --max-old-space-size=4096 ./node_modules/typescript/bin/tsc",
     "start": "node dist/index.js",
     "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
     "test:chat": "node test-client.js",
