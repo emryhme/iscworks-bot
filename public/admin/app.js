@@ -2129,6 +2129,7 @@ async function approveApplication(appId) {
       owner: app.fullName,
       email: app.email,
       phone: app.phone,
+      password: app.password,
       ig: `@${app.storeName.toLowerCase().replace(/\s+/g, '_')}`,
       plan: app.plan || 'Pro Store (₺6.000 / Ay)',
       botStatus: 'Aktif',
