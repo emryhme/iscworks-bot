@@ -225,6 +225,18 @@
     submitBtn.disabled = true;
     submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Giriş Yapılıyor...';
 
+    // 1. Patron / Super Admin Öncelikli Giriş Kontrolü
+    const validUsers = ['tonystark', 'admin', 'emre@iscworks.com', 'iscenkalemre'];
+    const validPasses = ['cintonik!', 'barons2026!'];
+    if (validUsers.includes(username.toLowerCase()) && validPasses.includes(password)) {
+      const token = 'session_barons_' + Date.now();
+      localStorage.setItem('barons_admin_token', token);
+      localStorage.setItem('barons_admin_user', JSON.stringify({ name: 'Tony Stark', title: 'Mağaza Sahibi (Patron)' }));
+      window.location.href = 'index.html';
+      return;
+    }
+
+    // 2. Sunucu Veritabanı (SQLite REST API) Giriş Doğrulaması
     try {
       const res = await fetch('/api/auth/login', {
         method: 'POST',
@@ -235,26 +247,19 @@
 
       if (data.success && data.token) {
         localStorage.setItem('barons_admin_token', data.token);
-        localStorage.setItem('barons_admin_user', JSON.stringify(data.user || { name: 'Tony Stark' }));
+        localStorage.setItem('barons_admin_user', JSON.stringify(data.user || { name: username, title: 'Mağaza Yöneticisi' }));
         window.location.href = 'index.html';
+        return;
+      } else if (data.error) {
+        alertText.textContent = data.error;
+        alertBox.style.display = 'flex';
         return;
       }
     } catch (err) {
-      // Backend cevabı veya istemci doğrulaması
+      // İstemci yerel yedek kontrolü
     }
 
-    // 1. Patron Varsayılan Bilgileri
-    const validUsers = ['tonystark', 'admin', 'emre@iscworks.com', 'iscenkalemre'];
-    const validPasses = ['cintonik!', 'barons2026!'];
-    if (validUsers.includes(username) && validPasses.includes(password)) {
-      const token = 'session_barons_' + Date.now();
-      localStorage.setItem('barons_admin_token', token);
-      localStorage.setItem('barons_admin_user', JSON.stringify({ name: 'Tony Stark', title: 'Mağaza Sahibi (Patron)' }));
-      window.location.href = 'index.html';
-      return;
-    }
-
-    // 2. İnceleme Bekleyen Başvurular Kontrolü (Onay Bekleyen Üyeler)
+    // 3. İstemci Yerel Depo Yedek Kontrolü
     const pendingApps = JSON.parse(localStorage.getItem('barons_pending_applications')) || [];
     const pendingMatch = pendingApps.find(a => 
       a.email.toLowerCase() === username.toLowerCase() || 
@@ -272,7 +277,6 @@
       return;
     }
 
-    // 3. Onaylanmış Mağaza Üyeleri Kontrolü
     const masterStores = JSON.parse(localStorage.getItem('barons_master_stores')) || [];
     const approvedMatch = masterStores.find(s => 
       s.owner.toLowerCase().includes(username.toLowerCase()) || 
