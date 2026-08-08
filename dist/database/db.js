@@ -83,6 +83,12 @@ function initDatabase() {
     );
   `);
     // 4. Sistem Ayarları Tablosu (settings - Kargo Fiyatları vb.)
+    exports.db.exec(`
+    CREATE TABLE IF NOT EXISTS settings (
+      key TEXT PRIMARY KEY,
+      value TEXT NOT NULL
+    );
+  `);
     // 5. Müşteri Kişiye Özel İndirim Ödülleri Tablosu (user_rewards - Instagram ID'ye özel %20 İndirim)
     exports.db.exec(`
     CREATE TABLE IF NOT EXISTS user_rewards (
@@ -120,6 +126,156 @@ function initDatabase() {
       processed_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
     );
   `);
+    // 8. Multi-Tenant Stores Tablosu
+    exports.db.exec(`
+    CREATE TABLE IF NOT EXISTS stores (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      owner_id INTEGER DEFAULT 1,
+      name TEXT NOT NULL,
+      slug TEXT UNIQUE NOT NULL,
+      status TEXT NOT NULL DEFAULT 'active',
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
+    // 9. Users Tablosu
+    exports.db.exec(`
+    CREATE TABLE IF NOT EXISTS users (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      full_name TEXT NOT NULL,
+      email TEXT UNIQUE NOT NULL,
+      phone TEXT DEFAULT '',
+      tc_no TEXT DEFAULT '',
+      password_hash TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'active',
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
+    // 10. Memberships (Store-User RBAC Roles)
+    exports.db.exec(`
+    CREATE TABLE IF NOT EXISTS memberships (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,
+      store_id INTEGER NOT NULL,
+      role TEXT NOT NULL DEFAULT 'OWNER',
+      status TEXT NOT NULL DEFAULT 'active',
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
+    // 11. Product Variants (SKU & Size/Color Level)
+    exports.db.exec(`
+    CREATE TABLE IF NOT EXISTS product_variants (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      product_id INTEGER DEFAULT 0,
+      store_id INTEGER NOT NULL DEFAULT 1,
+      sku TEXT NOT NULL,
+      color TEXT DEFAULT 'Standart',
+      size TEXT DEFAULT 'M',
+      price REAL NOT NULL DEFAULT 299.00,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
+    // 12. Inventory (Dedicated Stock & Reservation)
+    exports.db.exec(`
+    CREATE TABLE IF NOT EXISTS inventory (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      variant_id INTEGER DEFAULT 0,
+      product_code TEXT NOT NULL,
+      store_id INTEGER NOT NULL DEFAULT 1,
+      stock INTEGER NOT NULL DEFAULT 0,
+      reserved_stock INTEGER NOT NULL DEFAULT 0,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
+    // 13. Customers Directory
+    exports.db.exec(`
+    CREATE TABLE IF NOT EXISTS customers (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      store_id INTEGER NOT NULL DEFAULT 1,
+      sender_id TEXT DEFAULT '',
+      name TEXT NOT NULL,
+      phone TEXT DEFAULT '',
+      address TEXT DEFAULT '',
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
+    // 14. Persistent Conversations & Messages
+    exports.db.exec(`
+    CREATE TABLE IF NOT EXISTS conversations (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      store_id INTEGER NOT NULL DEFAULT 1,
+      customer_id INTEGER DEFAULT 0,
+      channel TEXT NOT NULL DEFAULT 'instagram',
+      external_user_id TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'active',
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS messages (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      conversation_id INTEGER NOT NULL,
+      sender_type TEXT NOT NULL DEFAULT 'user',
+      text TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
+    // 15. Normalized Order Items
+    exports.db.exec(`
+    CREATE TABLE IF NOT EXISTS order_items (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      order_id TEXT NOT NULL,
+      store_id INTEGER NOT NULL DEFAULT 1,
+      product_id INTEGER DEFAULT 0,
+      variant_id INTEGER DEFAULT 0,
+      product_name TEXT NOT NULL,
+      sku TEXT DEFAULT '',
+      size TEXT DEFAULT '',
+      unit_price REAL NOT NULL DEFAULT 0,
+      quantity INTEGER NOT NULL DEFAULT 1,
+      total_price REAL NOT NULL DEFAULT 0
+    );
+  `);
+    // 16. Audit Logs
+    exports.db.exec(`
+    CREATE TABLE IF NOT EXISTS audit_logs (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER DEFAULT 0,
+      store_id INTEGER NOT NULL DEFAULT 1,
+      action TEXT NOT NULL,
+      entity_type TEXT NOT NULL,
+      entity_id TEXT DEFAULT '',
+      old_value TEXT DEFAULT '',
+      new_value TEXT DEFAULT '',
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
+    // 17. API Keys (Merchant API Access)
+    exports.db.exec(`
+    CREATE TABLE IF NOT EXISTS api_keys (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      store_id INTEGER NOT NULL DEFAULT 1,
+      name TEXT NOT NULL,
+      key_hash TEXT NOT NULL UNIQUE,
+      permissions TEXT DEFAULT 'read_write',
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      last_used_at TEXT DEFAULT NULL
+    );
+  `);
+    // 18. AI Usage & Token Tracking
+    exports.db.exec(`
+    CREATE TABLE IF NOT EXISTS ai_usage (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      store_id INTEGER NOT NULL DEFAULT 1,
+      conversation_id INTEGER DEFAULT 0,
+      model TEXT NOT NULL,
+      input_tokens INTEGER NOT NULL DEFAULT 0,
+      output_tokens INTEGER NOT NULL DEFAULT 0,
+      total_tokens INTEGER NOT NULL DEFAULT 0,
+      estimated_cost REAL NOT NULL DEFAULT 0,
+      latency INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
     // Auto Migrations: Kolonlar eksikse otomatik ekle
     try {
         exports.db.exec(`ALTER TABLE products ADD COLUMN price REAL NOT NULL DEFAULT 299.00;`);
@@ -127,6 +283,10 @@ function initDatabase() {
     catch (e) { }
     try {
         exports.db.exec(`ALTER TABLE products ADD COLUMN store_name TEXT DEFAULT '';`);
+    }
+    catch (e) { }
+    try {
+        exports.db.exec(`ALTER TABLE products ADD COLUMN store_id INTEGER NOT NULL DEFAULT 1;`);
     }
     catch (e) { }
     try {
@@ -154,6 +314,10 @@ function initDatabase() {
     }
     catch (e) { }
     try {
+        exports.db.exec(`ALTER TABLE orders ADD COLUMN store_id INTEGER NOT NULL DEFAULT 1;`);
+    }
+    catch (e) { }
+    try {
         exports.db.exec(`ALTER TABLE campaigns ADD COLUMN start_date TEXT DEFAULT NULL;`);
     }
     catch (e) { }
@@ -166,7 +330,15 @@ function initDatabase() {
     }
     catch (e) { }
     try {
+        exports.db.exec(`ALTER TABLE campaigns ADD COLUMN store_id INTEGER NOT NULL DEFAULT 1;`);
+    }
+    catch (e) { }
+    try {
         exports.db.exec(`ALTER TABLE user_rewards ADD COLUMN store_name TEXT DEFAULT '';`);
+    }
+    catch (e) { }
+    try {
+        exports.db.exec(`ALTER TABLE user_rewards ADD COLUMN store_id INTEGER NOT NULL DEFAULT 1;`);
     }
     catch (e) { }
     // İndeksler (Sorgu Hızlandırma)
@@ -174,13 +346,18 @@ function initDatabase() {
     CREATE INDEX IF NOT EXISTS idx_products_code ON products(product_code);
     CREATE INDEX IF NOT EXISTS idx_products_short ON products(short_code);
     CREATE INDEX IF NOT EXISTS idx_products_store ON products(store_name);
+    CREATE INDEX IF NOT EXISTS idx_products_store_id ON products(store_id);
     CREATE INDEX IF NOT EXISTS idx_orders_id ON orders(order_id);
     CREATE INDEX IF NOT EXISTS idx_orders_phone ON orders(customer_phone);
     CREATE INDEX IF NOT EXISTS idx_orders_sender ON orders(sender_id);
     CREATE INDEX IF NOT EXISTS idx_orders_store ON orders(store_name);
+    CREATE INDEX IF NOT EXISTS idx_orders_store_id ON orders(store_id);
     CREATE INDEX IF NOT EXISTS idx_campaigns_active ON campaigns(active);
     CREATE INDEX IF NOT EXISTS idx_rewards_sender ON user_rewards(sender_id);
     CREATE INDEX IF NOT EXISTS idx_webhook_events_id ON webhook_events(event_id);
+    CREATE INDEX IF NOT EXISTS idx_stores_slug ON stores(slug);
+    CREATE INDEX IF NOT EXISTS idx_inventory_store ON inventory(store_id);
+    CREATE INDEX IF NOT EXISTS idx_ai_usage_store ON ai_usage(store_id);
   `);
     // Varsayılan Başlangıç Stok & Kampanya Verilerini Yükle
     seedInitialProducts();

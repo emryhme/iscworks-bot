@@ -49,6 +49,45 @@ export class AIService {
   }
 
   /**
+   * Kalıcı Sohbet Veritabanı ve Token Kullanım Takibi (ai_usage)
+   */
+  public static getOrCreateConversation(storeId: number, externalUserId: string): number {
+    try {
+      let conv = db.prepare('SELECT id FROM conversations WHERE store_id = ? AND external_user_id = ?').get(storeId, externalUserId) as any;
+      if (!conv) {
+        const res = db.prepare('INSERT INTO conversations (store_id, external_user_id) VALUES (?, ?)').run(storeId, externalUserId);
+        return Number(res.lastInsertRowid);
+      }
+      return conv.id;
+    } catch {
+      return 1;
+    }
+  }
+
+  public static persistMessage(conversationId: number, senderType: 'user' | 'assistant', text: string): void {
+    try {
+      db.prepare('INSERT INTO messages (conversation_id, sender_type, text) VALUES (?, ?, ?)').run(conversationId, senderType, text);
+    } catch {}
+  }
+
+  public static logAiUsage(storeId: number, conversationId: number, model: string, inputTokens: number, outputTokens: number, latency: number) {
+    try {
+      const totalTokens = inputTokens + outputTokens;
+      const isMini = model.includes('mini');
+      const inputCost = (inputTokens / 1_000_000) * (isMini ? 0.15 : 2.50);
+      const outputCost = (outputTokens / 1_000_000) * (isMini ? 0.60 : 10.00);
+      const estimatedCost = (inputCost + outputCost) * 35.0;
+
+      db.prepare(`
+        INSERT INTO ai_usage (store_id, conversation_id, model, input_tokens, output_tokens, total_tokens, estimated_cost, latency)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(storeId, conversationId, model, inputTokens, outputTokens, totalTokens, estimatedCost, latency);
+    } catch (e: any) {
+      console.warn('[AI Usage Tracker] Token logging error:', e.message);
+    }
+  }
+
+  /**
    * Yapay Zeka Destekli Akıllı Veri Ayıklama Motoru (AI Extractor - F.R.I.D.A.Y.)
    */
   private static async extractSessionDataWithAI(senderId: string, userText: string, apiKey: string) {
