@@ -19,10 +19,11 @@ function checkAuthStatus() {
   const path = window.location.pathname;
   if (path.endsWith('login.html') || path.endsWith('master-login.html')) return;
 
-  if (path.endsWith('master.html')) {
-    const isMaster = localStorage.getItem('iscworks_is_master_admin');
-    if (isMaster !== 'true') {
-      window.location.href = 'master-login.html';
+  const isMaster = (localStorage.getItem('iscworks_is_master_admin') === 'true');
+
+  if (path.endsWith('master.html') || path.endsWith('stores.html')) {
+    if (!isMaster) {
+      window.location.href = 'index.html';
       return;
     }
   }
@@ -30,6 +31,18 @@ function checkAuthStatus() {
   const token = localStorage.getItem('barons_admin_token');
   if (!token) {
     window.location.href = 'login.html';
+  }
+}
+
+function applyRoleBasedAccessControl() {
+  const isMaster = (localStorage.getItem('iscworks_is_master_admin') === 'true');
+  if (!isMaster) {
+    document.querySelectorAll('.sidebar a[href="stores.html"]').forEach(el => el.remove());
+    document.querySelectorAll('.sidebar .section-title').forEach(el => {
+      if (el.textContent.includes('SaaS MAĞAZA YÖNETİMİ')) {
+        el.remove();
+      }
+    });
   }
 }
 
@@ -48,6 +61,9 @@ function setupUserDropdown() {
   const userElem = document.querySelector('.user');
   if (!userElem) return;
 
+  const isMaster = (localStorage.getItem('iscworks_is_master_admin') === 'true');
+  const userObj = JSON.parse(localStorage.getItem('barons_admin_user') || '{}');
+
   userElem.style.cursor = 'pointer';
   userElem.style.position = 'relative';
 
@@ -61,14 +77,22 @@ function setupUserDropdown() {
       box-shadow: 0 10px 25px rgba(0,0,0,0.1); display: none; flex-direction: column;
       padding: 8px 0; z-index: 9999; animation: modalFadeIn 0.2s ease;
     `;
-    dropdown.innerHTML = `
-      <div style="padding: 10px 16px; border-bottom: 1px solid #f0f0f0;">
-        <strong style="font-size: 12px; display: block; color: #111827;">Tony Stark</strong>
-        <span style="font-size: 10px; color: #6b7280;">Super Admin (Patron)</span>
-      </div>
+
+    const masterLinkHtml = isMaster ? `
       <a href="master.html" style="padding: 10px 16px; font-size: 11px; color: #7c3aed; font-weight: 700; text-decoration: none; display: flex; align-items: center; gap: 8px; background: #f3e8ff;" onmouseover="this.style.background='#e9d5ff'" onmouseout="this.style.background='#f3e8ff'">
         <i class="fa-solid fa-shield-halved" style="color: #8b5cf6;"></i> ISCWORKS Master Konsolu
       </a>
+    ` : '';
+
+    const userTitle = isMaster ? 'Super Admin (Patron)' : 'Mağaza Yöneticisi';
+    const userName = isMaster ? 'Tony Stark' : (userObj.name || 'Mağaza Yöneticisi');
+
+    dropdown.innerHTML = `
+      <div style="padding: 10px 16px; border-bottom: 1px solid #f0f0f0;">
+        <strong style="font-size: 12px; display: block; color: #111827;">${escapeHtml(userName)}</strong>
+        <span style="font-size: 10px; color: #6b7280;">${escapeHtml(userTitle)}</span>
+      </div>
+      ${masterLinkHtml}
       <a href="api-settings.html" style="padding: 10px 16px; font-size: 11px; color: #374151; text-decoration: none; display: flex; align-items: center; gap: 8px;" onmouseover="this.style.background='#f3f4f6'" onmouseout="this.style.background='transparent'">
         <i class="fa-solid fa-sliders" style="color: #ff9900;"></i> API & AI Kişiselleştirme
       </a>
@@ -97,6 +121,7 @@ function setupUserDropdown() {
 // Initialize Application Robustly (Supports readyState interactive & complete)
 function initApp() {
   checkAuthStatus();
+  applyRoleBasedAccessControl();
   setupEventListeners();
   setupUserDropdown();
   fetchData();
