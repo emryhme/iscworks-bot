@@ -16,101 +16,32 @@ const state = {
 };
 
 function applyDynamicStoreBranding() {
-  const isMaster = (localStorage.getItem('iscworks_is_master_admin') === 'true');
-  const userObj = JSON.parse(localStorage.getItem('barons_admin_user') || '{}');
-  const storeName = isMaster 
-    ? (localStorage.getItem('barons_active_store') || "BARON'S SILLAGE") 
-    : (userObj.title || localStorage.getItem('barons_active_store') || "Özel Mağaza");
-
-  // Document Title Güncelleme
-  document.title = `${storeName} — CommerceOS Engine`;
-
-  // Topbar Kullanıcı Kartı Güncelleme
-  const userNameElem = document.querySelector('.user strong');
-  const userTitleElem = document.querySelector('.user span');
-  if (userNameElem) {
-    userNameElem.textContent = isMaster ? 'Tony Stark' : (userObj.name || 'Mağaza Yöneticisi');
-  }
-  if (userTitleElem) {
-    userTitleElem.textContent = isMaster ? 'Super Admin (Patron)' : `${storeName} Yöneticisi`;
-  }
-
-  // Sidebar Sol Üst Logo ve Mağaza Adı Güncelleme
-  const logoElem = document.querySelector('.sidebar .logo');
-  if (logoElem) {
-    logoElem.innerHTML = `
-      <div class="logo-mark">
-        <i data-lucide="crown" size="20"></i>
-      </div>
-      ${escapeHtml(storeName)}
-    `;
-    if (window.lucide && typeof window.lucide.createIcons === 'function') {
-      try { window.lucide.createIcons(); } catch (e) {}
-    }
-  }
-
-  // Sidebar Sol Alt Kart Güncelleme
-  const storeAvatar = document.querySelector('.sidebar-bottom .store-avatar');
-  const storeTitle = document.querySelector('.sidebar-bottom .store-info strong');
-  const storeSub = document.querySelector('.sidebar-bottom .store-info small');
-  if (storeAvatar) {
-    const initials = storeName.split(' ').map(w => w[0]).join('').substring(0, 2).toUpperCase() || 'M';
-    storeAvatar.textContent = initials;
-  }
-  if (storeTitle) storeTitle.textContent = storeName;
-  if (storeSub) storeSub.textContent = isMaster ? 'Master Platform Admin' : 'Özel Mağaza Kontrol Paneli';
+  // Sabit master admin branding
+  document.title = 'ISCWORKS — CommerceOS Admin';
 }
 
 function checkAuthStatus() {
   const path = window.location.pathname;
-  if (path.endsWith('login.html') || path.endsWith('master-login.html')) return;
-
-  const isMaster = (localStorage.getItem('iscworks_is_master_admin') === 'true');
-
-  if (path.endsWith('master.html') || path.endsWith('stores.html')) {
-    if (!isMaster) {
-      window.location.href = 'index.html';
-      return;
-    }
-  }
+  if (path.endsWith('login.html')) return;
 
   const token = localStorage.getItem('barons_admin_token');
   if (!token) {
     window.location.href = 'login.html';
-  } else {
-    setTimeout(applyDynamicStoreBranding, 50);
-  }
-}
-
-function applyRoleBasedAccessControl() {
-  const isMaster = (localStorage.getItem('iscworks_is_master_admin') === 'true');
-  if (!isMaster) {
-    document.querySelectorAll('.sidebar a[href="stores.html"]').forEach(el => el.remove());
-    document.querySelectorAll('.sidebar .section-title').forEach(el => {
-      if (el.textContent.includes('SaaS MAĞAZA YÖNETİMİ')) {
-        el.remove();
-      }
-    });
   }
 }
 
 function logoutUser() {
   localStorage.removeItem('barons_admin_token');
   localStorage.removeItem('barons_admin_user');
-  localStorage.removeItem('iscworks_master_token');
-  localStorage.removeItem('iscworks_is_master_admin');
-  showToast('👋 Çıkış yapıldı. ISCWORKS ana sayfasına yönlendiriliyorsunuz...', 'info');
+  showToast('👋 Çıkış yapıldı. Giriş sayfasına yönlendiriliyorsunuz...', 'info');
   setTimeout(() => {
-    window.location.href = '/';
+    window.location.href = 'login.html';
   }, 600);
 }
 
 function setupUserDropdown() {
   const userElem = document.querySelector('.user');
   if (!userElem) return;
-
-  const isMaster = (localStorage.getItem('iscworks_is_master_admin') === 'true');
-  const userObj = JSON.parse(localStorage.getItem('barons_admin_user') || '{}');
 
   userElem.style.cursor = 'pointer';
   userElem.style.position = 'relative';
@@ -120,41 +51,18 @@ function setupUserDropdown() {
     dropdown = document.createElement('div');
     dropdown.id = 'userProfileDropdown';
     dropdown.style.cssText = `
-      position: absolute; top: 50px; right: 0; width: 220px;
+      position: absolute; top: 50px; right: 0; width: 200px;
       background: #ffffff; border: 1px solid #e5e7eb; border-radius: 10px;
       box-shadow: 0 10px 25px rgba(0,0,0,0.1); display: none; flex-direction: column;
       padding: 8px 0; z-index: 9999; animation: modalFadeIn 0.2s ease;
     `;
-
-    const masterLinkHtml = isMaster ? `
-      <a href="master.html" style="padding: 10px 16px; font-size: 11px; color: #7c3aed; font-weight: 700; text-decoration: none; display: flex; align-items: center; gap: 8px; background: #f3e8ff;" onmouseover="this.style.background='#e9d5ff'" onmouseout="this.style.background='#f3e8ff'">
-        <i class="fa-solid fa-shield-halved" style="color: #8b5cf6;"></i> ISCWORKS Master Konsolu
-      </a>
-    ` : '';
-
-    const userTitle = isMaster ? 'Super Admin (Patron)' : 'Mağaza Yöneticisi';
-    const userName = isMaster ? 'Tony Stark' : (userObj.name || 'Mağaza Yöneticisi');
-
-    const sellerLinksHtml = isMaster ? '' : `
-      <a href="api-settings.html" style="padding: 10px 16px; font-size: 11px; color: #374151; text-decoration: none; display: flex; align-items: center; gap: 8px;" onmouseover="this.style.background='#f3f4f6'" onmouseout="this.style.background='transparent'">
-        <i class="fa-solid fa-sliders" style="color: #ff9900;"></i> API & AI Kişiselleştirme
-      </a>
-      <a href="settings.html" style="padding: 10px 16px; font-size: 11px; color: #374151; text-decoration: none; display: flex; align-items: center; gap: 8px;" onmouseover="this.style.background='#f3f4f6'" onmouseout="this.style.background='transparent'">
-        <i class="fa-solid fa-gear" style="color: #3b82f6;"></i> Fiyat & Kargo Ayarları
-      </a>
-    `;
-
     dropdown.innerHTML = `
       <div style="padding: 10px 16px; border-bottom: 1px solid #f0f0f0;">
-        <strong style="font-size: 12px; display: block; color: #111827;">${escapeHtml(userName)}</strong>
-        <span style="font-size: 10px; color: #6b7280;">${escapeHtml(userTitle)}</span>
+        <strong style="font-size: 12px; display: block; color: #111827;">Tony Stark</strong>
+        <span style="font-size: 10px; color: #6b7280;">Super Admin (Patron)</span>
       </div>
-      ${masterLinkHtml}
-      ${sellerLinksHtml}
-      <div style="border-top: 1px solid #f0f0f0; margin-top: 4px; padding-top: 4px;">
-        <div onclick="logoutUser()" style="padding: 10px 16px; font-size: 11px; color: #ef4444; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 8px;" onmouseover="this.style.background='#fef2f2'" onmouseout="this.style.background='transparent'">
-          <i class="fa-solid fa-right-from-bracket"></i> Çıkış Yap (Logout)
-        </div>
+      <div onclick="logoutUser()" style="padding: 10px 16px; font-size: 11px; color: #ef4444; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 8px;" onmouseover="this.style.background='#fef2f2'" onmouseout="this.style.background='transparent'">
+        <i class="fa-solid fa-right-from-bracket"></i> Çıkış Yap
       </div>
     `;
     userElem.appendChild(dropdown);
@@ -173,7 +81,6 @@ function setupUserDropdown() {
 // Initialize Application Robustly (Supports readyState interactive & complete)
 function initApp() {
   checkAuthStatus();
-  applyRoleBasedAccessControl();
   setupEventListeners();
   setupUserDropdown();
   fetchData();
@@ -410,23 +317,7 @@ function processIncomingOrders(newOrdersList) {
 }
 
 function getFilteredOrders() {
-  const isMaster = (localStorage.getItem('iscworks_is_master_admin') === 'true');
-  const storeName = getActiveStoreName();
-
-  if (isMaster || storeName.toLowerCase().includes('baron')) {
-    return state.orders || [];
-  }
-
-  const key = 'barons_orders_' + storeName.toLowerCase().replace(/[^a-z0-9]/g, '_');
-  const saved = localStorage.getItem(key);
-  if (saved !== null) {
-    try {
-      return JSON.parse(saved);
-    } catch (e) {
-      return [];
-    }
-  }
-  return [];
+  return state.orders || [];
 }
 
 // Update Top Metric Cards & Real Analytics (Mağaza Özel Dinamik Hesaplama)
@@ -448,15 +339,13 @@ function updateMetrics() {
   if (statTotalOrders) statTotalOrders.textContent = totalOrders.toLocaleString('tr-TR');
   if (ordersBadgeCount) ordersBadgeCount.textContent = totalOrders;
 
-  // AI Asistan Kartı Güncelleme (F.R.I.D.A.Y. / Mağaza AI)
+  // AI Asistan Kartı - sabit
   const metricCards = document.querySelectorAll('.metric-card');
   if (metricCards.length >= 4) {
     const aiValElem = metricCards[3].querySelector('.metric-value');
     const aiSubElem = metricCards[3].querySelector('.metric-sub');
-    const isMaster = (localStorage.getItem('iscworks_is_master_admin') === 'true');
-    const storeName = getActiveStoreName();
-    if (aiValElem) aiValElem.textContent = isMaster ? 'F.R.I.D.A.Y.' : `${storeName} AI`;
-    if (aiSubElem) aiSubElem.textContent = isMaster ? 'Tony Stark Özel Asistanı' : 'Aktif Otonom Mağaza Botu';
+    if (aiValElem) aiValElem.textContent = 'F.R.I.D.A.Y.';
+    if (aiSubElem) aiSubElem.textContent = 'Tony Stark Özel Asistanı';
   }
 
   // 1. Gerçek Ciro ve Sipariş Trendi Çizgi Grafiğini Çiz
@@ -735,46 +624,16 @@ function selectOrderForReward(senderId) {
   }
 }
 
-function getStoreProductsKey() {
-  const storeName = getActiveStoreName();
-  return 'barons_products_' + storeName.toLowerCase().replace(/[^a-z0-9]/g, '_');
+function getActiveStoreName() {
+  return 'ISCWORKS';
 }
 
 function getStoreProducts() {
-  const isMaster = (localStorage.getItem('iscworks_is_master_admin') === 'true');
-  const storeName = getActiveStoreName();
-
-  // Master veya varsayılan BARON'S SILLAGE mağazası ise genel kataloğu göster
-  if (isMaster || storeName.toLowerCase().includes('baron')) {
-    return state.products;
-  }
-
-  // Yeni açılan satıcı mağazaları için özel izole katalog
-  const key = getStoreProductsKey();
-  const saved = localStorage.getItem(key);
-  if (saved !== null) {
-    try {
-      return JSON.parse(saved);
-    } catch (e) {
-      return [];
-    }
-  }
-
-  // Henüz ürün eklememiş yeni mağaza -> 0 ÜRÜN İLE BAŞLAR (SIFIRDAN!)
-  return [];
+  return state.products;
 }
 
 function saveStoreProducts(productsArray) {
-  const isMaster = (localStorage.getItem('iscworks_is_master_admin') === 'true');
-  const storeName = getActiveStoreName();
-
-  if (isMaster || storeName.toLowerCase().includes('baron')) {
-    state.products = productsArray;
-    localStorage.setItem('barons_products_default', JSON.stringify(productsArray));
-  } else {
-    const key = getStoreProductsKey();
-    localStorage.setItem(key, JSON.stringify(productsArray));
-  }
+  state.products = productsArray;
 }
 
 function handleNewProductSubmit(e) {
@@ -806,8 +665,7 @@ function handleNewProductSubmit(e) {
     size: size,
     stock: stock,
     price: price,
-    category: category,
-    storeName: getActiveStoreName()
+    category: category
   };
 
   const currentProducts = getStoreProducts();
@@ -2101,443 +1959,6 @@ async function saveSystemSettingsPage() {
   }
 }
 
-// MASTER SaaS STORE & CLIENT MANAGEMENT ENGINE
-state.masterStores = JSON.parse(localStorage.getItem('barons_master_stores')) || [
-  { id: 1, name: "BARON'S SILLAGE", owner: "Tony Stark (Patron)", phone: "0532 999 8877", ig: "@barons_sillage", plan: "Enterprise VIP", botStatus: "Aktif", ciro: "₺485.200" },
-  { id: 2, name: "Nova Perfume Store", owner: "Emre İşcenkal", phone: "0533 111 2233", ig: "@nova_perfume", plan: "Enterprise VIP", botStatus: "Aktif", ciro: "₺284.650" },
-  { id: 3, name: "Lüks Fragrance Hub", owner: "Caner Yılmaz", phone: "0535 444 5566", ig: "@luks_fragrance", plan: "Pro Store", botStatus: "Aktif", ciro: "₺192.400" },
-  { id: 4, name: "Sillage Noir Boutique", owner: "Selin Aksoy", phone: "0536 777 8899", ig: "@sillage_noir", plan: "Pro Store", botStatus: "Deneme Süresi", ciro: "₺142.100" },
-  { id: 5, name: "Royal Essence Turkey", owner: "Murat Demir", phone: "0537 222 3344", ig: "@royal_essence_tr", plan: "Basic Store", botStatus: "Aktif", ciro: "₺118.500" },
-  { id: 6, name: "Parfüm Sepeti VIP", owner: "Zeynep Kaya", phone: "0538 555 6677", ig: "@parfum_sepeti_vip", plan: "Basic Store", botStatus: "Durduruldu", ciro: "₺94.300" },
-  { id: 7, name: "Oud & Amber Atelier", owner: "Burak Öztürk", phone: "0539 888 9900", ig: "@oud_amber_tr", plan: "Pro Store", botStatus: "Aktif", ciro: "₺86.750" },
-  { id: 8, name: "Elite Scent World", owner: "Ece Güneş", phone: "0540 123 4567", ig: "@elite_scent_world", plan: "Enterprise VIP", botStatus: "Aktif", ciro: "₺79.000" }
-];
-
-function renderMasterStoresTable() {
-  renderPendingApplicationsTable();
-  const tbody = document.getElementById('storesTableBody');
-  const countText = document.getElementById('storesCountText');
-  const statTotalStores = document.getElementById('statTotalStores');
-  const searchInput = document.getElementById('storeSearchInput');
-  if (!tbody) return;
-
-  let query = (searchInput?.value || '').toLowerCase().trim();
-  let filtered = state.masterStores.filter(s => 
-    s.name.toLowerCase().includes(query) || 
-    s.owner.toLowerCase().includes(query) || 
-    s.ig.toLowerCase().includes(query)
-  );
-
-  if (countText) countText.textContent = `${filtered.length} Mağaza Listelendi`;
-  if (statTotalStores) statTotalStores.textContent = `${state.masterStores.length} Mağaza`;
-
-  if (filtered.length === 0) {
-    tbody.innerHTML = `
-      <tr>
-        <td colspan="8" style="text-align:center; padding:40px; color:#6b7280;">
-          Arama kriterine uygun dükkan bulunamadı.
-        </td>
-      </tr>
-    `;
-    return;
-  }
-
-  tbody.innerHTML = filtered.map(s => {
-    let statusBadge = '<span class="status-badge in-stock">🟢 Aktif Bot</span>';
-    if (s.botStatus === 'Deneme Süresi') {
-      statusBadge = '<span class="status-badge low-stock">🟡 Deneme Süresi</span>';
-    } else if (s.botStatus === 'Durduruldu') {
-      statusBadge = '<span class="status-badge out-stock">🔴 Durduruldu</span>';
-    }
-
-    return `
-      <tr>
-        <td>
-          <div class="product">
-            <div class="store-avatar" style="width:30px; height:30px; border-radius:6px; background:#ff990015; color:#ff9900; font-weight:800; display:grid; place-items:center; font-size:11px;">
-              ${escapeHtml(s.name.charAt(0))}
-            </div>
-            <div>
-              <strong class="product-name" style="font-size:12px;">${escapeHtml(s.name)}</strong>
-              <div class="product-sku">ID: #SHOP-${s.id}</div>
-            </div>
-          </div>
-        </td>
-        <td><strong>${escapeHtml(s.owner)}</strong></td>
-        <td><small class="muted">${escapeHtml(s.phone)}</small></td>
-        <td><span class="code-tag" style="color:#e1306c;">${escapeHtml(s.ig)}</span></td>
-        <td><span class="size-pill">${escapeHtml(s.plan)}</span></td>
-        <td>${statusBadge}</td>
-        <td><strong style="color:#10b981;">${escapeHtml(s.ciro)}</strong></td>
-        <td>
-          <div class="action-btn-group">
-            <button class="btn btn-sm btn-primary" onclick="impersonateStore('${escapeHtml(s.name)}')">
-              <i class="fa-solid fa-right-to-bracket"></i> Mağazaya Sız
-            </button>
-            <button class="btn btn-sm btn-secondary" onclick="toggleStoreBot(${s.id})">
-              <i class="fa-solid fa-power-off"></i> Bot Aç/Kapat
-            </button>
-            <button class="btn btn-sm btn-delete" onclick="deleteStore(${s.id})">
-              <i class="fa-solid fa-trash"></i> Sil
-            </button>
-          </div>
-        </td>
-      </tr>
-    `;
-  }).join('');
-}
-
-// PENDING STORE APPLICATIONS (PATRON APPROVAL ENGINE)
-state.pendingApplications = JSON.parse(localStorage.getItem('barons_pending_applications')) || [
-  {
-    id: 101,
-    fullName: "Mehmet Demir",
-    tcNo: "12345678901",
-    phone: "0533 999 8811",
-    email: "mehmet@luxescent.com",
-    storeName: "Luxe Scent Boutique",
-    password: "pass",
-    status: "İnceleme Bekliyor",
-    createdAt: "08.08.2026 13:45"
-  },
-  {
-    id: 102,
-    fullName: "Ayşe Yılmaz",
-    tcNo: "98765432109",
-    phone: "0535 444 3322",
-    email: "ayse@parfumatolye.com",
-    storeName: "Parfüm Atölyesi TR",
-    password: "pass",
-    status: "İnceleme Bekliyor",
-    createdAt: "08.08.2026 14:02"
-  }
-];
-
-async function fetchServerApplications() {
-  try {
-    const res = await fetch('/api/admin/applications');
-    const data = await res.json();
-    if (data.success && Array.isArray(data.applications)) {
-      state.pendingApplications = data.applications.map(a => ({
-        id: a.id,
-        fullName: a.full_name,
-        tcNo: a.tc_no,
-        phone: a.phone,
-        email: a.email,
-        storeName: a.store_name,
-        plan: a.plan,
-        status: a.status === 'pending' ? 'İnceleme Bekliyor' : (a.status === 'approved' ? 'Onaylandı' : 'Reddedildi'),
-        createdAt: a.created_at
-      })).filter(a => a.status === 'İnceleme Bekliyor');
-
-      localStorage.setItem('barons_pending_applications', JSON.stringify(state.pendingApplications));
-    }
-  } catch (err) {}
-}
-
-async function renderPendingApplicationsTable() {
-  const tbody = document.getElementById('pendingAppsTableBody');
-  const countText = document.getElementById('pendingAppsCountText');
-  if (!tbody) return;
-
-  await fetchServerApplications();
-
-  if (countText) {
-    countText.textContent = state.pendingApplications.length > 0
-      ? `⚠️ ${state.pendingApplications.length} Mağaza Başvurusu Patron Onayı Bekliyor`
-      : '✓ İnceleme bekleyen yeni başvuru bulunmuyor';
-  }
-
-  if (state.pendingApplications.length === 0) {
-    tbody.innerHTML = `
-      <tr>
-        <td colspan="7" style="text-align:center; padding:30px; color:#94a3b8; font-size:12px;">
-          ✓ Onay bekleyen mağaza başvurusu bulunmuyor.
-        </td>
-      </tr>
-    `;
-    return;
-  }
-
-  tbody.innerHTML = state.pendingApplications.map(app => `
-    <tr>
-      <td><strong style="color:#f59e0b;">${escapeHtml(app.storeName)}</strong></td>
-      <td><strong>${escapeHtml(app.fullName)}</strong></td>
-      <td><span class="code-tag" style="color:#a78bfa;">${escapeHtml(app.tcNo)}</span></td>
-      <td>
-        <small style="display:block; color:#ffffff;">${escapeHtml(app.phone)}</small>
-        <small class="muted">${escapeHtml(app.email)}</small>
-      </td>
-      <td><small class="muted">${escapeHtml(app.createdAt)}</small></td>
-      <td><span class="status-badge low-stock">🟡 İnceleme Bekliyor</span></td>
-      <td>
-        <div class="action-btn-group">
-          <button class="btn btn-sm btn-primary" style="background:#10b981; border-color:#10b981;" onclick="approveApplication(${app.id})">
-            <i class="fa-solid fa-check"></i> Onayla & Aktif Et
-          </button>
-          <button class="btn btn-sm btn-delete" onclick="rejectApplication(${app.id})">
-            <i class="fa-solid fa-xmark"></i> Reddet
-          </button>
-        </div>
-      </td>
-    </tr>
-  `).join('');
-}
-
-async function approveApplication(appId) {
-  const appIndex = state.pendingApplications.findIndex(a => a.id === appId);
-  const app = appIndex !== -1 ? state.pendingApplications[appIndex] : null;
-
-  try {
-    await fetch(`/api/admin/applications/${appId}/approve`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: app?.email, storeName: app?.storeName })
-    });
-  } catch (e) {}
-
-  if (app) {
-    state.masterStores.unshift({
-      id: Date.now(),
-      name: app.storeName,
-      owner: app.fullName,
-      email: app.email,
-      phone: app.phone,
-      password: app.password,
-      ig: `@${app.storeName.toLowerCase().replace(/\s+/g, '_')}`,
-      plan: app.plan || 'Pro Store (₺6.000 / Ay)',
-      botStatus: 'Aktif',
-      ciro: '₺0'
-    });
-    state.pendingApplications.splice(appIndex, 1);
-    localStorage.setItem('barons_pending_applications', JSON.stringify(state.pendingApplications));
-    localStorage.setItem('barons_master_stores', JSON.stringify(state.masterStores));
-  }
-
-  showToast(`🎉 ${app ? app.storeName : 'Mağaza'} başvurusu onaylandı ve veritabanında aktif edildi!`, 'success');
-  renderPendingApplicationsTable();
-  renderMasterStoresTable();
-}
-
-async function rejectApplication(appId) {
-  if (!confirm('Bu başvuruyu reddetmek istediğinize emin misiniz?')) return;
-  const appIndex = state.pendingApplications.findIndex(a => a.id === appId);
-  const app = appIndex !== -1 ? state.pendingApplications[appIndex] : null;
-
-  try {
-    await fetch(`/api/admin/applications/${appId}/reject`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: app?.email, storeName: app?.storeName })
-    });
-  } catch (e) {}
-
-  state.pendingApplications = state.pendingApplications.filter(a => a.id !== appId);
-  localStorage.setItem('barons_pending_applications', JSON.stringify(state.pendingApplications));
-  showToast('❌ Başvuru reddedildi.', 'info');
-  renderPendingApplicationsTable();
-  renderMasterPasswordsTable();
-}
-
-async function renderMasterPasswordsTable() {
-  const tbody = document.getElementById('masterPasswordsTableBody');
-  const countText = document.getElementById('passwordsCountText');
-  if (!tbody) return;
-
-  let apps = [];
-
-  try {
-    const res = await fetch('/api/admin/applications');
-    const data = await res.json();
-    if (data.success && Array.isArray(data.applications) && data.applications.length > 0) {
-      apps = data.applications.map(a => ({
-        id: a.id,
-        storeName: a.store_name,
-        fullName: a.full_name,
-        tcNo: a.tc_no,
-        phone: a.phone,
-        email: a.email,
-        plan: a.plan,
-        password: a.password,
-        status: a.status,
-        createdAt: a.created_at
-      }));
-    }
-  } catch (err) {}
-
-  // Yerel depodaki onay bekleyen ve aktif tüm mağazaları birleştir (Yedek)
-  if (apps.length === 0) {
-    const pendingList = (JSON.parse(localStorage.getItem('barons_pending_applications')) || state.pendingApplications || []).map(a => ({
-      id: a.id,
-      storeName: a.storeName,
-      fullName: a.fullName,
-      tcNo: a.tcNo,
-      phone: a.phone,
-      email: a.email,
-      plan: a.plan || 'Pro Store (₺6.000 / Ay)',
-      password: a.password || '123456',
-      status: 'pending',
-      createdAt: a.createdAt || ''
-    }));
-
-    const activeList = (JSON.parse(localStorage.getItem('barons_master_stores')) || state.masterStores || []).map(s => ({
-      id: s.id,
-      storeName: s.name,
-      fullName: s.owner,
-      tcNo: s.tcNo || '11111111111',
-      phone: s.phone || '0532 000 0000',
-      email: s.email || `${s.name.toLowerCase().replace(/\s+/g, '')}@magaza.com`,
-      plan: s.plan || 'Enterprise VIP',
-      password: s.password || '123456',
-      status: 'approved',
-      createdAt: '08.08.2026'
-    }));
-
-    apps = [...pendingList, ...activeList];
-  }
-
-  if (countText) {
-    countText.textContent = `Toplam ${apps.length} Kayıtlı Veritabanı Mağaza Hesabı Listelendi`;
-  }
-
-  if (apps.length === 0) {
-    tbody.innerHTML = `
-      <tr>
-        <td colspan="8" style="text-align:center; padding:25px; color:#94a3b8; font-size:12px;">
-          ✓ Veritabanında henüz kayıtlı mağaza hesabı bulunmuyor.
-        </td>
-      </tr>
-    `;
-    return;
-  }
-
-  tbody.innerHTML = apps.map(a => {
-    const statusBadge = a.status === 'approved' || a.status === 'Aktif'
-      ? '<span class="status-badge active">🟢 Aktif Mağaza</span>'
-      : (a.status === 'rejected' ? '<span class="status-badge danger">🔴 Reddedildi</span>' : '<span class="status-badge low-stock">🟡 İnceleme Bekliyor</span>');
-
-    const rawPass = escapeHtml(a.password || '123456');
-
-    return `
-      <tr>
-        <td><strong style="color:#f59e0b;">${escapeHtml(a.storeName)}</strong></td>
-        <td><strong>${escapeHtml(a.fullName)}</strong></td>
-        <td><span class="code-tag" style="color:#a78bfa;">${escapeHtml(a.tcNo)}</span></td>
-        <td>
-          <small style="display:block; color:#ffffff;">${escapeHtml(a.phone)}</small>
-          <small class="muted">${escapeHtml(a.email)}</small>
-        </td>
-        <td><span class="badge badge-purple">${escapeHtml(a.plan || 'Pro Store')}</span></td>
-        <td>
-          <div style="display:flex; align-items:center; gap:8px;">
-            <input type="password" value="${rawPass}" readonly id="passInput_${a.id}" style="width:110px; background:#0f172a; border:1px solid #334155; color:#38bdf8; font-weight:700; font-family:monospace; padding:4px 8px; border-radius:6px; font-size:12px;" />
-            <button type="button" class="btn btn-sm btn-secondary" onclick="togglePasswordVisibility(${a.id})" style="padding:4px 8px; font-size:11px;">
-              <i class="fa-solid fa-eye" id="passEyeIcon_${a.id}"></i>
-            </button>
-          </div>
-        </td>
-        <td>${statusBadge}</td>
-        <td><small class="muted">${escapeHtml(a.createdAt || '')}</small></td>
-      </tr>
-    `;
-  }).join('');
-}
-
-function togglePasswordVisibility(id) {
-  const input = document.getElementById(`passInput_${id}`);
-  const icon = document.getElementById(`passEyeIcon_${id}`);
-  if (!input) return;
-
-  if (input.type === 'password') {
-    input.type = 'text';
-    if (icon) icon.className = 'fa-solid fa-eye-slash';
-  } else {
-    input.type = 'password';
-    if (icon) icon.className = 'fa-solid fa-eye';
-  }
-}
-
-function openNewStoreModal() {
-  const modal = document.getElementById('newStoreModal');
-  if (modal) modal.style.display = 'flex';
-}
-
-function closeNewStoreModal() {
-  const modal = document.getElementById('newStoreModal');
-  if (modal) modal.style.display = 'none';
-}
-
-function impersonateStore(storeName) {
-  localStorage.setItem('barons_active_store', storeName);
-  showToast(`🏢 ${storeName} dükkanına geçiş yapılıyor... Yönetim konsolu yönlendiriliyor.`, 'success');
-  setTimeout(() => {
-    window.location.href = 'index.html';
-  }, 600);
-}
-
-function toggleStoreBot(storeId) {
-  const store = state.masterStores.find(s => s.id === storeId);
-  if (!store) return;
-
-  store.botStatus = (store.botStatus === 'Aktif') ? 'Durduruldu' : 'Aktif';
-  localStorage.setItem('barons_master_stores', JSON.stringify(state.masterStores));
-  showToast(`🤖 ${store.name} Gemini AI Bot durumu '${store.botStatus}' olarak değiştirildi.`, 'info');
-  renderMasterStoresTable();
-}
-
-function deleteStore(storeId) {
-  if (!confirm('Bu dükkanı sistemden silmek istediğinize emin misiniz?')) return;
-  state.masterStores = state.masterStores.filter(s => s.id !== storeId);
-  localStorage.setItem('barons_master_stores', JSON.stringify(state.masterStores));
-  showToast('🗑️ Dükkan sistemden silindi.', 'success');
-  renderMasterStoresTable();
-}
-
-// Form event listener for new store form
-document.addEventListener('DOMContentLoaded', () => {
-  renderMasterStoresTable();
-  renderPendingApplicationsTable();
-  renderMasterPasswordsTable();
-
-  const form = document.getElementById('newStoreForm');
-  const searchInput = document.getElementById('storeSearchInput');
-
-  if (searchInput) {
-    searchInput.addEventListener('input', renderMasterStoresTable);
-  }
-
-  if (form) {
-    form.addEventListener('submit', (e) => {
-      e.preventDefault();
-      const name = document.getElementById('newStoreName')?.value.trim();
-      const owner = document.getElementById('newStoreOwner')?.value.trim();
-      const phone = document.getElementById('newStorePhone')?.value.trim();
-      const ig = document.getElementById('newStoreIg')?.value.trim();
-      const plan = document.getElementById('newStorePlan')?.value;
-      const botStatus = document.getElementById('newStoreBotStatus')?.value;
-
-      if (!name || !owner) return;
-
-      const newId = Date.now();
-      state.masterStores.unshift({
-        id: newId,
-        name,
-        owner,
-        phone: phone || '0532 000 0000',
-        ig: ig.startsWith('@') ? ig : `@${ig}`,
-        plan: plan || 'Enterprise VIP',
-        botStatus: botStatus || 'Aktif',
-        ciro: '₺0'
-      });
-
-      localStorage.setItem('barons_master_stores', JSON.stringify(state.masterStores));
-      showToast(`🚀 ${name} yeni dükkan olarak sisteme kaydedildi!`, 'success');
-      closeNewStoreModal();
-      form.reset();
-      renderMasterStoresTable();
-    });
-  }
-});
 
 // GOOGLE SHEET & CSV İÇE / DIŞA AKTARMA MOTORU (MAĞAZA ÖZEL)
 async function importFromCustomGoogleSheet() {

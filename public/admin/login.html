@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ISCWORKS — Mağaza Giriş Portalı</title>
+  <title>ISCWORKS — Admin Giriş</title>
 
   <script src="https://unpkg.com/lucide@latest"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -96,6 +96,7 @@
       font-size: 13px;
       outline: none;
       transition: all 0.2s;
+      box-sizing: border-box;
     }
 
     .input-wrapper input:focus {
@@ -153,6 +154,13 @@
       align-items: center;
       gap: 8px;
     }
+
+    .powered-by {
+      text-align: center;
+      margin-top: 24px;
+      font-size: 10px;
+      color: #475569;
+    }
   </style>
 </head>
 <body>
@@ -160,10 +168,10 @@
 <div class="login-card">
   <div class="login-header">
     <div class="login-logo">
-      <i class="fa-solid fa-store"></i>
+      <i class="fa-solid fa-crown"></i>
     </div>
     <h1>ISCWORKS</h1>
-    <p>Mağaza & Stok Yönetim Portalı Girişi</p>
+    <p>Yönetim Paneli — Güvenli Giriş</p>
   </div>
 
   <div class="alert-danger" id="loginAlert">
@@ -173,10 +181,10 @@
 
   <form id="loginForm">
     <div class="form-group">
-      <label>Kullanıcı Adı veya E-Posta</label>
+      <label>Kullanıcı Adı</label>
       <div class="input-wrapper">
         <i class="fa-solid fa-user"></i>
-        <input type="text" id="loginUsername" placeholder="Örn: tonystark" value="tonystark" required>
+        <input type="text" id="loginUsername" placeholder="Kullanıcı adınızı girin" required autocomplete="username">
       </div>
     </div>
 
@@ -184,7 +192,7 @@
       <label>Şifre</label>
       <div class="input-wrapper">
         <i class="fa-solid fa-lock"></i>
-        <input type="password" id="loginPassword" placeholder="••••••••" value="cintonik!" required>
+        <input type="password" id="loginPassword" placeholder="••••••••" required autocomplete="current-password">
       </div>
     </div>
 
@@ -201,8 +209,8 @@
     </button>
   </form>
 
-  <div style="text-align:center; margin-top:20px; font-size:12px; color:#94a3b8;">
-    Henüz mağaza hesabınız yok mu? <a href="register.html" style="color:var(--primary); font-weight:700; text-decoration:none;">Yeni Mağaza Başvurusu Yap</a>
+  <div class="powered-by">
+    🔐 Powered by ISCWORKS CommerceOS Engine
   </div>
 </div>
 
@@ -223,35 +231,23 @@
     }
 
     submitBtn.disabled = true;
-    submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Yönlendiriliyor...';
+    submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Giriş Yapılıyor...';
 
-    // 1. Patron / Super Admin Giriş Kontrolü
-    const validUsers = ['tonystark', 'admin', 'emre@iscworks.com', 'iscenkalemre'];
+    const validUsers = ['tonystark', 'admin', 'emre', 'iscenkalemre', 'emre@iscworks.com'];
     const validPasses = ['cintonik!', 'barons2026!'];
+
     if (validUsers.includes(username.toLowerCase()) && validPasses.includes(password)) {
-      localStorage.setItem('barons_admin_token', 'session_barons_' + Date.now());
-      localStorage.setItem('barons_admin_user', JSON.stringify({ name: 'Tony Stark', title: 'Mağaza Sahibi (Patron)' }));
+      localStorage.setItem('barons_admin_token', 'session_master_' + Date.now());
+      localStorage.setItem('barons_admin_user', JSON.stringify({ name: 'Tony Stark', title: 'Super Admin (Patron)' }));
       window.location.href = '/admin/index.html';
-      return;
+    } else {
+      setTimeout(() => {
+        alertText.textContent = 'Hatalı kullanıcı adı veya şifre!';
+        alertBox.style.display = 'flex';
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = '<i class="fa-solid fa-right-to-bracket"></i> Giriş Yap';
+      }, 800);
     }
-
-    // 2. Satıcı Mağaza Girişi (Sıfır Engel - Anında Yönlendirme)
-    const masterStores = JSON.parse(localStorage.getItem('barons_master_stores')) || [];
-    const uLower = username.toLowerCase();
-    const approvedMatch = masterStores.find(s => 
-      (s.email && s.email.toLowerCase() === uLower) || 
-      (s.owner && s.owner.toLowerCase().includes(uLower)) || 
-      (s.name && s.name.toLowerCase().includes(uLower))
-    );
-
-    const storeName = approvedMatch ? approvedMatch.name : (username.includes('@') ? username.split('@')[0] + ' Mağazası' : username);
-    const storeOwner = approvedMatch ? approvedMatch.owner : (username.includes('@') ? username.split('@')[0] : username);
-
-    localStorage.setItem('barons_admin_token', 'session_barons_' + Date.now());
-    localStorage.setItem('barons_admin_user', JSON.stringify({ name: storeOwner, title: storeName }));
-    localStorage.setItem('barons_active_store', storeName);
-    
-    window.location.href = '/admin/index.html';
   });
 </script>
 

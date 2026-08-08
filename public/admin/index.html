@@ -3,12 +3,11 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>BARON'S SILLAGE — CommerceOS Engine</title>
+  <title>ISCWORKS — CommerceOS Dashboard</title>
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script src="https://unpkg.com/lucide@latest"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -21,14 +20,14 @@
         <div class="logo-mark">
             <i data-lucide="crown" size="20"></i>
         </div>
-        BARON'S<span> SILLAGE</span>
+        ISCWORKS<span> Admin</span>
     </a>
 
     <div class="section-title">ANA MENÜ</div>
 
     <a href="index.html" class="nav-item active">
         <i data-lucide="layout-dashboard"></i>
-        Dashboard & Stok
+        Dashboard &amp; Stok
     </a>
 
     <a href="orders.html" class="nav-item">
@@ -52,14 +51,7 @@
         VIP Ödüller
     </a>
 
-    <div class="section-title">SaaS MAĞAZA YÖNETİMİ</div>
-
-    <a href="stores.html" class="nav-item">
-        <i data-lucide="store"></i>
-        🏢 Mağazalar & Müşteriler
-    </a>
-
-    <div class="section-title">AI & MAĞAZA YÖNETİMİ</div>
+    <div class="section-title">AI &amp; YÖNETİM</div>
 
     <a href="ai-product.html" class="nav-item">
         <i data-lucide="sparkles"></i>
@@ -68,22 +60,22 @@
 
     <a href="settings.html" class="nav-item">
         <i data-lucide="settings"></i>
-        Fiyat & Kargo Ayarları
+        Fiyat &amp; Kargo Ayarları
     </a>
 
-    <div class="section-title">SİSTEM & ALTYAPI</div>
+    <div class="section-title">SİSTEM</div>
 
     <a href="api-settings.html" class="nav-item">
         <i data-lucide="sliders"></i>
-        API & AI Kişiselleştirme
+        API &amp; AI Kişiselleştirme
     </a>
 
     <div class="sidebar-bottom">
         <div class="store-card">
-            <div class="store-avatar">B</div>
+            <div class="store-avatar">IS</div>
             <div class="store-info">
-                <strong>BARON'S SILLAGE</strong>
-                <small>Enterprise Admin Console</small>
+                <strong>ISCWORKS</strong>
+                <small>Admin Kontrol Paneli</small>
             </div>
             <i data-lucide="chevron-down" size="15" style="margin-left:auto;color:#9ca3af"></i>
         </div>
@@ -110,7 +102,7 @@
         <div class="top-actions">
             <div class="sync-badge" id="syncStatusBadge" style="margin-right:8px;">
                 <span class="pulse-dot"></span>
-                <span>Live SQLite & Sheet Sync</span>
+                <span>Live SQLite Sync</span>
             </div>
 
             <button class="icon-button" id="btnToggleSound" title="Bildirim Seslerini Aç/Kapat">
@@ -126,11 +118,11 @@
                 <i data-lucide="sliders" size="17"></i>
             </button>
 
-            <div class="user">
+            <div class="user" id="userProfileTrigger">
                 <div class="avatar">TS</div>
                 <div class="user-text">
                     <strong>Tony Stark</strong>
-                    <span>Mağaza Sahibi (Patron)</span>
+                    <span>Super Admin (Patron)</span>
                 </div>
                 <i data-lucide="chevron-down" size="13"></i>
             </div>
@@ -142,8 +134,8 @@
 
         <div class="page-header">
             <div class="page-title">
-                <h1>Mağaza & Stok Dashboard</h1>
-                <p>Google Sheet ve SQLite verileriyle canlı senkronize çalışan yönetim konsolu.</p>
+                <h1>Mağaza &amp; Stok Dashboard</h1>
+                <p>SQLite veritabanıyla canlı senkronize çalışan yönetim konsolu.</p>
             </div>
 
             <div class="header-actions">
@@ -154,7 +146,7 @@
 
                 <a href="ai-product.html" class="btn btn-primary">
                     <i data-lucide="sparkles" size="14"></i>
-                    Gemini AI Destek Al
+                    F.R.I.D.A.Y. AI Destek Al
                 </a>
             </div>
         </div>
@@ -170,7 +162,7 @@
                 </div>
                 <div class="kpi-value" id="statTotalProducts">--</div>
                 <div class="kpi-bottom">
-                    <span class="up">↑ Google Sheet</span>
+                    <span class="up">↑ SQLite</span>
                     <span class="muted">canlı envanter</span>
                 </div>
             </div>
@@ -199,7 +191,7 @@
                 <div class="kpi-value" id="statTotalOrders">--</div>
                 <div class="kpi-bottom">
                     <span class="up">↑ Live Satışlar</span>
-                    <span class="muted">tamamlanan & beklemede</span>
+                    <span class="muted">tamamlanan &amp; beklemede</span>
                 </div>
             </div>
 
@@ -223,7 +215,7 @@
             <div class="card chart-card">
                 <div class="card-header">
                     <div>
-                        <div class="card-title">📈 Canlı Ciro & Satış Performansı (Çizgi Grafiği)</div>
+                        <div class="card-title">📈 Canlı Ciro &amp; Satış Performansı (Çizgi Grafiği)</div>
                         <div class="card-subtitle">Gerçek sipariş tarihlerine ve cirolarına göre gün bazlı çizgi grafiği</div>
                     </div>
                 </div>
@@ -251,7 +243,7 @@
         <div class="card table-card">
             <div class="table-header">
                 <div>
-                    <div class="table-title">Google Sheet Stok & Ürün Listesi (Canlı Düzenlenebilir)</div>
+                    <div class="table-title">Stok &amp; Ürün Listesi (Canlı Düzenlenebilir)</div>
                     <span style="font-size:10px;color:#6b7280;" id="productsTableCount">0 ürün listelendi</span>
                 </div>
                 <button class="btn btn-primary btn-sm" onclick="saveAllPricesAndStocks()">
@@ -277,7 +269,7 @@
                     <tbody id="productsTableBody">
                         <tr>
                             <td colspan="9" style="text-align:center;padding:40px;color:#6b7280;">
-                                Stok verileri SQLite ve Google Sheet ile senkronize ediliyor...
+                                Stok verileri SQLite ile senkronize ediliyor...
                             </td>
                         </tr>
                     </tbody>
@@ -297,35 +289,6 @@
     document.getElementById("sidebar").classList.toggle("open");
   }
   lucide.createIcons();
-
-  // Initialize Sales Chart
-  const ctx = document.getElementById("salesChart");
-  if(ctx){
-    new Chart(ctx,{
-        type:"line",
-        data:{
-            labels:["10 Tem","14 Tem","18 Tem","22 Tem","26 Tem","30 Tem","3 Ağu","7 Ağu"],
-            datasets:[
-                {
-                    label:"Satış (TL)",
-                    data:[11200,15400,13600,18500,21400,26100,29700,32900],
-                    borderWidth:2,
-                    tension:.4,
-                    fill:true,
-                    backgroundColor:"rgba(255,153,0,.08)",
-                    borderColor:"#ff9900",
-                    pointRadius:0
-                }
-            ]
-        },
-        options:{
-            responsive:true,
-            maintainAspectRatio:false,
-            plugins:{legend:{display:false}},
-            scales:{x:{grid:{display:false}},y:{grid:{color:"#f0f0f0"}}}
-        }
-    });
-  }
 </script>
 </body>
 </html>
