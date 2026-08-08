@@ -226,13 +226,25 @@ function getAllMerchantApplications() {
     const stmt = exports.db.prepare(`SELECT * FROM merchant_applications ORDER BY id DESC`);
     return stmt.all();
 }
-function approveMerchantApplication(id) {
-    const stmt = exports.db.prepare(`UPDATE merchant_applications SET status = 'approved', updated_at = CURRENT_TIMESTAMP WHERE id = ?`);
-    return stmt.run(id);
+function approveMerchantApplication(identifier) {
+    const idStr = String(identifier).trim();
+    const idNum = parseInt(idStr, 10) || 0;
+    const stmt = exports.db.prepare(`
+    UPDATE merchant_applications 
+    SET status = 'approved', updated_at = CURRENT_TIMESTAMP 
+    WHERE id = ? OR LOWER(email) = LOWER(?) OR LOWER(store_name) = LOWER(?) OR phone = ?
+  `);
+    return stmt.run(idNum, idStr, idStr, idStr);
 }
-function rejectMerchantApplication(id) {
-    const stmt = exports.db.prepare(`UPDATE merchant_applications SET status = 'rejected', updated_at = CURRENT_TIMESTAMP WHERE id = ?`);
-    return stmt.run(id);
+function rejectMerchantApplication(identifier) {
+    const idStr = String(identifier).trim();
+    const idNum = parseInt(idStr, 10) || 0;
+    const stmt = exports.db.prepare(`
+    UPDATE merchant_applications 
+    SET status = 'rejected', updated_at = CURRENT_TIMESTAMP 
+    WHERE id = ? OR LOWER(email) = LOWER(?) OR LOWER(store_name) = LOWER(?) OR phone = ?
+  `);
+    return stmt.run(idNum, idStr, idStr, idStr);
 }
 function findMerchantApplicationByIdentifier(identifier) {
     const cleanId = (identifier || '').trim();

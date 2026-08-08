@@ -71,8 +71,8 @@ app.get('/api/admin/applications', (req, res) => {
 
 app.post('/api/admin/applications/:id/approve', (req, res) => {
   try {
-    const id = parseInt(req.params.id, 10);
-    approveMerchantApplication(id);
+    const target = req.body?.email || req.body?.storeName || req.params.id;
+    approveMerchantApplication(target);
     return res.json({ success: true });
   } catch (err) {
     return res.status(500).json({ success: false, error: 'Onaylama hatası' });
@@ -81,8 +81,8 @@ app.post('/api/admin/applications/:id/approve', (req, res) => {
 
 app.post('/api/admin/applications/:id/reject', (req, res) => {
   try {
-    const id = parseInt(req.params.id, 10);
-    rejectMerchantApplication(id);
+    const target = req.body?.email || req.body?.storeName || req.params.id;
+    rejectMerchantApplication(target);
     return res.json({ success: true });
   } catch (err) {
     return res.status(500).json({ success: false, error: 'Reddetme hatası' });

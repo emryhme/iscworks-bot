@@ -62,8 +62,8 @@ app.get('/api/admin/applications', (req, res) => {
 });
 app.post('/api/admin/applications/:id/approve', (req, res) => {
     try {
-        const id = parseInt(req.params.id, 10);
-        (0, db_2.approveMerchantApplication)(id);
+        const target = req.body?.email || req.body?.storeName || req.params.id;
+        (0, db_2.approveMerchantApplication)(target);
         return res.json({ success: true });
     }
     catch (err) {
@@ -72,8 +72,8 @@ app.post('/api/admin/applications/:id/approve', (req, res) => {
 });
 app.post('/api/admin/applications/:id/reject', (req, res) => {
     try {
-        const id = parseInt(req.params.id, 10);
-        (0, db_2.rejectMerchantApplication)(id);
+        const target = req.body?.email || req.body?.storeName || req.params.id;
+        (0, db_2.rejectMerchantApplication)(target);
         return res.json({ success: true });
     }
     catch (err) {

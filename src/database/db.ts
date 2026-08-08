@@ -242,14 +242,26 @@ export function getAllMerchantApplications() {
   return stmt.all();
 }
 
-export function approveMerchantApplication(id: number) {
-  const stmt = db.prepare(`UPDATE merchant_applications SET status = 'approved', updated_at = CURRENT_TIMESTAMP WHERE id = ?`);
-  return stmt.run(id);
+export function approveMerchantApplication(identifier: number | string) {
+  const idStr = String(identifier).trim();
+  const idNum = parseInt(idStr, 10) || 0;
+  const stmt = db.prepare(`
+    UPDATE merchant_applications 
+    SET status = 'approved', updated_at = CURRENT_TIMESTAMP 
+    WHERE id = ? OR LOWER(email) = LOWER(?) OR LOWER(store_name) = LOWER(?) OR phone = ?
+  `);
+  return stmt.run(idNum, idStr, idStr, idStr);
 }
 
-export function rejectMerchantApplication(id: number) {
-  const stmt = db.prepare(`UPDATE merchant_applications SET status = 'rejected', updated_at = CURRENT_TIMESTAMP WHERE id = ?`);
-  return stmt.run(id);
+export function rejectMerchantApplication(identifier: number | string) {
+  const idStr = String(identifier).trim();
+  const idNum = parseInt(idStr, 10) || 0;
+  const stmt = db.prepare(`
+    UPDATE merchant_applications 
+    SET status = 'rejected', updated_at = CURRENT_TIMESTAMP 
+    WHERE id = ? OR LOWER(email) = LOWER(?) OR LOWER(store_name) = LOWER(?) OR phone = ?
+  `);
+  return stmt.run(idNum, idStr, idStr, idStr);
 }
 
 export function findMerchantApplicationByIdentifier(identifier: string) {

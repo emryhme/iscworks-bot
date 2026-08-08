@@ -2111,17 +2111,23 @@ async function renderPendingApplicationsTable() {
 }
 
 async function approveApplication(appId) {
+  const appIndex = state.pendingApplications.findIndex(a => a.id === appId);
+  const app = appIndex !== -1 ? state.pendingApplications[appIndex] : null;
+
   try {
-    await fetch(`/api/admin/applications/${appId}/approve`, { method: 'POST' });
+    await fetch(`/api/admin/applications/${appId}/approve`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: app?.email, storeName: app?.storeName })
+    });
   } catch (e) {}
 
-  const appIndex = state.pendingApplications.findIndex(a => a.id === appId);
-  if (appIndex !== -1) {
-    const app = state.pendingApplications[appIndex];
+  if (app) {
     state.masterStores.unshift({
       id: Date.now(),
       name: app.storeName,
       owner: app.fullName,
+      email: app.email,
       phone: app.phone,
       ig: `@${app.storeName.toLowerCase().replace(/\s+/g, '_')}`,
       plan: app.plan || 'Pro Store (₺6.000 / Ay)',
@@ -2131,17 +2137,24 @@ async function approveApplication(appId) {
     state.pendingApplications.splice(appIndex, 1);
     localStorage.setItem('barons_pending_applications', JSON.stringify(state.pendingApplications));
     localStorage.setItem('barons_master_stores', JSON.stringify(state.masterStores));
-    showToast(`🎉 ${app.storeName} başvurusu onaylandı ve mağaza veritabanında aktif edildi!`, 'success');
   }
 
+  showToast(`🎉 ${app ? app.storeName : 'Mağaza'} başvurusu onaylandı ve veritabanında aktif edildi!`, 'success');
   renderPendingApplicationsTable();
   renderMasterStoresTable();
 }
 
 async function rejectApplication(appId) {
   if (!confirm('Bu başvuruyu reddetmek istediğinize emin misiniz?')) return;
+  const appIndex = state.pendingApplications.findIndex(a => a.id === appId);
+  const app = appIndex !== -1 ? state.pendingApplications[appIndex] : null;
+
   try {
-    await fetch(`/api/admin/applications/${appId}/reject`, { method: 'POST' });
+    await fetch(`/api/admin/applications/${appId}/reject`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: app?.email, storeName: app?.storeName })
+    });
   } catch (e) {}
 
   state.pendingApplications = state.pendingApplications.filter(a => a.id !== appId);
