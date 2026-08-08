@@ -52,8 +52,11 @@ function setupUserDropdown() {
     dropdown.innerHTML = `
       <div style="padding: 10px 16px; border-bottom: 1px solid #f0f0f0;">
         <strong style="font-size: 12px; display: block; color: #111827;">Tony Stark</strong>
-        <span style="font-size: 10px; color: #6b7280;">Mağaza Sahibi (Patron)</span>
+        <span style="font-size: 10px; color: #6b7280;">Super Admin (Patron)</span>
       </div>
+      <a href="master.html" style="padding: 10px 16px; font-size: 11px; color: #7c3aed; font-weight: 700; text-decoration: none; display: flex; align-items: center; gap: 8px; background: #f3e8ff;" onmouseover="this.style.background='#e9d5ff'" onmouseout="this.style.background='#f3e8ff'">
+        <i class="fa-solid fa-shield-halved" style="color: #8b5cf6;"></i> Master SaaS Super-Admin
+      </a>
       <a href="api-settings.html" style="padding: 10px 16px; font-size: 11px; color: #374151; text-decoration: none; display: flex; align-items: center; gap: 8px;" onmouseover="this.style.background='#f3f4f6'" onmouseout="this.style.background='transparent'">
         <i class="fa-solid fa-sliders" style="color: #ff9900;"></i> API & AI Kişiselleştirme
       </a>
@@ -1979,9 +1982,11 @@ function closeNewStoreModal() {
 }
 
 function impersonateStore(storeName) {
-  showToast(`🏢 ${storeName} dükkanına sızılıyor... Yönetim konsolu aktif edildi!`, 'success');
-  const storeAvatar = document.querySelector('.store-info strong');
-  if (storeAvatar) storeAvatar.textContent = storeName;
+  localStorage.setItem('barons_active_store', storeName);
+  showToast(`🏢 ${storeName} dükkanına geçiş yapılıyor... Yönetim konsolu yönlendiriliyor.`, 'success');
+  setTimeout(() => {
+    window.location.href = 'index.html';
+  }, 600);
 }
 
 function toggleStoreBot(storeId) {

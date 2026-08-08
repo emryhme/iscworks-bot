@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ISCWORKS — Master SaaS Super-Admin Console</title>
+
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="styles.css">
+
+  <style>
+    :root {
+      --sidebar: #0f172a;
+      --sidebar-hover: #1e293b;
+      --primary: #8b5cf6;
+      --primary-dark: #7c3aed;
+    }
+  </style>
+</head>
+<body>
+
+<div class="layout">
+
+<!-- MASTER SIDEBAR -->
+<aside class="sidebar" id="sidebar" style="background:#0f172a;">
+    <a href="master.html" class="logo">
+        <div class="logo-mark" style="background:var(--primary); color:white;">
+            <i data-lucide="shield-check" size="20"></i>
+        </div>
+        ISCWORKS<span> SaaS</span>
+    </a>
+
+    <div class="section-title">PLATFORM YÖNETİMİ</div>
+
+    <a href="master.html" class="nav-item active">
+        <i data-lucide="layout-grid"></i>
+        Master Dashboard
+    </a>
+
+    <a href="master.html" class="nav-item">
+        <i data-lucide="store"></i>
+        Tüm Mağazalar & Kiracılar
+    </a>
+
+    <a href="api-settings.html" class="nav-item">
+        <i data-lucide="key"></i>
+        Master API & Bot Keyler
+    </a>
+
+    <div class="section-title">MAĞAZA HIZLI ERİŞİM</div>
+
+    <a href="index.html" class="nav-item">
+        <i data-lucide="crown" style="color:#ff9900;"></i>
+        BARON'S SILLAGE Paneli
+    </a>
+
+    <div class="sidebar-bottom">
+        <div class="store-card" style="background:#1e293b; border-color:#334155;">
+            <div class="store-avatar" style="background:#8b5cf6; color:white;">TS</div>
+            <div class="store-info">
+                <strong>Tony Stark</strong>
+                <small>Master SaaS Owner (Patron)</small>
+            </div>
+            <i data-lucide="chevron-down" size="15" style="margin-left:auto;color:#9ca3af"></i>
+        </div>
+    </div>
+</aside>
+
+<!-- MAIN -->
+<main class="main">
+
+    <!-- TOPBAR -->
+    <header class="topbar">
+        <div style="display:flex;align-items:center;gap:10px">
+            <button class="icon-button mobile-menu" onclick="toggleSidebar()">
+                <i data-lucide="menu"></i>
+            </button>
+
+            <div class="search" style="width:420px;">
+                <i data-lucide="search" size="15"></i>
+                <input type="text" id="masterSearchInput" placeholder="Tüm müşterilerde, dükkan adında veya tel no ile ara...">
+                <span style="font-size:9px;color:#9ca3af">⌘ K</span>
+            </div>
+        </div>
+
+        <div class="top-actions">
+            <div class="sync-badge" style="background:#f3e8ff; color:#7c3aed; border-color:#e9d5ff; margin-right:8px;">
+                <span class="pulse-dot" style="background:#8b5cf6;"></span>
+                <span>ISCWORKS Master SaaS Engine</span>
+            </div>
+
+            <button class="icon-button" id="btnToggleSound" title="Bildirim Sesleri">
+                <i data-lucide="bell" size="17"></i>
+                <span class="notification-dot"></span>
+            </button>
+
+            <button class="icon-button" id="btnRefreshData" title="Verileri Yenile">
+                <i data-lucide="refresh-cw" size="17"></i>
+            </button>
+
+            <div class="user">
+                <div class="avatar" style="background:#8b5cf6;">TS</div>
+                <div class="user-text">
+                    <strong>Tony Stark</strong>
+                    <span>Master SaaS Owner</span>
+                </div>
+                <i data-lucide="chevron-down" size="13"></i>
+            </div>
+        </div>
+    </header>
+
+    <!-- CONTENT -->
+    <section class="content">
+
+        <div class="page-header">
+            <div class="page-title">
+                <h1>ISCWORKS Master SaaS Super-Admin Konsolu</h1>
+                <p>Platformunuzdaki tüm dükkanları, müşteri botlarını, lisans durumlarını ve SaaS abonelik gelirlerini yönetin.</p>
+            </div>
+
+            <div class="header-actions">
+                <button class="btn btn-primary" onclick="openNewStoreModal()" style="background:#8b5cf6; border-color:#8b5cf6;">
+                    <i data-lucide="plus-circle" size="14"></i>
+                    Yeni Mağaza / Dükkan Tanımla
+                </button>
+            </div>
+        </div>
+
+        <!-- MASTER METRICS GRID -->
+        <div class="kpi-grid">
+            <div class="card kpi">
+                <div class="kpi-top">
+                    <span class="kpi-label">TOPLAM KİRACI MAĞAZA</span>
+                    <div class="kpi-icon purple">
+                        <i data-lucide="store" size="16"></i>
+                    </div>
+                </div>
+                <div class="kpi-value" id="statTotalStores">8 Mağaza</div>
+                <div class="kpi-bottom">
+                    <span class="up" style="color:#7c3aed;">↑ 6 Aktif Lisans</span>
+                    <span class="muted">2 Deneme Sürümü</span>
+                </div>
+            </div>
+
+            <div class="card kpi">
+                <div class="kpi-top">
+                    <span class="kpi-label">MÜŞTERİ TOPLAM CİRO HACMİ</span>
+                    <div class="kpi-icon green">
+                        <i data-lucide="badge-turkish-lira" size="16"></i>
+                    </div>
+                </div>
+                <div class="kpi-value">₺1.482.900</div>
+                <div class="kpi-bottom">
+                    <span class="up">↑ %24.8 büyüme</span>
+                    <span class="muted">tüm dükkanlar</span>
+                </div>
+            </div>
+
+            <div class="card kpi">
+                <div class="kpi-top">
+                    <span class="kpi-label">CANLI AI BOT ENTEGRASYONU</span>
+                    <div class="kpi-icon blue">
+                        <i data-lucide="bot" size="16"></i>
+                    </div>
+                </div>
+                <div class="kpi-value">8 Active Bots</div>
+                <div class="kpi-bottom">
+                    <span class="up">✓ Gemini AI 1.5</span>
+                    <span class="muted">Instagram DM Otomasyonu</span>
+                </div>
+            </div>
+
+            <div class="card kpi">
+                <div class="kpi-top">
+                    <span class="kpi-label">AYLIK PLATFORM SAAS GELİRİ</span>
+                    <div class="kpi-icon orange">
+                        <i data-lucide="credit-card" size="16"></i>
+                    </div>
+                </div>
+                <div class="kpi-value" style="color:#7c3aed;">₺48.000 / Ay</div>
+                <div class="kpi-bottom">
+                    <span class="up">↑ Düzenli SaaS</span>
+                    <span class="muted">lisans ödemeleri</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- STORES TABLE CARD -->
+        <div class="card table-card">
+            <div class="table-header">
+                <div>
+                    <div class="table-title">Tüm Kiracı Mağazalar & Yönetim Paneli Erişimleri</div>
+                    <span style="font-size:10px;color:#6b7280;" id="storesCountText">8 Mağaza Listelendi</span>
+                </div>
+            </div>
+
+            <div class="table-responsive">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>MAĞAZA ADI / KİRACI ID</th>
+                            <th>DÜKKAN SAHİBİ</th>
+                            <th>İLETİŞİM / TEL</th>
+                            <th>INSTAGRAM HESABI</th>
+                            <th>LİSANS PAKETİ</th>
+                            <th>BOT DURUMU</th>
+                            <th>AYLIK SAAS KAZANCI</th>
+                            <th>İŞLEMLER</th>
+                        </tr>
+                    </thead>
+                    <tbody id="storesTableBody">
+                        <!-- Master Stores Table Body -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+    </section>
+</main>
+</div>
+
+<!-- NEW STORE MODAL -->
+<div id="newStoreModal" style="position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(15,23,42,0.8); backdrop-filter:blur(8px); display:none; align-items:center; justify-content:center; z-index:99999;">
+    <div class="card" style="width:92%; max-width:600px; padding:25px; box-shadow:0 20px 50px rgba(0,0,0,0.3); max-height:90vh; overflow-y:auto;">
+        <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border); padding-bottom:15px; margin-bottom:20px;">
+            <h3 style="font-size:16px; font-weight:800; display:flex; align-items:center; gap:9px; color:var(--text);">
+                <i data-lucide="store" style="color:#8b5cf6;"></i> 🚀 Yeni Kiracı Mağaza / Dükkan Ekle
+            </h3>
+            <button onclick="closeNewStoreModal()" style="background:none; border:none; font-size:22px; cursor:pointer; color:var(--muted);">&times;</button>
+        </div>
+
+        <form id="newStoreForm">
+            <div class="form-grid">
+                <div class="form-group">
+                    <label>Mağaza / Dükkan Adı</label>
+                    <input type="text" id="newStoreName" placeholder="Örn: BARON'S SILLAGE" required>
+                </div>
+
+                <div class="form-group">
+                    <label>Dükkan Sahibi Yetkili Adı</label>
+                    <input type="text" id="newStoreOwner" placeholder="Örn: Emre İşcenkal" required>
+                </div>
+
+                <div class="form-group">
+                    <label>Telefon / WhatsApp</label>
+                    <input type="text" id="newStorePhone" placeholder="Örn: 0532 123 4567" required>
+                </div>
+
+                <div class="form-group">
+                    <label>Instagram Kullanıcı Adı</label>
+                    <input type="text" id="newStoreIg" placeholder="Örn: @barons_sillage" required>
+                </div>
+
+                <div class="form-group">
+                    <label>Abonelik Paketi & Fiyat</label>
+                    <select id="newStorePlan" class="select" style="width:100%; height:40px; font-size:12px;">
+                        <option value="Enterprise VIP">Enterprise VIP (₺12.000 / Ay)</option>
+                        <option value="Pro Store">Pro Store (₺6.000 / Ay)</option>
+                        <option value="Basic Store">Basic Store (₺3.000 / Ay)</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label>Gemini AI Bot Durumu</label>
+                    <select id="newStoreBotStatus" class="select" style="width:100%; height:40px; font-size:12px;">
+                        <option value="Aktif">🟢 Aktif Bot (7/24 Yanıt Veriyor)</option>
+                        <option value="Deneme Süresi">🟡 Deneme Süresi (7 Gün)</option>
+                        <option value="Durduruldu">🔴 Durduruldu</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="form-actions" style="margin-top:20px;">
+                <button type="button" class="btn btn-secondary" onclick="closeNewStoreModal()">Vazgeç</button>
+                <button type="submit" class="btn btn-primary" style="background:#8b5cf6; border-color:#8b5cf6;">
+                    <i data-lucide="plus" size="14"></i>
+                    Mağazayı Tanımla & Aktif Et
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="toast-container" id="toastContainer"></div>
+
+<script src="app.js"></script>
+<script>
+  function toggleSidebar(){
+    document.getElementById("sidebar").classList.toggle("open");
+  }
+  lucide.createIcons();
+
+  document.addEventListener("DOMContentLoaded", () => {
+    if (typeof renderMasterStoresTable === "function") {
+      renderMasterStoresTable();
+    }
+  });
+</script>
+</body>
+</html>
