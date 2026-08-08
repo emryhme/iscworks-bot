@@ -18,11 +18,12 @@ class AIService {
     static getApiKey() {
         return (process.env.OPENAI_API_KEY || env_1.env.openaiApiKey || '').trim().replace(/^["']|["']$/g, '');
     }
-    static getSessionContext(senderId) {
-        if (!this.sessions.has(senderId)) {
-            this.sessions.set(senderId, { history: [], cart: [] });
+    static getSessionContext(senderId, storeSlug = 'default') {
+        const key = `${storeSlug}:ig:${senderId}`;
+        if (!this.sessions.has(key)) {
+            this.sessions.set(key, { history: [], cart: [] });
         }
-        const ctx = this.sessions.get(senderId);
+        const ctx = this.sessions.get(key);
         if (!ctx.cart)
             ctx.cart = [];
         return ctx;
@@ -299,9 +300,6 @@ Yalnızca aşağıdaki JSON yapısını döndür (bilinmeyen alanlar için null 
             SET unit_price = ?, shipping_fee = ?, discount = ?, total_price = ?
             WHERE order_id = ?
           `).run(subtotal / Math.max(1, totalQuantity), shippingFee, discount, totalPrice, order.orderId);
-                    for (const item of ctx.cart) {
-                        await stock_service_1.StockService.deductStock(item.productCode, item.quantity);
-                    }
                     const cartSummaryText = ctx.cart.map(i => `• ${i.productName} (${i.size}) - ${i.quantity} adet x ${i.unitPrice} TL`).join('\n');
                     ctx.cart = [];
                     return JSON.stringify({

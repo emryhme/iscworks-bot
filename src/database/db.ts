@@ -108,6 +108,15 @@ export function initDatabase() {
     );
   `);
 
+  // 7. Webhook Mükerrer İşleme Engelleyici Tablo (webhook_events - Idempotency)
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS webhook_events (
+      event_id TEXT PRIMARY KEY,
+      store_slug TEXT DEFAULT '',
+      processed_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
+
   // Auto Migrations: Kolonlar eksikse otomatik ekle
   try { db.exec(`ALTER TABLE products ADD COLUMN price REAL NOT NULL DEFAULT 299.00;`); } catch (e) {}
   try { db.exec(`ALTER TABLE products ADD COLUMN store_name TEXT DEFAULT '';`); } catch (e) {}
@@ -133,6 +142,7 @@ export function initDatabase() {
     CREATE INDEX IF NOT EXISTS idx_orders_store ON orders(store_name);
     CREATE INDEX IF NOT EXISTS idx_campaigns_active ON campaigns(active);
     CREATE INDEX IF NOT EXISTS idx_rewards_sender ON user_rewards(sender_id);
+    CREATE INDEX IF NOT EXISTS idx_webhook_events_id ON webhook_events(event_id);
   `);
 
   // Varsayılan Başlangıç Stok & Kampanya Verilerini Yükle
@@ -281,4 +291,26 @@ export function findMerchantApplicationByIdentifier(identifier: string) {
        OR tc_no = ?
   `);
   return stmt.get(cleanId, cleanId, cleanId, cleanId, cleanId);
+}
+
+/**
+ * Şifre Güvenliği & Hashleme (PBKDF2 / SHA-512)
+ */
+import crypto from 'crypto';
+
+export function hashPassword(password: string): string {
+  if (!password) return '';
+  const salt = 'iscworks_salt_2026';
+  const hash = crypto.pbkdf2Sync(password, salt, 1000, 64, 'sha512').toString('hex');
+  return `pbkdf2:sha512:${hash}`;
+}
+
+export function verifyPassword(password: string, storedHash: string): boolean {
+  if (!password || !storedHash) return false;
+  // Düz metin geçiş desteği (eski veriler için)
+  if (!storedHash.startsWith('pbkdf2:')) {
+    return String(password).trim() === String(storedHash).trim();
+  }
+  const computed = hashPassword(password);
+  return computed === storedHash;
 }

@@ -3,6 +3,7 @@ import { env } from '../config/env';
 import { extractProductCode } from '../utils/regex.util';
 import { AIService } from '../services/ai.service';
 import { FacebookService } from '../services/facebook.service';
+import { db } from '../database/db';
 
 export class WebhookController {
   /**
@@ -43,14 +44,29 @@ export class WebhookController {
     }
   }
 
+  private static isDuplicateEvent(eventId: string, storeSlug: string = 'default'): boolean {
+    if (!eventId) return false;
+    try {
+      const existing = db.prepare('SELECT event_id FROM webhook_events WHERE event_id = ?').get(eventId);
+      if (existing) {
+        console.log(`[Webhook Idempotency] ⚠️ Mükerrer Webhook paketi tespit edildi ve atlandı (eventId: ${eventId}, store: ${storeSlug})`);
+        return true;
+      }
+      db.prepare('INSERT INTO webhook_events (event_id, store_slug) VALUES (?, ?)').run(eventId, storeSlug);
+      return false;
+    } catch (e) {
+      return false;
+    }
+  }
+
   /**
    * Mağazaya Özel Gelen DM Mesajlarını İşleme (POST /api/webhook/:storeSlug)
    */
   public static async handleStoreWebhook(req: Request, res: Response): Promise<void> {
-    const { storeSlug } = req.params;
+    const storeSlugStr = String(req.params.storeSlug || 'default');
     const body = req.body;
 
-    console.log(`[WebhookController] 📩 MAĞAZAYA ÖZEL WEBHOOK PAKETİ GELDİ (${storeSlug}):`);
+    console.log(`[WebhookController] 📩 MAĞAZAYA ÖZEL WEBHOOK PAKETİ GELDİ (${storeSlugStr}):`);
     res.status(200).send('EVENT_RECEIVED');
 
     if (!body || !body.entry) return;
@@ -63,9 +79,15 @@ export class WebhookController {
 
         if (!senderId || !message || message.is_echo) continue;
 
+        // Idempotency: Mükerrer mesaj paketlerini süz
+        const eventId = String(message.mid || `${entry.id}_${messagingEvent.timestamp || Date.now()}`);
+        if (WebhookController.isDuplicateEvent(eventId, storeSlugStr)) {
+          continue;
+        }
+
         let incomingText = message.text || '';
         if (incomingText.trim()) {
-          console.log(`[Store Webhook: ${storeSlug}] 🚀 DM Mesajı İşleniyor (${senderId}): "${incomingText}"`);
+          console.log(`[Store Webhook: ${storeSlugStr}] 🚀 DM Mesajı İşleniyor (${senderId}): "${incomingText}"`);
           WebhookController.processAndReply(senderId, incomingText);
         }
       }

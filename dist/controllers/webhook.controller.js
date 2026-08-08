@@ -5,6 +5,7 @@ const env_1 = require("../config/env");
 const regex_util_1 = require("../utils/regex.util");
 const ai_service_1 = require("../services/ai.service");
 const facebook_service_1 = require("../services/facebook.service");
+const db_1 = require("../database/db");
 class WebhookController {
     /**
      * Facebook / Instagram Webhook Doğrulama (GET /webhook/instagram)
@@ -40,13 +41,29 @@ class WebhookController {
             res.sendStatus(403);
         }
     }
+    static isDuplicateEvent(eventId, storeSlug = 'default') {
+        if (!eventId)
+            return false;
+        try {
+            const existing = db_1.db.prepare('SELECT event_id FROM webhook_events WHERE event_id = ?').get(eventId);
+            if (existing) {
+                console.log(`[Webhook Idempotency] ⚠️ Mükerrer Webhook paketi tespit edildi ve atlandı (eventId: ${eventId}, store: ${storeSlug})`);
+                return true;
+            }
+            db_1.db.prepare('INSERT INTO webhook_events (event_id, store_slug) VALUES (?, ?)').run(eventId, storeSlug);
+            return false;
+        }
+        catch (e) {
+            return false;
+        }
+    }
     /**
      * Mağazaya Özel Gelen DM Mesajlarını İşleme (POST /api/webhook/:storeSlug)
      */
     static async handleStoreWebhook(req, res) {
-        const { storeSlug } = req.params;
+        const storeSlugStr = String(req.params.storeSlug || 'default');
         const body = req.body;
-        console.log(`[WebhookController] 📩 MAĞAZAYA ÖZEL WEBHOOK PAKETİ GELDİ (${storeSlug}):`);
+        console.log(`[WebhookController] 📩 MAĞAZAYA ÖZEL WEBHOOK PAKETİ GELDİ (${storeSlugStr}):`);
         res.status(200).send('EVENT_RECEIVED');
         if (!body || !body.entry)
             return;
@@ -57,9 +74,14 @@ class WebhookController {
                 const message = messagingEvent.message;
                 if (!senderId || !message || message.is_echo)
                     continue;
+                // Idempotency: Mükerrer mesaj paketlerini süz
+                const eventId = String(message.mid || `${entry.id}_${messagingEvent.timestamp || Date.now()}`);
+                if (WebhookController.isDuplicateEvent(eventId, storeSlugStr)) {
+                    continue;
+                }
                 let incomingText = message.text || '';
                 if (incomingText.trim()) {
-                    console.log(`[Store Webhook: ${storeSlug}] 🚀 DM Mesajı İşleniyor (${senderId}): "${incomingText}"`);
+                    console.log(`[Store Webhook: ${storeSlugStr}] 🚀 DM Mesajı İşleniyor (${senderId}): "${incomingText}"`);
                     WebhookController.processAndReply(senderId, incomingText);
                 }
             }

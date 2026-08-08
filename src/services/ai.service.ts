@@ -38,11 +38,12 @@ export class AIService {
     return (process.env.OPENAI_API_KEY || env.openaiApiKey || '').trim().replace(/^["']|["']$/g, '');
   }
 
-  private static getSessionContext(senderId: string): SessionContext {
-    if (!this.sessions.has(senderId)) {
-      this.sessions.set(senderId, { history: [], cart: [] });
+  private static getSessionContext(senderId: string, storeSlug: string = 'default'): SessionContext {
+    const key = `${storeSlug}:ig:${senderId}`;
+    if (!this.sessions.has(key)) {
+      this.sessions.set(key, { history: [], cart: [] });
     }
-    const ctx = this.sessions.get(senderId)!;
+    const ctx = this.sessions.get(key)!;
     if (!ctx.cart) ctx.cart = [];
     return ctx;
   }
@@ -334,10 +335,6 @@ Yalnızca aşağıdaki JSON yapısını döndür (bilinmeyen alanlar için null 
             SET unit_price = ?, shipping_fee = ?, discount = ?, total_price = ?
             WHERE order_id = ?
           `).run(subtotal / Math.max(1, totalQuantity), shippingFee, discount, totalPrice, order.orderId);
-
-          for (const item of ctx.cart) {
-            await StockService.deductStock(item.productCode, item.quantity);
-          }
 
           const cartSummaryText = ctx.cart.map(i => `• ${i.productName} (${i.size}) - ${i.quantity} adet x ${i.unitPrice} TL`).join('\n');
 

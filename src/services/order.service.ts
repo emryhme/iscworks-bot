@@ -70,17 +70,35 @@ export class OrderService {
     const status = 'BEKLEMEDE';
     const senderId = data.senderId || '';
 
-    // İsim ve Soyisim ayırma
     const nameParts = data.customerName.trim().split(' ');
     const firstName = nameParts[0] || data.customerName;
     const lastName = nameParts.slice(1).join(' ') || '';
 
-    const unitPrice = data.unitPrice || 0;
-    const shippingFee = data.shippingFee || 0;
-    const discount = data.discount || 0;
-    const totalPrice = data.totalPrice || 0;
+    let unitPrice = data.unitPrice || 0;
+    const quantity = Math.max(1, Number(data.quantity) || 1);
 
-    try {
+    // Atomik Veritabanı İşlemi (Transaction-Safe Order & Single Stock Deduction)
+    const createOrderTx = db.transaction(() => {
+      // 1. Ürün Yetkili Fiyatı ve Stok Kontrolü
+      const pCode = (data.productCode || '').trim();
+      const productObj = db.prepare('SELECT price, stock FROM products WHERE product_code = ? OR short_code = ?').get(pCode, pCode) as any;
+
+      if (productObj && productObj.price) {
+        unitPrice = productObj.price;
+      }
+
+      const shippingFee = data.shippingFee !== undefined ? data.shippingFee : (unitPrice * quantity >= 1500 ? 0 : 49);
+      const discount = data.discount || 0;
+      const totalPrice = Math.max(0, (unitPrice * quantity) + shippingFee - discount);
+
+      // 2. Stok Adedini Atomik Olarak 1 Kez Düş
+      db.prepare(`
+        UPDATE products 
+        SET stock = MAX(0, stock - ?), updated_at = CURRENT_TIMESTAMP 
+        WHERE product_code = ? OR short_code = ?
+      `).run(quantity, pCode, pCode);
+
+      // 3. Siparişi Veritabanına Ekle
       const stmt = db.prepare(`
         INSERT INTO orders (order_id, first_name, last_name, customer_phone, address, product_code, product_name, size, quantity, unit_price, shipping_fee, discount, total_price, status, sender_id, created_at)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -95,7 +113,7 @@ export class OrderService {
         data.productCode,
         data.productName || data.productCode,
         data.size,
-        data.quantity,
+        quantity,
         unitPrice,
         shippingFee,
         discount,
@@ -105,17 +123,19 @@ export class OrderService {
         createdAt
       );
 
-      console.log(`[OrderService SQLite] 🛍️ Sipariş Veritabanına Kaydedildi: ${orderId} (senderId: ${senderId})`);
+      return { unitPrice, shippingFee, discount, totalPrice };
+    });
+
+    let calcResult = { unitPrice: data.unitPrice || 299, shippingFee: 0, discount: 0, totalPrice: (data.unitPrice || 299) * quantity };
+    try {
+      calcResult = createOrderTx();
+      console.log(`[OrderService SQLite] 🛍️ Sipariş Veritabanına Atomik İşlemle Kaydedildi: ${orderId} (senderId: ${senderId})`);
 
       // Google Sheets 'SİPARİŞLER' Tablosuna Yaz
-      const rowValues = [firstName, lastName, data.customerPhone, data.address, data.quantity, data.productCode, createdAt, orderId, status, senderId];
+      const rowValues = [firstName, lastName, data.customerPhone, data.address, quantity, data.productCode, createdAt, orderId, status, senderId];
       GoogleSheetsService.appendOrderRow(rowValues).catch(() => {});
-
-      // SİPARİŞ VERİLDİĞİNDE ÜRÜN STOĞUNU -1 DÜŞ (-quantity)
-      await StockService.deductStock(data.productCode, Number(data.quantity) || 1, data.size);
-
     } catch (e: any) {
-      console.error('[OrderService SQLite] ❌ Sipariş kaydı başarısız:', e.message);
+      console.error('[OrderService Transaction Error] ❌ Sipariş kaydı başarısız:', e.message);
     }
 
     return {
@@ -126,11 +146,11 @@ export class OrderService {
       productCode: data.productCode,
       productName: data.productName,
       size: data.size,
-      quantity: data.quantity,
-      unitPrice,
-      shippingFee,
-      discount,
-      totalPrice,
+      quantity: quantity,
+      unitPrice: calcResult.unitPrice,
+      shippingFee: calcResult.shippingFee,
+      discount: calcResult.discount,
+      totalPrice: calcResult.totalPrice,
       createdAt,
       status,
       senderId

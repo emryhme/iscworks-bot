@@ -10,6 +10,8 @@ exports.getAllMerchantApplications = getAllMerchantApplications;
 exports.approveMerchantApplication = approveMerchantApplication;
 exports.rejectMerchantApplication = rejectMerchantApplication;
 exports.findMerchantApplicationByIdentifier = findMerchantApplicationByIdentifier;
+exports.hashPassword = hashPassword;
+exports.verifyPassword = verifyPassword;
 const better_sqlite3_1 = __importDefault(require("better-sqlite3"));
 const path_1 = __importDefault(require("path"));
 /**
@@ -110,6 +112,14 @@ function initDatabase() {
       updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
     );
   `);
+    // 7. Webhook Mükerrer İşleme Engelleyici Tablo (webhook_events - Idempotency)
+    exports.db.exec(`
+    CREATE TABLE IF NOT EXISTS webhook_events (
+      event_id TEXT PRIMARY KEY,
+      store_slug TEXT DEFAULT '',
+      processed_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
     // Auto Migrations: Kolonlar eksikse otomatik ekle
     try {
         exports.db.exec(`ALTER TABLE products ADD COLUMN price REAL NOT NULL DEFAULT 299.00;`);
@@ -170,6 +180,7 @@ function initDatabase() {
     CREATE INDEX IF NOT EXISTS idx_orders_store ON orders(store_name);
     CREATE INDEX IF NOT EXISTS idx_campaigns_active ON campaigns(active);
     CREATE INDEX IF NOT EXISTS idx_rewards_sender ON user_rewards(sender_id);
+    CREATE INDEX IF NOT EXISTS idx_webhook_events_id ON webhook_events(event_id);
   `);
     // Varsayılan Başlangıç Stok & Kampanya Verilerini Yükle
     seedInitialProducts();
@@ -275,4 +286,25 @@ function findMerchantApplicationByIdentifier(identifier) {
        OR tc_no = ?
   `);
     return stmt.get(cleanId, cleanId, cleanId, cleanId, cleanId);
+}
+/**
+ * Şifre Güvenliği & Hashleme (PBKDF2 / SHA-512)
+ */
+const crypto_1 = __importDefault(require("crypto"));
+function hashPassword(password) {
+    if (!password)
+        return '';
+    const salt = 'iscworks_salt_2026';
+    const hash = crypto_1.default.pbkdf2Sync(password, salt, 1000, 64, 'sha512').toString('hex');
+    return `pbkdf2:sha512:${hash}`;
+}
+function verifyPassword(password, storedHash) {
+    if (!password || !storedHash)
+        return false;
+    // Düz metin geçiş desteği (eski veriler için)
+    if (!storedHash.startsWith('pbkdf2:')) {
+        return String(password).trim() === String(storedHash).trim();
+    }
+    const computed = hashPassword(password);
+    return computed === storedHash;
 }

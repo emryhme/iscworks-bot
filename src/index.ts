@@ -35,7 +35,9 @@ import {
   getAllMerchantApplications,
   approveMerchantApplication,
   rejectMerchantApplication,
-  findMerchantApplicationByIdentifier
+  findMerchantApplicationByIdentifier,
+  hashPassword,
+  verifyPassword
 } from './database/db';
 
 // AUTH API REST ENDPOINTS (SQLite Database Persistence)
@@ -50,7 +52,8 @@ app.post('/api/auth/register', (req, res) => {
       return res.status(400).json({ success: false, error: 'T.C. Kimlik Numarası 11 haneli olmalıdır.' });
     }
 
-    createMerchantApplication({ fullName, tcNo, phone, email, storeName, plan, password });
+    const hashedPassword = hashPassword(password);
+    createMerchantApplication({ fullName, tcNo, phone, email, storeName, plan, password: hashedPassword });
     return res.json({ success: true, message: 'Başvuru veritabanına başarıyla kaydedildi.' });
   } catch (err: any) {
     if (err.message && err.message.includes('UNIQUE')) {
@@ -122,7 +125,7 @@ app.post('/api/auth/login', (req, res) => {
     }
 
     if (dbApp) {
-      if (String(dbApp.password).trim() !== cleanPass) {
+      if (!verifyPassword(cleanPass, dbApp.password)) {
         return res.status(401).json({ success: false, error: '❌ Hatalı kullanıcı adı veya şifre!' });
       }
 
