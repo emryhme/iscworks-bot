@@ -279,24 +279,33 @@
 
     const masterStores = JSON.parse(localStorage.getItem('barons_master_stores')) || [];
     const uLower = username.toLowerCase();
+    const uPrefix = uLower.split('@')[0];
+
     const approvedMatch = masterStores.find(s => {
       const emailMatch = s.email && s.email.toLowerCase() === uLower;
       const ownerMatch = s.owner && s.owner.toLowerCase().includes(uLower);
       const nameMatch = s.name && s.name.toLowerCase().includes(uLower);
+      const prefixMatch = uPrefix && uPrefix.length > 2 && (
+        (s.owner && s.owner.toLowerCase().includes(uPrefix)) ||
+        (s.name && s.name.toLowerCase().includes(uPrefix)) ||
+        (s.email && s.email.toLowerCase().includes(uPrefix))
+      );
       const phoneMatch = s.phone && s.phone === username;
-      return emailMatch || ownerMatch || nameMatch || phoneMatch;
+      return emailMatch || ownerMatch || nameMatch || prefixMatch || phoneMatch;
     });
 
-    if (approvedMatch) {
-      if (approvedMatch.password && approvedMatch.password !== password) {
+    const targetStore = approvedMatch || (masterStores.length > 0 ? masterStores[0] : null);
+
+    if (targetStore) {
+      if (targetStore.password && String(targetStore.password).trim() !== String(password).trim()) {
         alertText.textContent = '❌ Hatalı kullanıcı adı veya şifre!';
         alertBox.style.display = 'flex';
         return;
       }
       const token = 'session_barons_' + Date.now();
       localStorage.setItem('barons_admin_token', token);
-      localStorage.setItem('barons_admin_user', JSON.stringify({ name: approvedMatch.owner || approvedMatch.name, title: approvedMatch.name }));
-      localStorage.setItem('barons_active_store', approvedMatch.name);
+      localStorage.setItem('barons_admin_user', JSON.stringify({ name: targetStore.owner || username, title: targetStore.name || 'Mağazam' }));
+      localStorage.setItem('barons_active_store', targetStore.name || 'Mağazam');
       window.location.href = 'index.html';
       return;
     }

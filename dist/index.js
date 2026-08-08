@@ -82,10 +82,12 @@ app.post('/api/admin/applications/:id/reject', (req, res) => {
 });
 app.post('/api/auth/login', (req, res) => {
     const { username, password } = req.body || {};
-    const ADMIN_USER = process.env.ADMIN_USER || 'tonystark';
+    const cleanUser = (username || '').trim().toLowerCase();
+    const cleanPass = (password || '').trim();
+    const ADMIN_USER = (process.env.ADMIN_USER || 'tonystark').toLowerCase();
     const ADMIN_PASS = process.env.ADMIN_PASS || 'cintonik!';
-    const isUserValid = (username === ADMIN_USER || username === 'admin' || username === 'emre@iscworks.com' || username === 'iscenkalemre');
-    const isPassValid = (password === ADMIN_PASS || password === 'cintonik!' || password === 'barons2026!');
+    const isUserValid = (cleanUser === ADMIN_USER || cleanUser === 'admin' || cleanUser === 'emre@iscworks.com' || cleanUser === 'iscenkalemre');
+    const isPassValid = (cleanPass === ADMIN_PASS || cleanPass === 'cintonik!' || cleanPass === 'barons2026!');
     if (isUserValid && isPassValid) {
         const token = 'session_barons_' + Date.now() + '_' + Math.random().toString(36).substring(2);
         return res.json({
@@ -100,9 +102,13 @@ app.post('/api/auth/login', (req, res) => {
         });
     }
     try {
-        const dbApp = (0, db_2.findMerchantApplicationByIdentifier)(username);
+        const userPrefix = cleanUser.split('@')[0];
+        let dbApp = (0, db_2.findMerchantApplicationByIdentifier)(cleanUser);
+        if (!dbApp && userPrefix) {
+            dbApp = (0, db_2.findMerchantApplicationByIdentifier)(userPrefix);
+        }
         if (dbApp) {
-            if (dbApp.password !== password) {
+            if (String(dbApp.password).trim() !== cleanPass) {
                 return res.status(401).json({ success: false, error: '❌ Hatalı kullanıcı adı veya şifre!' });
             }
             if (dbApp.status === 'pending') {
