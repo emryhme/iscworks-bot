@@ -2504,3 +2504,126 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 });
+
+// GOOGLE SHEET & CSV İÇE / DIŞA AKTARMA MOTORU (MAĞAZA ÖZEL)
+async function importFromCustomGoogleSheet() {
+  const inputElem = document.getElementById('customSheetImportUrl') || document.getElementById('sysGoogleSheetId');
+  if (!inputElem) return;
+
+  let val = inputElem.value.trim();
+  if (!val) {
+    showToast('Lütfen Google Sheet ID veya paylaşım bağlantısını girin.', 'error');
+    return;
+  }
+
+  let sheetId = val;
+  const match = val.match(/\/d\/([a-zA-Z0-9-_]+)/);
+  if (match && match[1]) {
+    sheetId = match[1];
+  }
+
+  const btn = document.getElementById('btnImportSheet');
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Tablo Çekiliyor...';
+  }
+
+  try {
+    const csvUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:csv`;
+    const res = await fetch(csvUrl);
+    
+    if (!res.ok) {
+      throw new Error('Google Sheet verisi okunamadı. Lütfen tablonuzun "Bağlantıya sahip herkes görebilir" olarak ayarlandığından emin olun.');
+    }
+
+    const csvText = await res.text();
+    const lines = csvText.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+
+    if (lines.length <= 1) {
+      throw new Error('Google Sheet tablosu boş veya geçersiz formatta.');
+    }
+
+    const importedProducts = [];
+    const storeName = getActiveStoreName();
+
+    for (let i = 1; i < lines.length; i++) {
+      const cols = lines[i].split(',').map(c => c.replace(/^"|"$/g, '').trim());
+      if (cols.length >= 2) {
+        const sc = (cols[0] || 'STK').toUpperCase();
+        const name = cols[1] || 'İsimsiz Ürün';
+        const color = cols[2] || 'Standart';
+        const size = (cols[3] || 'M').toUpperCase();
+        const stock = Number(cols[4]) || 100;
+        const price = Number(cols[5]) || 299;
+        const category = cols[6] || 'Genel';
+        const code = cols[7] ? cols[7].toUpperCase() : `${sc}-${size}`;
+
+        importedProducts.push({
+          shortCode: sc,
+          productCode: code,
+          name: name,
+          color: color,
+          size: size,
+          stock: stock,
+          price: price,
+          category: category,
+          storeName: storeName
+        });
+      }
+    }
+
+    if (importedProducts.length === 0) {
+      throw new Error('Tablodan aktarılacak geçerli ürün verisi okunamadı.');
+    }
+
+    const currentProducts = getStoreProducts();
+    const mergedProducts = [...importedProducts, ...currentProducts];
+    saveStoreProducts(mergedProducts);
+
+    showToast(`🎉 Başarılı! Google Sheet tablosundan ${importedProducts.length} adet stok ürünü veritabanınıza içe aktarıldı!`, 'success');
+    
+    setTimeout(() => {
+      window.location.href = 'index.html';
+    }, 1200);
+
+  } catch (err) {
+    showToast(`❌ İçe Aktarma Hatası: ${err.message}`, 'error');
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = '<i class="fa-solid fa-file-import"></i> Google Sheet\'ten Stok İçe Aktar (Import Products)';
+    }
+  }
+}
+
+function exportStoreDataToCSV() {
+  const storeProducts = getStoreProducts();
+  if (storeProducts.length === 0) {
+    showToast('İndirilecek stok verisi bulunmuyor.', 'info');
+    return;
+  }
+
+  let csvContent = 'data:text/csv;charset=utf-8,KODU,ISIM,RENK,BEDEN,STOK,FIYAT,KATEGORI\n';
+  storeProducts.forEach(p => {
+    const row = [
+      p.shortCode || '',
+      `"${p.name || ''}"`,
+      `"${p.color || ''}"`,
+      p.size || '',
+      p.stock || 0,
+      p.price || 0,
+      `"${p.category || ''}"`
+    ].join(',');
+    csvContent += row + '\n';
+  });
+
+  const encodedUri = encodeURI(csvContent);
+  const link = document.createElement('a');
+  link.setAttribute('href', encodedUri);
+  link.setAttribute('download', `${getActiveStoreName()}_stok_verileri.csv`);
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+
+  showToast('📥 Mağaza stok verileriniz CSV dosyası olarak indirildi.', 'success');
+}

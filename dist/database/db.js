@@ -116,6 +116,10 @@ function initDatabase() {
     }
     catch (e) { }
     try {
+        exports.db.exec(`ALTER TABLE products ADD COLUMN store_name TEXT DEFAULT '';`);
+    }
+    catch (e) { }
+    try {
         exports.db.exec(`ALTER TABLE orders ADD COLUMN unit_price REAL NOT NULL DEFAULT 0;`);
     }
     catch (e) { }
@@ -136,6 +140,10 @@ function initDatabase() {
     }
     catch (e) { }
     try {
+        exports.db.exec(`ALTER TABLE orders ADD COLUMN store_name TEXT DEFAULT '';`);
+    }
+    catch (e) { }
+    try {
         exports.db.exec(`ALTER TABLE campaigns ADD COLUMN start_date TEXT DEFAULT NULL;`);
     }
     catch (e) { }
@@ -143,13 +151,23 @@ function initDatabase() {
         exports.db.exec(`ALTER TABLE campaigns ADD COLUMN end_date TEXT DEFAULT NULL;`);
     }
     catch (e) { }
+    try {
+        exports.db.exec(`ALTER TABLE campaigns ADD COLUMN store_name TEXT DEFAULT '';`);
+    }
+    catch (e) { }
+    try {
+        exports.db.exec(`ALTER TABLE user_rewards ADD COLUMN store_name TEXT DEFAULT '';`);
+    }
+    catch (e) { }
     // İndeksler (Sorgu Hızlandırma)
     exports.db.exec(`
     CREATE INDEX IF NOT EXISTS idx_products_code ON products(product_code);
     CREATE INDEX IF NOT EXISTS idx_products_short ON products(short_code);
+    CREATE INDEX IF NOT EXISTS idx_products_store ON products(store_name);
     CREATE INDEX IF NOT EXISTS idx_orders_id ON orders(order_id);
     CREATE INDEX IF NOT EXISTS idx_orders_phone ON orders(customer_phone);
     CREATE INDEX IF NOT EXISTS idx_orders_sender ON orders(sender_id);
+    CREATE INDEX IF NOT EXISTS idx_orders_store ON orders(store_name);
     CREATE INDEX IF NOT EXISTS idx_campaigns_active ON campaigns(active);
     CREATE INDEX IF NOT EXISTS idx_rewards_sender ON user_rewards(sender_id);
   `);
