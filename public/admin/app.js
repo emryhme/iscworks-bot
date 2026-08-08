@@ -1882,3 +1882,164 @@ async function saveSystemSettingsPage() {
     showToast('Ayarlar kaydedilirken hata oluştu.', 'error');
   }
 }
+
+// MASTER SaaS STORE & CLIENT MANAGEMENT ENGINE
+state.masterStores = JSON.parse(localStorage.getItem('barons_master_stores')) || [
+  { id: 1, name: "BARON'S SILLAGE", owner: "Tony Stark (Patron)", phone: "0532 999 8877", ig: "@barons_sillage", plan: "Enterprise VIP", botStatus: "Aktif", ciro: "₺485.200" },
+  { id: 2, name: "Nova Perfume Store", owner: "Emre İşcenkal", phone: "0533 111 2233", ig: "@nova_perfume", plan: "Enterprise VIP", botStatus: "Aktif", ciro: "₺284.650" },
+  { id: 3, name: "Lüks Fragrance Hub", owner: "Caner Yılmaz", phone: "0535 444 5566", ig: "@luks_fragrance", plan: "Pro Store", botStatus: "Aktif", ciro: "₺192.400" },
+  { id: 4, name: "Sillage Noir Boutique", owner: "Selin Aksoy", phone: "0536 777 8899", ig: "@sillage_noir", plan: "Pro Store", botStatus: "Deneme Süresi", ciro: "₺142.100" },
+  { id: 5, name: "Royal Essence Turkey", owner: "Murat Demir", phone: "0537 222 3344", ig: "@royal_essence_tr", plan: "Basic Store", botStatus: "Aktif", ciro: "₺118.500" },
+  { id: 6, name: "Parfüm Sepeti VIP", owner: "Zeynep Kaya", phone: "0538 555 6677", ig: "@parfum_sepeti_vip", plan: "Basic Store", botStatus: "Durduruldu", ciro: "₺94.300" },
+  { id: 7, name: "Oud & Amber Atelier", owner: "Burak Öztürk", phone: "0539 888 9900", ig: "@oud_amber_tr", plan: "Pro Store", botStatus: "Aktif", ciro: "₺86.750" },
+  { id: 8, name: "Elite Scent World", owner: "Ece Güneş", phone: "0540 123 4567", ig: "@elite_scent_world", plan: "Enterprise VIP", botStatus: "Aktif", ciro: "₺79.000" }
+];
+
+function renderMasterStoresTable() {
+  const tbody = document.getElementById('storesTableBody');
+  const countText = document.getElementById('storesCountText');
+  const statTotalStores = document.getElementById('statTotalStores');
+  const searchInput = document.getElementById('storeSearchInput');
+  if (!tbody) return;
+
+  let query = (searchInput?.value || '').toLowerCase().trim();
+  let filtered = state.masterStores.filter(s => 
+    s.name.toLowerCase().includes(query) || 
+    s.owner.toLowerCase().includes(query) || 
+    s.ig.toLowerCase().includes(query)
+  );
+
+  if (countText) countText.textContent = `${filtered.length} Mağaza Listelendi`;
+  if (statTotalStores) statTotalStores.textContent = `${state.masterStores.length} Mağaza`;
+
+  if (filtered.length === 0) {
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="8" style="text-align:center; padding:40px; color:#6b7280;">
+          Arama kriterine uygun dükkan bulunamadı.
+        </td>
+      </tr>
+    `;
+    return;
+  }
+
+  tbody.innerHTML = filtered.map(s => {
+    let statusBadge = '<span class="status-badge in-stock">🟢 Aktif Bot</span>';
+    if (s.botStatus === 'Deneme Süresi') {
+      statusBadge = '<span class="status-badge low-stock">🟡 Deneme Süresi</span>';
+    } else if (s.botStatus === 'Durduruldu') {
+      statusBadge = '<span class="status-badge out-stock">🔴 Durduruldu</span>';
+    }
+
+    return `
+      <tr>
+        <td>
+          <div class="product">
+            <div class="store-avatar" style="width:30px; height:30px; border-radius:6px; background:#ff990015; color:#ff9900; font-weight:800; display:grid; place-items:center; font-size:11px;">
+              ${escapeHtml(s.name.charAt(0))}
+            </div>
+            <div>
+              <strong class="product-name" style="font-size:12px;">${escapeHtml(s.name)}</strong>
+              <div class="product-sku">ID: #SHOP-${s.id}</div>
+            </div>
+          </div>
+        </td>
+        <td><strong>${escapeHtml(s.owner)}</strong></td>
+        <td><small class="muted">${escapeHtml(s.phone)}</small></td>
+        <td><span class="code-tag" style="color:#e1306c;">${escapeHtml(s.ig)}</span></td>
+        <td><span class="size-pill">${escapeHtml(s.plan)}</span></td>
+        <td>${statusBadge}</td>
+        <td><strong style="color:#10b981;">${escapeHtml(s.ciro)}</strong></td>
+        <td>
+          <div class="action-btn-group">
+            <button class="btn btn-sm btn-primary" onclick="impersonateStore('${escapeHtml(s.name)}')">
+              <i class="fa-solid fa-right-to-bracket"></i> Mağazaya Sız
+            </button>
+            <button class="btn btn-sm btn-secondary" onclick="toggleStoreBot(${s.id})">
+              <i class="fa-solid fa-power-off"></i> Bot Aç/Kapat
+            </button>
+            <button class="btn btn-sm btn-delete" onclick="deleteStore(${s.id})">
+              <i class="fa-solid fa-trash"></i> Sil
+            </button>
+          </div>
+        </td>
+      </tr>
+    `;
+  }).join('');
+}
+
+function openNewStoreModal() {
+  const modal = document.getElementById('newStoreModal');
+  if (modal) modal.style.display = 'flex';
+}
+
+function closeNewStoreModal() {
+  const modal = document.getElementById('newStoreModal');
+  if (modal) modal.style.display = 'none';
+}
+
+function impersonateStore(storeName) {
+  showToast(`🏢 ${storeName} dükkanına sızılıyor... Yönetim konsolu aktif edildi!`, 'success');
+  const storeAvatar = document.querySelector('.store-info strong');
+  if (storeAvatar) storeAvatar.textContent = storeName;
+}
+
+function toggleStoreBot(storeId) {
+  const store = state.masterStores.find(s => s.id === storeId);
+  if (!store) return;
+
+  store.botStatus = (store.botStatus === 'Aktif') ? 'Durduruldu' : 'Aktif';
+  localStorage.setItem('barons_master_stores', JSON.stringify(state.masterStores));
+  showToast(`🤖 ${store.name} Gemini AI Bot durumu '${store.botStatus}' olarak değiştirildi.`, 'info');
+  renderMasterStoresTable();
+}
+
+function deleteStore(storeId) {
+  if (!confirm('Bu dükkanı sistemden silmek istediğinize emin misiniz?')) return;
+  state.masterStores = state.masterStores.filter(s => s.id !== storeId);
+  localStorage.setItem('barons_master_stores', JSON.stringify(state.masterStores));
+  showToast('🗑️ Dükkan sistemden silindi.', 'success');
+  renderMasterStoresTable();
+}
+
+// Form event listener for new store form
+document.addEventListener('DOMContentLoaded', () => {
+  const form = document.getElementById('newStoreForm');
+  const searchInput = document.getElementById('storeSearchInput');
+
+  if (searchInput) {
+    searchInput.addEventListener('input', renderMasterStoresTable);
+  }
+
+  if (form) {
+    form.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const name = document.getElementById('newStoreName')?.value.trim();
+      const owner = document.getElementById('newStoreOwner')?.value.trim();
+      const phone = document.getElementById('newStorePhone')?.value.trim();
+      const ig = document.getElementById('newStoreIg')?.value.trim();
+      const plan = document.getElementById('newStorePlan')?.value;
+      const botStatus = document.getElementById('newStoreBotStatus')?.value;
+
+      if (!name || !owner) return;
+
+      const newId = Date.now();
+      state.masterStores.unshift({
+        id: newId,
+        name,
+        owner,
+        phone: phone || '0532 000 0000',
+        ig: ig.startsWith('@') ? ig : `@${ig}`,
+        plan: plan || 'Enterprise VIP',
+        botStatus: botStatus || 'Aktif',
+        ciro: '₺0'
+      });
+
+      localStorage.setItem('barons_master_stores', JSON.stringify(state.masterStores));
+      showToast(`🚀 ${name} yeni dükkan olarak sisteme kaydedildi!`, 'success');
+      closeNewStoreModal();
+      form.reset();
+      renderMasterStoresTable();
+    });
+  }
+});
