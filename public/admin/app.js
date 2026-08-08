@@ -16,7 +16,17 @@ const state = {
 };
 
 function checkAuthStatus() {
-  if (window.location.pathname.endsWith('login.html')) return;
+  const path = window.location.pathname;
+  if (path.endsWith('login.html') || path.endsWith('master-login.html')) return;
+
+  if (path.endsWith('master.html')) {
+    const isMaster = localStorage.getItem('iscworks_is_master_admin');
+    if (isMaster !== 'true') {
+      window.location.href = 'master-login.html';
+      return;
+    }
+  }
+
   const token = localStorage.getItem('barons_admin_token');
   if (!token) {
     window.location.href = 'login.html';
