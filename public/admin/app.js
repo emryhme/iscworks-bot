@@ -409,11 +409,34 @@ function processIncomingOrders(newOrdersList) {
   return hasNew;
 }
 
-// Update Top Metric Cards & Real Analytics
+function getFilteredOrders() {
+  const isMaster = (localStorage.getItem('iscworks_is_master_admin') === 'true');
+  const storeName = getActiveStoreName();
+
+  if (isMaster || storeName.toLowerCase().includes('baron')) {
+    return state.orders || [];
+  }
+
+  const key = 'barons_orders_' + storeName.toLowerCase().replace(/[^a-z0-9]/g, '_');
+  const saved = localStorage.getItem(key);
+  if (saved !== null) {
+    try {
+      return JSON.parse(saved);
+    } catch (e) {
+      return [];
+    }
+  }
+  return [];
+}
+
+// Update Top Metric Cards & Real Analytics (Mağaza Özel Dinamik Hesaplama)
 function updateMetrics() {
-  const totalProducts = state.products.length;
-  const totalStock = state.products.reduce((acc, p) => acc + (Number(p.stock) || 0), 0);
-  const totalOrders = state.orders.length;
+  const currentProducts = getStoreProducts();
+  const currentOrders = getFilteredOrders();
+
+  const totalProducts = currentProducts.length;
+  const totalStock = currentProducts.reduce((acc, p) => acc + (Number(p.stock) || 0), 0);
+  const totalOrders = currentOrders.length;
 
   const statTotalProducts = document.getElementById('statTotalProducts');
   const statTotalStock = document.getElementById('statTotalStock');
@@ -424,6 +447,17 @@ function updateMetrics() {
   if (statTotalStock) statTotalStock.textContent = totalStock.toLocaleString('tr-TR');
   if (statTotalOrders) statTotalOrders.textContent = totalOrders.toLocaleString('tr-TR');
   if (ordersBadgeCount) ordersBadgeCount.textContent = totalOrders;
+
+  // AI Asistan Kartı Güncelleme (F.R.I.D.A.Y. / Mağaza AI)
+  const metricCards = document.querySelectorAll('.metric-card');
+  if (metricCards.length >= 4) {
+    const aiValElem = metricCards[3].querySelector('.metric-value');
+    const aiSubElem = metricCards[3].querySelector('.metric-sub');
+    const isMaster = (localStorage.getItem('iscworks_is_master_admin') === 'true');
+    const storeName = getActiveStoreName();
+    if (aiValElem) aiValElem.textContent = isMaster ? 'F.R.I.D.A.Y.' : `${storeName} AI`;
+    if (aiSubElem) aiSubElem.textContent = isMaster ? 'Tony Stark Özel Asistanı' : 'Aktif Otonom Mağaza Botu';
+  }
 
   // 1. Gerçek Ciro ve Sipariş Trendi Çizgi Grafiğini Çiz
   renderRevenueTrendLineChart();

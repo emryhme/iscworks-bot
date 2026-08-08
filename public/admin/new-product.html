@@ -215,6 +215,11 @@
     document.getElementById("sidebar").classList.toggle("open");
   }
   lucide.createIcons();
+  document.addEventListener('DOMContentLoaded', () => {
+    if (typeof setupEventListeners === 'function') {
+      setupEventListeners();
+    }
+  });
 </script>
 </body>
 </html>
