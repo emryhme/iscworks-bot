@@ -1936,6 +1936,7 @@ state.masterStores = JSON.parse(localStorage.getItem('barons_master_stores')) ||
 ];
 
 function renderMasterStoresTable() {
+  renderPendingApplicationsTable();
   const tbody = document.getElementById('storesTableBody');
   const countText = document.getElementById('storesCountText');
   const statTotalStores = document.getElementById('statTotalStores');
@@ -2006,6 +2007,118 @@ function renderMasterStoresTable() {
       </tr>
     `;
   }).join('');
+}
+
+// PENDING STORE APPLICATIONS (PATRON APPROVAL ENGINE)
+state.pendingApplications = JSON.parse(localStorage.getItem('barons_pending_applications')) || [
+  {
+    id: 101,
+    fullName: "Mehmet Demir",
+    tcNo: "12345678901",
+    phone: "0533 999 8811",
+    email: "mehmet@luxescent.com",
+    storeName: "Luxe Scent Boutique",
+    password: "pass",
+    status: "İnceleme Bekliyor",
+    createdAt: "08.08.2026 13:45"
+  },
+  {
+    id: 102,
+    fullName: "Ayşe Yılmaz",
+    tcNo: "98765432109",
+    phone: "0535 444 3322",
+    email: "ayse@parfumatolye.com",
+    storeName: "Parfüm Atölyesi TR",
+    password: "pass",
+    status: "İnceleme Bekliyor",
+    createdAt: "08.08.2026 14:02"
+  }
+];
+
+function renderPendingApplicationsTable() {
+  const tbody = document.getElementById('pendingAppsTableBody');
+  const countText = document.getElementById('pendingAppsCountText');
+  if (!tbody) return;
+
+  state.pendingApplications = JSON.parse(localStorage.getItem('barons_pending_applications')) || state.pendingApplications;
+
+  if (countText) {
+    countText.textContent = state.pendingApplications.length > 0
+      ? `⚠️ ${state.pendingApplications.length} Mağaza Başvurusu Patron Onayı Bekliyor`
+      : '✓ İnceleme bekleyen yeni başvuru bulunmuyor';
+  }
+
+  if (state.pendingApplications.length === 0) {
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="7" style="text-align:center; padding:30px; color:#94a3b8; font-size:12px;">
+          ✓ Onay bekleyen mağaza başvurusu bulunmuyor.
+        </td>
+      </tr>
+    `;
+    return;
+  }
+
+  tbody.innerHTML = state.pendingApplications.map(app => `
+    <tr>
+      <td><strong style="color:#f59e0b;">${escapeHtml(app.storeName)}</strong></td>
+      <td><strong>${escapeHtml(app.fullName)}</strong></td>
+      <td><span class="code-tag" style="color:#a78bfa;">${escapeHtml(app.tcNo)}</span></td>
+      <td>
+        <small style="display:block; color:#ffffff;">${escapeHtml(app.phone)}</small>
+        <small class="muted">${escapeHtml(app.email)}</small>
+      </td>
+      <td><small class="muted">${escapeHtml(app.createdAt)}</small></td>
+      <td><span class="status-badge low-stock">🟡 İnceleme Bekliyor</span></td>
+      <td>
+        <div class="action-btn-group">
+          <button class="btn btn-sm btn-primary" style="background:#10b981; border-color:#10b981;" onclick="approveApplication(${app.id})">
+            <i class="fa-solid fa-check"></i> Onayla & Aktif Et
+          </button>
+          <button class="btn btn-sm btn-delete" onclick="rejectApplication(${app.id})">
+            <i class="fa-solid fa-xmark"></i> Reddet
+          </button>
+        </div>
+      </td>
+    </tr>
+  `).join('');
+}
+
+function approveApplication(appId) {
+  const appIndex = state.pendingApplications.findIndex(a => a.id === appId);
+  if (appIndex === -1) return;
+
+  const app = state.pendingApplications[appIndex];
+  
+  // Add to master stores list
+  state.masterStores.unshift({
+    id: Date.now(),
+    name: app.storeName,
+    owner: app.fullName,
+    phone: app.phone,
+    ig: `@${app.storeName.toLowerCase().replace(/\s+/g, '_')}`,
+    plan: 'Enterprise VIP',
+    botStatus: 'Aktif',
+    ciro: '₺0'
+  });
+
+  // Remove from pending
+  state.pendingApplications.splice(appIndex, 1);
+
+  localStorage.setItem('barons_pending_applications', JSON.stringify(state.pendingApplications));
+  localStorage.setItem('barons_master_stores', JSON.stringify(state.masterStores));
+
+  showToast(`🎉 ${app.storeName} başvurusu onaylandı ve mağaza aktif edildi!`, 'success');
+  renderPendingApplicationsTable();
+  renderMasterStoresTable();
+}
+
+function rejectApplication(appId) {
+  if (!confirm('Bu başvuruyu reddetmek istediğinize emin misiniz?')) return;
+  state.pendingApplications = state.pendingApplications.filter(a => a.id !== appId);
+  localStorage.setItem('barons_pending_applications', JSON.stringify(state.pendingApplications));
+  showToast('❌ Başvuru reddedildi.', 'info');
+  renderPendingApplicationsTable();
 }
 
 function openNewStoreModal() {

@@ -186,11 +186,42 @@
             </div>
         </div>
 
+        <!-- PENDING APPLICATIONS TABLE CARD (PATRON REVIEW) -->
+        <div class="card table-card" style="margin-bottom:30px; border-color:#f59e0b30;">
+            <div class="table-header" style="background:rgba(245,158,11,0.05);">
+                <div>
+                    <div class="table-title" style="color:#f59e0b; display:flex; align-items:center; gap:8px;">
+                        <i data-lucide="clock-rotate-left" size="18"></i> 📋 İnceleme Bekleyen Mağaza Başvuruları (Patron Onayı)
+                    </div>
+                    <span style="font-size:10px;color:#94a3b8;" id="pendingAppsCountText">İnceleme bekleyen yeni başvuru bulunmuyor</span>
+                </div>
+            </div>
+
+            <div class="table-responsive">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>MAĞAZA İSMİ</th>
+                            <th>BAŞVURAN (AD SOYAD)</th>
+                            <th>T.C. KİMLİK NO</th>
+                            <th>İLETİŞİM / TEL / E-POSTA</th>
+                            <th>BAŞVURU TARİHİ</th>
+                            <th>DURUM</th>
+                            <th>PATRON ONAY İŞLEMİ</th>
+                        </tr>
+                    </thead>
+                    <tbody id="pendingAppsTableBody">
+                        <!-- Pending Applications Dynamic Rows -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
         <!-- STORES TABLE CARD -->
         <div class="card table-card">
             <div class="table-header">
                 <div>
-                    <div class="table-title">Tüm Kiracı Mağazalar & Yönetim Paneli Erişimleri</div>
+                    <div class="table-title">Tüm Aktif Kiracı Mağazalar & Yönetim Paneli Erişimleri</div>
                     <span style="font-size:10px;color:#6b7280;" id="storesCountText">8 Mağaza Listelendi</span>
                 </div>
             </div>
