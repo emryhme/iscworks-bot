@@ -701,14 +701,104 @@ function selectOrderForReward(senderId) {
   }
 }
 
+function getStoreProductsKey() {
+  const storeName = getActiveStoreName();
+  return 'barons_products_' + storeName.toLowerCase().replace(/[^a-z0-9]/g, '_');
+}
+
+function getStoreProducts() {
+  const isMaster = (localStorage.getItem('iscworks_is_master_admin') === 'true');
+  const storeName = getActiveStoreName();
+
+  // Master veya varsayılan BARON'S SILLAGE mağazası ise genel kataloğu göster
+  if (isMaster || storeName.toLowerCase().includes('baron')) {
+    return state.products;
+  }
+
+  // Yeni açılan satıcı mağazaları için özel izole katalog
+  const key = getStoreProductsKey();
+  const saved = localStorage.getItem(key);
+  if (saved !== null) {
+    try {
+      return JSON.parse(saved);
+    } catch (e) {
+      return [];
+    }
+  }
+
+  // Henüz ürün eklememiş yeni mağaza -> 0 ÜRÜN İLE BAŞLAR (SIFIRDAN!)
+  return [];
+}
+
+function saveStoreProducts(productsArray) {
+  const isMaster = (localStorage.getItem('iscworks_is_master_admin') === 'true');
+  const storeName = getActiveStoreName();
+
+  if (isMaster || storeName.toLowerCase().includes('baron')) {
+    state.products = productsArray;
+    localStorage.setItem('barons_products_default', JSON.stringify(productsArray));
+  } else {
+    const key = getStoreProductsKey();
+    localStorage.setItem(key, JSON.stringify(productsArray));
+  }
+}
+
+function handleNewProductSubmit(e) {
+  e.preventDefault();
+  const shortCodeElem = document.getElementById('shortCode');
+  const sizeElem = document.getElementById('sizeInput');
+  const nameElem = document.getElementById('productName');
+  const colorElem = document.getElementById('colorInput');
+  const stockElem = document.getElementById('stockInput');
+  const priceElem = document.getElementById('priceInput');
+  const catElem = document.getElementById('categoryInput');
+
+  if (!shortCodeElem || !nameElem) return;
+
+  const sc = shortCodeElem.value.toUpperCase().trim();
+  const size = sizeElem ? sizeElem.value.toUpperCase().trim() : 'M';
+  const code = `${sc}-${size}`;
+  const name = nameElem.value.trim();
+  const color = colorElem ? colorElem.value.trim() : 'Standart';
+  const stock = Number(stockElem.value) || 0;
+  const price = Number(priceElem.value) || 299;
+  const category = catElem ? catElem.value.trim() : 'Genel';
+
+  const newProduct = {
+    shortCode: sc,
+    productCode: code,
+    name: name,
+    color: color,
+    size: size,
+    stock: stock,
+    price: price,
+    category: category,
+    storeName: getActiveStoreName()
+  };
+
+  const currentProducts = getStoreProducts();
+  currentProducts.unshift(newProduct);
+  saveStoreProducts(currentProducts);
+
+  showToast(`🎉 "${name}" (${code}) mağazanıza başarıyla eklendi!`, 'success');
+  
+  const form = document.getElementById('newProductForm');
+  if (form) form.reset();
+
+  setTimeout(() => {
+    window.location.href = 'index.html';
+  }, 1000);
+}
+
 // Render Products Table
 function renderProductsTable() {
   const productsTableBody = document.getElementById('productsTableBody');
   const productsTableCount = document.getElementById('productsTableCount');
   if (!productsTableBody) return;
 
+  const currentProducts = getStoreProducts();
   const query = state.searchQuery;
-  const filtered = state.products.filter(p => {
+  const filtered = currentProducts.filter(p => {
     const shortCode = (p.shortCode || '').toLowerCase();
     const code = (p.productCode || '').toLowerCase();
     const name = (p.name || '').toLowerCase();
@@ -722,8 +812,10 @@ function renderProductsTable() {
   if (filtered.length === 0) {
     productsTableBody.innerHTML = `
       <tr>
-        <td colspan="9" class="loading-cell">
-          <i class="fa-solid fa-box-open"></i> Hiç ürün bulunamadı.
+        <td colspan="9" class="loading-cell" style="padding: 35px 20px; text-align: center; color: #94a3b8;">
+          <i class="fa-solid fa-box-open" style="font-size: 24px; margin-bottom: 8px; display: block; color: #64748b;"></i>
+          Mağazanızda henüz stoklu ürün bulunmuyor.<br>
+          <small style="color: #64748b; font-size: 11px;">"Yeni Ürün Girişi" sayfasından veya F.R.I.D.A.Y. AI Asistanı ile mağazanıza sıfırdan ürün ekleyebilirsiniz.</small>
         </td>
       </tr>
     `;
