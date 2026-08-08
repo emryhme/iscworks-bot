@@ -15,9 +15,75 @@ const state = {
   isFetching: false
 };
 
+function checkAuthStatus() {
+  if (window.location.pathname.endsWith('login.html')) return;
+  const token = localStorage.getItem('barons_admin_token');
+  if (!token) {
+    window.location.href = 'login.html';
+  }
+}
+
+function logoutUser() {
+  localStorage.removeItem('barons_admin_token');
+  localStorage.removeItem('barons_admin_user');
+  showToast('👋 Çıkış yapıldı. Giriş ekranına yönlendiriliyorsunuz...', 'info');
+  setTimeout(() => {
+    window.location.href = 'login.html';
+  }, 600);
+}
+
+function setupUserDropdown() {
+  const userElem = document.querySelector('.user');
+  if (!userElem) return;
+
+  userElem.style.cursor = 'pointer';
+  userElem.style.position = 'relative';
+
+  let dropdown = document.getElementById('userProfileDropdown');
+  if (!dropdown) {
+    dropdown = document.createElement('div');
+    dropdown.id = 'userProfileDropdown';
+    dropdown.style.cssText = `
+      position: absolute; top: 50px; right: 0; width: 220px;
+      background: #ffffff; border: 1px solid #e5e7eb; border-radius: 10px;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.1); display: none; flex-direction: column;
+      padding: 8px 0; z-index: 9999; animation: modalFadeIn 0.2s ease;
+    `;
+    dropdown.innerHTML = `
+      <div style="padding: 10px 16px; border-bottom: 1px solid #f0f0f0;">
+        <strong style="font-size: 12px; display: block; color: #111827;">Tony Stark</strong>
+        <span style="font-size: 10px; color: #6b7280;">Mağaza Sahibi (Patron)</span>
+      </div>
+      <a href="api-settings.html" style="padding: 10px 16px; font-size: 11px; color: #374151; text-decoration: none; display: flex; align-items: center; gap: 8px;" onmouseover="this.style.background='#f3f4f6'" onmouseout="this.style.background='transparent'">
+        <i class="fa-solid fa-sliders" style="color: #ff9900;"></i> API & AI Kişiselleştirme
+      </a>
+      <a href="settings.html" style="padding: 10px 16px; font-size: 11px; color: #374151; text-decoration: none; display: flex; align-items: center; gap: 8px;" onmouseover="this.style.background='#f3f4f6'" onmouseout="this.style.background='transparent'">
+        <i class="fa-solid fa-gear" style="color: #3b82f6;"></i> Fiyat & Kargo Ayarları
+      </a>
+      <div style="border-top: 1px solid #f0f0f0; margin-top: 4px; padding-top: 4px;">
+        <div onclick="logoutUser()" style="padding: 10px 16px; font-size: 11px; color: #ef4444; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 8px;" onmouseover="this.style.background='#fef2f2'" onmouseout="this.style.background='transparent'">
+          <i class="fa-solid fa-right-from-bracket"></i> Çıkış Yap (Logout)
+        </div>
+      </div>
+    `;
+    userElem.appendChild(dropdown);
+  }
+
+  userElem.onclick = (e) => {
+    e.stopPropagation();
+    dropdown.style.display = (dropdown.style.display === 'flex') ? 'none' : 'flex';
+  };
+
+  document.addEventListener('click', () => {
+    dropdown.style.display = 'none';
+  });
+}
+
 // Initialize Application Robustly (Supports readyState interactive & complete)
 function initApp() {
+  checkAuthStatus();
   setupEventListeners();
+  setupUserDropdown();
   fetchData();
   fetchCampaigns();
   fetchSettings();

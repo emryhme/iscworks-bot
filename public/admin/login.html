@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BARON'S SILLAGE — Admin Giriş Portalı</title>
+
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="styles.css">
+
+  <style>
+    body {
+      background: #0f172a;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      margin: 0;
+      padding: 20px;
+    }
+
+    .login-card {
+      width: 100%;
+      max-width: 420px;
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 16px;
+      padding: 35px 30px;
+      box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5);
+      color: white;
+    }
+
+    .login-header {
+      text-align: center;
+      margin-bottom: 28px;
+    }
+
+    .login-logo {
+      width: 54px;
+      height: 54px;
+      border-radius: 14px;
+      background: var(--primary);
+      color: #111827;
+      display: grid;
+      place-items: center;
+      margin: 0 auto 14px;
+      font-size: 24px;
+      box-shadow: 0 8px 20px rgba(255,153,0,0.3);
+    }
+
+    .login-header h1 {
+      font-size: 20px;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+      margin-bottom: 6px;
+    }
+
+    .login-header p {
+      font-size: 12px;
+      color: #94a3b8;
+    }
+
+    .form-group {
+      margin-bottom: 18px;
+    }
+
+    .form-group label {
+      display: block;
+      font-size: 11px;
+      font-weight: 600;
+      color: #cbd5e1;
+      margin-bottom: 6px;
+    }
+
+    .input-wrapper {
+      position: relative;
+    }
+
+    .input-wrapper i {
+      position: absolute;
+      left: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: #64748b;
+      font-size: 14px;
+    }
+
+    .input-wrapper input {
+      width: 100%;
+      padding: 11px 12px 11px 38px;
+      border-radius: 8px;
+      border: 1px solid #334155;
+      background: #0f172a;
+      color: white;
+      font-size: 13px;
+      outline: none;
+      transition: all 0.2s;
+    }
+
+    .input-wrapper input:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(255,153,0,0.15);
+    }
+
+    .login-options {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 11px;
+      margin-bottom: 24px;
+      color: #94a3b8;
+    }
+
+    .login-options label {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      cursor: pointer;
+    }
+
+    .btn-login {
+      width: 100%;
+      height: 44px;
+      background: var(--primary);
+      color: #111827;
+      border: none;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      transition: all 0.2s;
+    }
+
+    .btn-login:hover {
+      background: var(--primary-dark);
+      transform: translateY(-1px);
+    }
+
+    .alert-danger {
+      background: rgba(239,68,68,0.15);
+      border: 1px solid #ef4444;
+      color: #fca5a5;
+      padding: 10px 14px;
+      border-radius: 8px;
+      font-size: 11px;
+      margin-bottom: 18px;
+      display: none;
+      align-items: center;
+      gap: 8px;
+    }
+  </style>
+</head>
+<body>
+
+<div class="login-card">
+  <div class="login-header">
+    <div class="login-logo">
+      <i class="fa-solid fa-crown"></i>
+    </div>
+    <h1>BARON'S SILLAGE</h1>
+    <p>Mağaza & Stok Yönetim Portalı Girişi</p>
+  </div>
+
+  <div class="alert-danger" id="loginAlert">
+    <i class="fa-solid fa-circle-exclamation"></i>
+    <span id="loginAlertText">Hatalı kullanıcı adı veya şifre!</span>
+  </div>
+
+  <form id="loginForm">
+    <div class="form-group">
+      <label>Kullanıcı Adı veya E-Posta</label>
+      <div class="input-wrapper">
+        <i class="fa-solid fa-user"></i>
+        <input type="text" id="loginUsername" placeholder="Örn: tonystark" value="tonystark" required>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label>Şifre</label>
+      <div class="input-wrapper">
+        <i class="fa-solid fa-lock"></i>
+        <input type="password" id="loginPassword" placeholder="••••••••" value="cintonik!" required>
+      </div>
+    </div>
+
+    <div class="login-options">
+      <label>
+        <input type="checkbox" id="rememberMe" checked> Beni Hatırla
+      </label>
+      <span style="color:#64748b;">GÜVENLİ OTURUM</span>
+    </div>
+
+    <button type="submit" class="btn-login" id="btnLoginSubmit">
+      <i class="fa-solid fa-right-to-bracket"></i>
+      Giriş Yap
+    </button>
+  </form>
+</div>
+
+<script>
+  document.getElementById('loginForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const alertBox = document.getElementById('loginAlert');
+    const alertText = document.getElementById('loginAlertText');
+    const submitBtn = document.getElementById('btnLoginSubmit');
+
+    const username = document.getElementById('loginUsername').value.trim();
+    const password = document.getElementById('loginPassword').value.trim();
+
+    if (!username || !password) {
+      alertText.textContent = 'Lütfen kullanıcı adı ve şifrenizi girin.';
+      alertBox.style.display = 'flex';
+      return;
+    }
+
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Giriş Yapılıyor...';
+
+    try {
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password })
+      });
+      const data = await res.json();
+
+      if (data.success && data.token) {
+        localStorage.setItem('barons_admin_token', data.token);
+        localStorage.setItem('barons_admin_user', JSON.stringify(data.user || { name: 'Tony Stark' }));
+        window.location.href = 'index.html';
+      } else {
+        alertText.textContent = data.error || 'Hatalı kullanıcı adı veya şifre!';
+        alertBox.style.display = 'flex';
+      }
+    } catch (err) {
+      alertText.textContent = 'Sunucu bağlantı hatası oluştu.';
+      alertBox.style.display = 'flex';
+    } finally {
+      submitBtn.disabled = false;
+      submitBtn.innerHTML = '<i class="fa-solid fa-right-to-bracket"></i> Giriş Yap';
+    }
+  });
+</script>
+
+</body>
+</html>
