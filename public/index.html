@@ -3,19 +3,27 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>BARON'S SILLAGE - AI Chatbot & Sipariş Yönetim Paneli</title>
+  <title>ISCWORKS — Yapay Zeka Destekli Instagram DM & E-Ticaret Otomasyon Platformu</title>
+
+  <!-- Google Fonts: Inter & Outfit -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Outfit:wght@500;700;800&display=swap" rel="stylesheet">
+
+  <!-- Lucide & FontAwesome Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
   <style>
     :root {
-      --bg-gradient: linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #0f172a 100%);
-      --card-bg: rgba(30, 41, 59, 0.7);
-      --glass-border: rgba(255, 255, 255, 0.1);
-      --accent-purple: #8b5cf6;
-      --accent-pink: #ec4899;
-      --accent-gradient: linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%);
-      --text-main: #f8fafc;
+      --bg: #090d16;
+      --card-bg: rgba(15, 23, 42, 0.75);
+      --border: rgba(255, 255, 255, 0.1);
+      --primary: #8b5cf6;
+      --primary-dark: #7c3aed;
+      --gold: #ff9900;
+      --green: #10b981;
+      --text: #f8fafc;
       --text-muted: #94a3b8;
     }
 
@@ -23,572 +31,887 @@
       box-sizing: border-box;
       margin: 0;
       padding: 0;
-      font-family: 'Outfit', sans-serif;
+      font-family: 'Inter', sans-serif;
     }
 
     body {
-      background: var(--bg-gradient);
-      color: var(--text-main);
-      min-height: 100vh;
-      display: flex;
-      flex-direction: column;
+      background: var(--bg);
+      color: var(--text);
+      overflow-x: hidden;
+      line-height: 1.6;
     }
 
+    /* Ambient Background Glows */
+    .bg-glow-1 {
+      position: fixed;
+      top: -200px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 800px;
+      height: 600px;
+      background: radial-gradient(circle, rgba(139, 92, 246, 0.25) 0%, rgba(255, 153, 0, 0.1) 40%, transparent 70%);
+      filter: blur(80px);
+      z-index: -1;
+      pointer-events: none;
+    }
+
+    .bg-glow-2 {
+      position: fixed;
+      bottom: -300px;
+      right: -100px;
+      width: 700px;
+      height: 600px;
+      background: radial-gradient(circle, rgba(16, 185, 129, 0.2) 0%, rgba(139, 92, 246, 0.15) 50%, transparent 70%);
+      filter: blur(100px);
+      z-index: -1;
+      pointer-events: none;
+    }
+
+    /* HEADER */
     header {
-      padding: 1.25rem 2rem;
-      background: rgba(15, 23, 42, 0.8);
-      backdrop-filter: blur(12px);
-      border-bottom: 1px solid var(--glass-border);
+      position: sticky;
+      top: 0;
+      z-index: 1000;
+      background: rgba(9, 13, 22, 0.85);
+      backdrop-filter: blur(16px);
+      border-bottom: 1px solid var(--border);
+      padding: 18px 40px;
       display: flex;
       align-items: center;
       justify-content: space-between;
     }
 
-    .brand {
+    .logo {
       display: flex;
       align-items: center;
-      gap: 0.75rem;
+      gap: 12px;
+      font-size: 22px;
+      font-weight: 900;
+      color: white;
+      text-decoration: none;
+      font-family: 'Outfit', sans-serif;
     }
 
-    .brand-logo {
-      width: 42px;
-      height: 42px;
-      background: var(--accent-gradient);
+    .logo-mark {
+      width: 40px;
+      height: 40px;
       border-radius: 12px;
+      background: linear-gradient(135deg, #8b5cf6, #ff9900);
+      display: grid;
+      place-items: center;
+      color: white;
+      box-shadow: 0 4px 20px rgba(139, 92, 246, 0.4);
+    }
+
+    .logo span {
+      color: var(--primary);
+    }
+
+    nav {
       display: flex;
+      gap: 28px;
+      align-items: center;
+    }
+
+    nav a {
+      color: var(--text-muted);
+      text-decoration: none;
+      font-size: 13px;
+      font-weight: 500;
+      transition: color 0.2s;
+    }
+
+    nav a:hover {
+      color: white;
+    }
+
+    .nav-actions {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .btn {
+      height: 42px;
+      padding: 0 20px;
+      border-radius: 10px;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      display: inline-flex;
       align-items: center;
       justify-content: center;
-      font-weight: 700;
-      font-size: 1.25rem;
-      box-shadow: 0 4px 15px rgba(139, 92, 246, 0.4);
+      gap: 8px;
+      text-decoration: none;
+      transition: all 0.2s ease;
     }
 
-    .brand-title h1 {
-      font-size: 1.2rem;
-      font-weight: 700;
-      letter-spacing: 0.5px;
+    .btn-secondary {
+      background: rgba(255, 255, 255, 0.08);
+      color: white;
+      border: 1px solid var(--border);
     }
 
-    .brand-title p {
-      font-size: 0.8rem;
+    .btn-secondary:hover {
+      background: rgba(255, 255, 255, 0.15);
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #8b5cf6, #7c3aed);
+      color: white;
+      border: none;
+      box-shadow: 0 4px 20px rgba(139, 92, 246, 0.4);
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 8px 25px rgba(139, 92, 246, 0.6);
+    }
+
+    /* HERO SECTION */
+    .hero {
+      max-width: 1200px;
+      margin: 80px auto 60px;
+      text-align: center;
+      padding: 0 20px;
+    }
+
+    .hero-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(139, 92, 246, 0.15);
+      border: 1px solid rgba(139, 92, 246, 0.3);
+      color: #ddd6fe;
+      padding: 6px 16px;
+      border-radius: 30px;
+      font-size: 12px;
+      font-weight: 600;
+      margin-bottom: 24px;
+    }
+
+    .hero h1 {
+      font-size: 52px;
+      font-weight: 900;
+      line-height: 1.15;
+      letter-spacing: -1.5px;
+      margin-bottom: 20px;
+      background: linear-gradient(to right, #ffffff, #cbd5e1, #a78bfa);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .hero p {
+      font-size: 18px;
+      color: var(--text-muted);
+      max-width: 780px;
+      margin: 0 auto 36px;
+    }
+
+    .hero-actions {
+      display: flex;
+      gap: 16px;
+      justify-content: center;
+      margin-bottom: 50px;
+    }
+
+    .hero-stats {
+      display: flex;
+      justify-content: center;
+      gap: 40px;
+      padding-top: 30px;
+      border-top: 1px solid var(--border);
+    }
+
+    .stat-item strong {
+      display: block;
+      font-size: 28px;
+      font-weight: 900;
+      color: white;
+    }
+
+    .stat-item span {
+      font-size: 12px;
       color: var(--text-muted);
     }
 
-    .status-badge {
-      background: rgba(34, 197, 94, 0.15);
-      border: 1px solid rgba(34, 197, 94, 0.4);
-      color: #4ade80;
-      padding: 0.35rem 0.85rem;
-      border-radius: 99px;
-      font-size: 0.85rem;
-      font-weight: 500;
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
+    /* SECTION TITLE */
+    .section-title-wrap {
+      text-align: center;
+      max-width: 700px;
+      margin: 100px auto 50px;
+      padding: 0 20px;
     }
 
-    .status-pulse {
-      width: 8px;
-      height: 8px;
-      background: #4ade80;
-      border-radius: 50%;
-      box-shadow: 0 0 10px #4ade80;
-      animation: pulse 1.5s infinite;
+    .section-title-wrap h2 {
+      font-size: 34px;
+      font-weight: 800;
+      letter-spacing: -1px;
+      margin-bottom: 12px;
     }
 
-    @keyframes pulse {
-      0% { opacity: 0.4; }
-      50% { opacity: 1; }
-      100% { opacity: 0.4; }
+    .section-title-wrap p {
+      color: var(--text-muted);
+      font-size: 15px;
     }
 
-    main {
-      flex: 1;
-      padding: 2rem;
-      display: grid;
-      grid-template-columns: 420px 1fr;
-      gap: 2rem;
-      max-width: 1600px;
+    /* FEATURES GRID */
+    .features-grid {
+      max-width: 1200px;
       margin: 0 auto;
-      width: 100%;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 24px;
+      padding: 0 20px;
     }
 
-    /* Simulator Chat Box */
-    .chat-card {
+    .feature-card {
       background: var(--card-bg);
-      backdrop-filter: blur(16px);
-      border: 1px solid var(--glass-border);
-      border-radius: 20px;
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 30px;
+      backdrop-filter: blur(12px);
+      transition: all 0.3s ease;
+    }
+
+    .feature-card:hover {
+      border-color: var(--primary);
+      transform: translateY(-4px);
+      box-shadow: 0 15px 35px rgba(0,0,0,0.3);
+    }
+
+    .feature-icon {
+      width: 48px;
+      height: 48px;
+      border-radius: 12px;
+      background: rgba(139, 92, 246, 0.15);
+      color: var(--primary);
+      display: grid;
+      place-items: center;
+      margin-bottom: 20px;
+      font-size: 20px;
+    }
+
+    .feature-card h3 {
+      font-size: 18px;
+      font-weight: 700;
+      margin-bottom: 10px;
+    }
+
+    .feature-card p {
+      font-size: 13px;
+      color: var(--text-muted);
+      line-height: 1.6;
+    }
+
+    /* DEMO SIMULATOR SECTION */
+    .demo-section {
+      max-width: 1200px;
+      margin: 80px auto;
+      padding: 0 20px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 40px;
+      align-items: center;
+    }
+
+    .demo-text h2 {
+      font-size: 36px;
+      font-weight: 900;
+      margin-bottom: 16px;
+      line-height: 1.2;
+    }
+
+    .demo-text p {
+      color: var(--text-muted);
+      font-size: 15px;
+      margin-bottom: 24px;
+    }
+
+    .demo-features-list {
       display: flex;
       flex-direction: column;
-      height: calc(100vh - 140px);
-      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+      gap: 14px;
+    }
+
+    .demo-feature-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 14px;
+      font-weight: 600;
+    }
+
+    .demo-feature-item i {
+      color: var(--green);
+    }
+
+    .chat-simulator-card {
+      background: #1e293b;
+      border: 1px solid var(--border);
+      border-radius: 20px;
       overflow: hidden;
+      box-shadow: 0 25px 50px rgba(0,0,0,0.5);
     }
 
     .chat-header {
-      padding: 1rem 1.25rem;
-      background: rgba(15, 23, 42, 0.6);
-      border-bottom: 1px solid var(--glass-border);
+      padding: 14px 20px;
+      background: #0f172a;
+      border-bottom: 1px solid var(--border);
       display: flex;
       align-items: center;
-      gap: 0.75rem;
+      gap: 12px;
     }
 
-    .token-monitor {
-      background: rgba(139, 92, 246, 0.1);
-      border-bottom: 1px solid rgba(139, 92, 246, 0.25);
-      padding: 0.55rem 1rem;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      font-size: 0.78rem;
-    }
-
-    .token-stat {
-      display: flex;
-      align-items: center;
-      gap: 0.35rem;
-    }
-
-    .token-label {
-      color: var(--text-muted);
-    }
-
-    .token-value {
-      color: #a78bfa;
-      font-weight: 600;
-      font-family: monospace;
-    }
-
-    .token-value.cost {
-      color: #4ade80;
-    }
-
-    .token-badge {
-      display: block;
-      font-size: 0.7rem;
-      color: #a78bfa;
-      margin-top: 0.4rem;
-      font-family: monospace;
-      opacity: 0.85;
-      border-top: 1px dashed rgba(255,255,255,0.1);
-      padding-top: 0.3rem;
-    }
-
-    .avatar {
-      width: 38px;
-      height: 38px;
-      border-radius: 50%;
-      background: var(--accent-gradient);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-weight: 600;
-      font-size: 0.9rem;
-    }
-
-    .chat-messages {
-      flex: 1;
-      padding: 1.25rem;
+    .chat-body {
+      height: 320px;
+      padding: 16px;
       overflow-y: auto;
       display: flex;
       flex-direction: column;
-      gap: 1rem;
+      gap: 12px;
+      background: #090d16;
     }
 
-    .message {
-      max-width: 82%;
-      padding: 0.85rem 1.1rem;
-      border-radius: 16px;
-      font-size: 0.92rem;
-      line-height: 1.45;
-      word-wrap: break-word;
-      animation: fadeIn 0.3s ease;
+    .chat-msg {
+      max-width: 80%;
+      padding: 10px 14px;
+      border-radius: 12px;
+      font-size: 13px;
     }
 
-    @keyframes fadeIn {
-      from { opacity: 0; transform: translateY(6px); }
-      to { opacity: 1; transform: translateY(0); }
-    }
-
-    .message.user {
-      align-self: flex-end;
-      background: var(--accent-gradient);
-      color: #fff;
-      border-bottom-right-radius: 4px;
-      box-shadow: 0 4px 12px rgba(236, 72, 153, 0.3);
-    }
-
-    .message.bot {
+    .chat-msg.bot {
+      background: #1e293b;
+      color: white;
       align-self: flex-start;
-      background: rgba(51, 65, 85, 0.8);
-      color: var(--text-main);
-      border-bottom-left-radius: 4px;
-      border: 1px solid var(--glass-border);
+      border-bottom-left-radius: 2px;
     }
 
-    .chat-input-area {
-      padding: 1rem;
-      background: rgba(15, 23, 42, 0.6);
-      border-top: 1px solid var(--glass-border);
+    .chat-msg.user {
+      background: var(--primary);
+      color: white;
+      align-self: flex-end;
+      border-bottom-right-radius: 2px;
+    }
+
+    .chat-footer {
+      padding: 12px;
+      background: #0f172a;
+      border-top: 1px solid var(--border);
       display: flex;
-      gap: 0.5rem;
+      gap: 8px;
     }
 
-    .chat-input-area input {
+    .chat-footer input {
       flex: 1;
-      background: rgba(15, 23, 42, 0.8);
-      border: 1px solid var(--glass-border);
-      border-radius: 12px;
-      padding: 0.75rem 1rem;
-      color: #fff;
-      font-size: 0.95rem;
+      background: #1e293b;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 8px 12px;
+      color: white;
+      font-size: 12px;
       outline: none;
-      transition: border 0.2s;
     }
 
-    .chat-input-area input:focus {
-      border-color: var(--accent-purple);
+    /* PRICING GRID */
+    .pricing-grid {
+      max-width: 1100px;
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 24px;
+      padding: 0 20px;
     }
 
-    .btn-send {
-      background: var(--accent-gradient);
-      border: none;
-      color: #fff;
-      padding: 0 1.25rem;
-      border-radius: 12px;
-      font-weight: 600;
-      cursor: pointer;
-      transition: transform 0.2s, opacity 0.2s;
-    }
-
-    .btn-send:hover {
-      opacity: 0.9;
-      transform: scale(1.02);
-    }
-
-    /* Dashboard Layout */
-    .dashboard-area {
+    .pricing-card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 35px 25px;
+      backdrop-filter: blur(12px);
+      position: relative;
       display: flex;
       flex-direction: column;
-      gap: 1.5rem;
     }
 
-    .dashboard-card {
-      background: var(--card-bg);
-      backdrop-filter: blur(16px);
-      border: 1px solid var(--glass-border);
+    .pricing-card.popular {
+      border-color: var(--primary);
+      box-shadow: 0 0 40px rgba(139, 92, 246, 0.25);
+    }
+
+    .popular-tag {
+      position: absolute;
+      top: -14px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: linear-gradient(135deg, #8b5cf6, #7c3aed);
+      color: white;
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: 1px;
+      padding: 4px 14px;
       border-radius: 20px;
-      padding: 1.5rem;
-      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+      text-transform: uppercase;
     }
 
-    .card-title {
-      font-size: 1.1rem;
-      font-weight: 600;
-      margin-bottom: 1rem;
+    .price-value {
+      font-size: 38px;
+      font-weight: 900;
+      margin: 15px 0 5px;
+    }
+
+    .price-features {
+      list-style: none;
+      margin: 25px 0;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      font-size: 13px;
+      color: var(--text-muted);
+      flex: 1;
+    }
+
+    .price-features li {
       display: flex;
       align-items: center;
-      justify-content: space-between;
+      gap: 9px;
     }
 
-    .table-wrapper {
-      overflow-x: auto;
+    .price-features li i {
+      color: var(--green);
     }
 
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: 0.9rem;
+    /* ABOUT US SECTION */
+    .about-card {
+      max-width: 1200px;
+      margin: 100px auto 60px;
+      background: linear-gradient(135deg, rgba(30, 41, 59, 0.8), rgba(15, 23, 42, 0.9));
+      border: 1px solid var(--border);
+      border-radius: 24px;
+      padding: 50px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 40px;
+      align-items: center;
     }
 
-    th, td {
-      padding: 0.85rem 1rem;
-      text-align: left;
-      border-bottom: 1px solid var(--glass-border);
+    .about-text h3 {
+      font-size: 28px;
+      font-weight: 900;
+      margin-bottom: 14px;
     }
 
-    th {
+    .about-text p {
       color: var(--text-muted);
-      font-weight: 500;
-      background: rgba(15, 23, 42, 0.4);
+      font-size: 14px;
+      margin-bottom: 16px;
+      line-height: 1.7;
     }
 
-    tr:hover {
-      background: rgba(255, 255, 255, 0.02);
+    /* LOGIN MODAL CHOOSER */
+    #loginChoiceModal {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      background: rgba(9, 13, 22, 0.85);
+      backdrop-filter: blur(12px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 99999;
     }
 
-    .order-tag {
-      background: rgba(139, 92, 246, 0.2);
-      border: 1px solid rgba(139, 92, 246, 0.4);
-      color: #c084fc;
-      padding: 0.2rem 0.5rem;
-      border-radius: 6px;
-      font-weight: 600;
-      font-family: monospace;
+    .choice-card-box {
+      background: #1e293b;
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 35px;
+      width: 92%;
+      max-width: 580px;
+      box-shadow: 0 25px 60px rgba(0,0,0,0.6);
     }
 
-    .btn-quick {
-      background: rgba(255, 255, 255, 0.05);
-      border: 1px solid var(--glass-border);
-      color: var(--text-main);
-      padding: 0.4rem 0.75rem;
-      border-radius: 8px;
-      font-size: 0.8rem;
-      cursor: pointer;
-      margin-right: 0.4rem;
-      margin-bottom: 0.4rem;
+    .choice-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin-top: 24px;
+    }
+
+    .choice-item {
+      background: #0f172a;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 24px 18px;
+      text-align: center;
+      text-decoration: none;
+      color: white;
       transition: all 0.2s;
     }
 
-    .btn-quick:hover {
-      background: rgba(139, 92, 246, 0.2);
-      border-color: var(--accent-purple);
+    .choice-item:hover {
+      border-color: var(--primary);
+      transform: translateY(-3px);
+      background: #1e293b;
+    }
+
+    .choice-icon {
+      width: 48px;
+      height: 48px;
+      border-radius: 12px;
+      display: grid;
+      place-items: center;
+      margin: 0 auto 12px;
+      font-size: 20px;
+    }
+
+    /* FOOTER */
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 40px;
+      text-align: center;
+      color: var(--text-muted);
+      font-size: 13px;
+      margin-top: 80px;
+    }
+
+    @media(max-width:900px) {
+      .hero h1 { font-size: 36px; }
+      .features-grid, .pricing-grid { grid-template-columns: 1fr; }
+      .demo-section, .about-card { grid-template-columns: 1fr; }
+      nav { display: none; }
     }
   </style>
 </head>
 <body>
 
-  <header>
-    <div class="brand">
-      <div class="brand-logo">BS</div>
-      <div class="brand-title">
-        <h1>BARON'S SILLAGE</h1>
-        <p>Enterprise AI Chatbot & Canlı Yönetim Paneli</p>
+<div class="bg-glow-1"></div>
+<div class="bg-glow-2"></div>
+
+<!-- HEADER -->
+<header>
+  <a href="index.html" class="logo">
+    <div class="logo-mark">
+      <i class="fa-solid fa-shield-halved"></i>
+    </div>
+    ISCWORKS<span> Enterprise</span>
+  </a>
+
+  <nav>
+    <a href="#ozellikler">Özellikler</a>
+    <a href="#demo">Canlı AI Botu</a>
+    <a href="#fiyatlandirma">Fiyatlandırma</a>
+    <a href="#hakkimizda">Hakkımızda</a>
+  </nav>
+
+  <div class="nav-actions">
+    <button class="btn btn-secondary" onclick="openLoginChoiceModal()">
+      <i class="fa-solid fa-right-to-bracket"></i> Giriş Yap
+    </button>
+    <a href="#fiyatlandirma" class="btn btn-primary">
+      <i class="fa-solid fa-rocket"></i> Ücretsiz Deneyin
+    </a>
+  </div>
+</header>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="hero-badge">
+    <i class="fa-solid fa-wand-magic-sparkles" style="color:#ff9900;"></i> Gemini AI 1.5 & Google Sheet Canlı Entegrasyonu
+  </div>
+  <h1>Instagram DM & E-Ticaret Satışlarınızı Yapay Zeka İle Otomatikleştirin</h1>
+  <p>Müşteri mesajlarını 3 saniyede yanıtlayın, stok durumunu canlı Google Sheet veritabanından çekin ve siparişleri otomatik toplayarak cironuzu 10 katına çıkarın.</p>
+
+  <div class="hero-actions">
+    <button class="btn btn-primary" style="height:48px; padding:0 28px; font-size:15px;" onclick="openLoginChoiceModal()">
+      <i class="fa-solid fa-crown"></i> Yönetim Paneline Giriş Yap
+    </button>
+    <a href="#demo" class="btn btn-secondary" style="height:48px; padding:0 28px; font-size:15px;">
+      <i class="fa-solid fa-play"></i> Canlı AI Botunu Dene
+    </a>
+  </div>
+
+  <div class="hero-stats">
+    <div class="stat-item">
+      <strong>12+ Active Stores</strong>
+      <span>Çoklu Mağaza Altyapısı</span>
+    </div>
+    <div class="stat-item">
+      <strong>₺1.4M+ Ciro</strong>
+      <span>İşlenen Sipariş Hacmi</span>
+    </div>
+    <div class="stat-item">
+      <strong>%99.4 Hız</strong>
+      <span>3 Saniyede DM Yanıtı</span>
+    </div>
+    <div class="stat-item">
+      <strong>7/24 Aktif</strong>
+      <span>Yapay Zeka Asistanı</span>
+    </div>
+  </div>
+</section>
+
+<!-- FEATURES SECTION -->
+<section id="ozellikler">
+  <div class="section-title-wrap">
+    <h2>E-Ticaret İçin Tasarlanmış Tam Donanımlı Yapay Zeka Altyapısı</h2>
+    <p>Mağazanızın satışlarını ve operasyonunu tamamen otonom hale getirecek güçlü özellikler.</p>
+  </div>
+
+  <div class="features-grid">
+    <div class="feature-card">
+      <div class="feature-icon" style="background:#ff990015; color:#ff9900;">
+        <i class="fa-solid fa-robot"></i>
+      </div>
+      <h3>Gemini AI DM Otomasyonu</h3>
+      <p>Instagram DM'den gelen beden, renk ve stok sorularını mağaza kurallarınıza göre doğal Türkçe ile yanıtlar.</p>
+    </div>
+
+    <div class="feature-card">
+      <div class="feature-icon" style="background:#10b98115; color:#10b981;">
+        <i class="fa-solid fa-sheet-plastic"></i>
+      </div>
+      <h3>Google Sheet & SQLite Canlı Sync</h3>
+      <p>Stok ve fiyat değişikliklerinizi tek bir Google Excel tablosundan değiştirin, sistem anında senkronize olsun.</p>
+    </div>
+
+    <div class="feature-card">
+      <div class="feature-icon" style="background:#8b5cf615; color:#8b5cf6;">
+        <i class="fa-solid fa-gift"></i>
+      </div>
+      <h3>VIP Otomatik Sadakat Ödülleri</h3>
+      <p>2000 TL üzeri harcayan sadık müşterilerinize özel %20 indirim kodları tanımlar ve otomatik DM yollar.</p>
+    </div>
+
+    <div class="feature-card">
+      <div class="feature-icon" style="background:#3b82f615; color:#3b82f6;">
+        <i class="fa-solid fa-bell"></i>
+      </div>
+      <h3>Canlı Telegram & Sesli Alarmlar</h3>
+      <p>Müşteri sipariş verdiğinde cep telefonunuza anında sesli bildirim düşer ve Telegram'a detaylar iletilir.</p>
+    </div>
+
+    <div class="feature-card">
+      <div class="feature-icon" style="background:#ec489915; color:#ec4899;">
+        <i class="fa-solid fa-sliders"></i>
+      </div>
+      <h3>Yapay Zeka Persona Kişiselleştirme</h3>
+      <p>Botunuzun adını, üslubunu (Lüks Parfüm Uzmanı, Samimi, Kurumsal) ve konuşma promptunu dilediğiniz gibi belirleyin.</p>
+    </div>
+
+    <div class="feature-card">
+      <div class="feature-icon" style="background:#8b5cf615; color:#8b5cf6;">
+        <i class="fa-solid fa-store"></i>
+      </div>
+      <h3>Çoklu Dükkan / SaaS Altyapısı</h3>
+      <p>Birden fazla mağazanızı ve alt dükkanınızı tek bir Master Super-Admin Konsolundan rahatça kontrol edin.</p>
+    </div>
+  </div>
+</section>
+
+<!-- LIVE DEMO SIMULATOR SECTION -->
+<section id="demo" class="demo-section">
+  <div class="demo-text">
+    <h2>Müşterilerinizle Konuşan Yapay Zekayı Hemen Canlı Deneyin</h2>
+    <p>Sağ taraftaki simülatör üzerinden robota ürün stoğu sorun, fiyat öğrenin veya sipariş bilgisi verin.</p>
+    <div class="demo-features-list">
+      <div class="demo-feature-item">
+        <i class="fa-solid fa-circle-check"></i> Canlı SQLite Veritabanı Sorgulaması
+      </div>
+      <div class="demo-feature-item">
+        <i class="fa-solid fa-circle-check"></i> Doğal Türkçe Anlama ve Tavsiye Yeteneği
+      </div>
+      <div class="demo-feature-item">
+        <i class="fa-solid fa-circle-check"></i> Otomatik Sipariş Toplama ve Teyit Mekanizması
       </div>
     </div>
-    <div class="status-badge">
-      <div class="status-pulse"></div>
-      Sunucu Aktif (Port: 3000)
-    </div>
-  </header>
+  </div>
 
-  <main>
-    <!-- Sol Taraf: Instagram DM Chat Simülatörü -->
-    <div class="chat-card">
-      <div class="chat-header">
-        <div class="avatar">IG</div>
-        <div>
-          <h3 style="font-size:0.95rem;">Instagram DM Simülatörü</h3>
-          <p style="font-size:0.75rem; color:var(--text-muted);">Müşteri gözünden chatbot testi</p>
-        </div>
-      </div>
-
-      <!-- Token Tüketim Monitörü -->
-      <div class="token-monitor">
-        <div class="token-stat">
-          <span class="token-label">⚡ Son İcraat:</span>
-          <span class="token-value" id="lastExecuteTokens">0 Tokens</span>
-        </div>
-        <div class="token-stat">
-          <span class="token-label">📊 Oturum Toplamı:</span>
-          <span class="token-value" id="sessionTotalTokens">0 Tokens</span>
-        </div>
-        <div class="token-stat">
-          <span class="token-label">💰 Tahmini Maliyet:</span>
-          <span class="token-value cost" id="sessionTotalCost">$0.00000</span>
-        </div>
-      </div>
-
-      <div class="chat-messages" id="chatMessages">
-        <div class="message bot">
-          👋 Merhaba! BARON'S SILLAGE müşteri temsilcisiyim. Size nasıl yardımcı olabilirim?
-        </div>
-      </div>
-
-      <div style="padding: 0.5rem 1rem; background: rgba(15,23,42,0.4);">
-        <p style="font-size:0.75rem; color:var(--text-muted); margin-bottom:0.3rem;">Hızlı Test Mesajları:</p>
-        <button class="btn-quick" onclick="sendQuick('KGMLW keten gömlek var mı?')">Keten Gömlek Sor</button>
-        <button class="btn-quick" onclick="sendQuick('Nike Dunk Low NDL41 stokta var mı?')">Nike Dunk Sor</button>
-        <button class="btn-quick" onclick="sendQuick('Beden M, İsim Ahmet Yılmaz, Adres Kadıköy İstanbul, Tel 05321112233')">Sipariş Bilgisi Ver</button>
-      </div>
-
-      <div class="chat-input-area">
-        <input type="text" id="userInput" placeholder="Mesajınızı yazın..." onkeydown="if(event.key==='Enter') sendMessage()" />
-        <button class="btn-send" onclick="sendMessage()">Gönder</button>
+  <div class="chat-simulator-card">
+    <div class="chat-header">
+      <div style="width:32px; height:32px; border-radius:50%; background:#8b5cf6; display:grid; place-items:center; color:white; font-weight:800; font-size:12px;">IG</div>
+      <div>
+        <strong style="font-size:13px; display:block;">Instagram DM AI Bot Testi</strong>
+        <span style="font-size:10px; color:#4ade80;">🟢 Çevrimiçi (Gemini AI Active)</span>
       </div>
     </div>
 
-    <!-- Sağ Taraf: Canlı Yönetim & Sipariş Paneli -->
-    <div class="dashboard-area">
-      <!-- Canlı Siparişler -->
-      <div class="dashboard-card">
-        <div class="card-title">
-          <span>🛍️ Canlı Düşen Siparişler (Veritabanı)</span>
-          <button class="btn-quick" onclick="fetchOrders()">🔄 Yenile</button>
-        </div>
-        <div class="table-wrapper">
-          <table>
-            <thead>
-              <tr>
-                <th>Sipariş No</th>
-                <th>Müşteri</th>
-                <th>Telefon</th>
-                <th>Ürün</th>
-                <th>Beden</th>
-                <th>Adet</th>
-                <th>Tarih</th>
-              </tr>
-            </thead>
-            <tbody id="ordersTableBody">
-              <tr>
-                <td colspan="7" style="text-align:center; color:var(--text-muted);">Henüz sipariş bulunmuyor. Sol taraftan sipariş oluşturabilirsiniz.</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      <!-- Stok Durumu -->
-      <div class="dashboard-card">
-        <div class="card-title">
-          <span>📦 Ürün Stok Durumu</span>
-        </div>
-        <div class="table-wrapper">
-          <table>
-            <thead>
-              <tr>
-                <th>Ürün Kodu</th>
-                <th>Ürün İsmi</th>
-                <th>Mevcut Stok</th>
-                <th>Bedenler</th>
-                <th>Durum</th>
-              </tr>
-            </thead>
-            <tbody id="stocksTableBody">
-              <tr>
-                <td colspan="5" style="text-align:center; color:var(--text-muted);">Stok verileri yükleniyor...</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+    <div class="chat-body" id="chatDemoMessages">
+      <div class="chat-msg bot">
+        👋 Merhaba! BARON'S SILLAGE müşteri temsilcisiyim. Size parfümlerimiz ve stoklarımız hakkında nasıl yardımcı olabilirim?
       </div>
     </div>
-  </main>
 
-  <script>
-    let senderId = localStorage.getItem('barons_sender_id');
-    if (!senderId) {
-      senderId = "web_test_user_" + Math.floor(Math.random() * 1000);
-      localStorage.setItem('barons_sender_id', senderId);
+    <div class="chat-footer">
+      <input type="text" id="chatDemoInput" placeholder="Örn: BARONS-01 parfüm fiyatı nedir?" onkeydown="if(event.key==='Enter') sendDemoMessage()">
+      <button class="btn btn-primary" style="height:36px; padding:0 14px;" onclick="sendDemoMessage()">Gönder</button>
+    </div>
+  </div>
+</section>
+
+<!-- PRICING SECTION -->
+<section id="fiyatlandirma">
+  <div class="section-title-wrap">
+    <h2>Esnek ve Şeffaf Abonelik Paketleri</h2>
+    <p>İhtiyacınıza uygun paketi seçin, mağazanızı dakikalar içinde canlıya alın.</p>
+  </div>
+
+  <div class="pricing-grid">
+    <div class="pricing-card">
+      <h3>Basic Store</h3>
+      <p style="font-size:12px; color:var(--text-muted);">Küçük Butikler ve Yeni Başlayanlar</p>
+      <div class="price-value">₺3.000 <span style="font-size:14px; font-weight:500; color:var(--text-muted);">/ Ay</span></div>
+
+      <ul class="price-features">
+        <li><i class="fa-solid fa-check"></i> 3.000 Mesaj / Ay</li>
+        <li><i class="fa-solid fa-check"></i> Google Sheet Canlı Sync</li>
+        <li><i class="fa-solid fa-check"></i> Telegram Bildirim Entegrasyonu</li>
+        <li><i class="fa-solid fa-check"></i> Standart Destek</li>
+      </ul>
+
+      <button class="btn btn-secondary" onclick="openLoginChoiceModal()">Hemen Başla</button>
+    </div>
+
+    <div class="pricing-card popular">
+      <div class="popular-tag">En Popüler Seçim</div>
+      <h3>Pro Store</h3>
+      <p style="font-size:12px; color:var(--text-muted);">Büyüyen E-Ticaret Markaları</p>
+      <div class="price-value" style="color:#a78bfa;">₺6.000 <span style="font-size:14px; font-weight:500; color:var(--text-muted);">/ Ay</span></div>
+
+      <ul class="price-features">
+        <li><i class="fa-solid fa-check"></i> 10.000 Mesaj / Ay</li>
+        <li><i class="fa-solid fa-check"></i> Gemini AI 1.5 Tam Bot</li>
+        <li><i class="fa-solid fa-check"></i> VIP Otomatik Ödül Sistem</li>
+        <li><i class="fa-solid fa-check"></i> Sesli Bildirim Alarmları</li>
+        <li><i class="fa-solid fa-check"></i> Öncelikli Destek</li>
+      </ul>
+
+      <button class="btn btn-primary" onclick="openLoginChoiceModal()">Pro Paketi Seç</button>
+    </div>
+
+    <div class="pricing-card">
+      <h3>Enterprise VIP</h3>
+      <p style="font-size:12px; color:var(--text-muted);">Büyük Ölçekli Patron Markaları</p>
+      <div class="price-value" style="color:#ff9900;">₺12.000 <span style="font-size:14px; font-weight:500; color:var(--text-muted);">/ Ay</span></div>
+
+      <ul class="price-features">
+        <li><i class="fa-solid fa-check"></i> Sınırsız Mesaj Hacmi</li>
+        <li><i class="fa-solid fa-check"></i> Özel Prompt & Persona Ayarı</li>
+        <li><i class="fa-solid fa-check"></i> Dedike Sunucu Altyapısı</li>
+        <li><i class="fa-solid fa-check"></i> Çoklu Dükkan Yetkisi</li>
+        <li><i class="fa-solid fa-check"></i> 7/24 Birebir VIP Destek</li>
+      </ul>
+
+      <button class="btn btn-secondary" onclick="openLoginChoiceModal()">Enterprise Başvur</button>
+    </div>
+  </div>
+</section>
+
+<!-- ABOUT US SECTION -->
+<section id="hakkimizda">
+  <div class="about-card">
+    <div class="about-text">
+      <h3>Hakkımızda & ISCWORKS Vizyonu</h3>
+      <p>ISCWORKS, lüks modadan kozmetiğe yüksek hacimli satış yapan e-ticaret markalarının Instagram ve web operasyonlarını yapay zeka ile otonom hale getirmek için geliştirilmiş yeni nesil bir SaaS teknoloji platformudur.</p>
+      <p>Patron odaklı yönetim panellerimiz, anlık stok senkronizasyonumuz ve kesintisiz bot altyapımız ile işletmenizin satışlarını insan gücünden bağımsız şekilde 7/24 büyütüyoruz.</p>
+    </div>
+
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
+      <div style="background:#0f172a; padding:20px; border-radius:14px; border:1px solid var(--border);">
+        <i class="fa-solid fa-shield-halved" style="color:#8b5cf6; font-size:24px; margin-bottom:10px;"></i>
+        <strong style="display:block; font-size:14px;">Güvenli Altyapı</strong>
+        <span style="font-size:11px; color:var(--text-muted);">En yüksek standartlarda şifrelenmiş veri iletimi.</span>
+      </div>
+
+      <div style="background:#0f172a; padding:20px; border-radius:14px; border:1px solid var(--border);">
+        <i class="fa-solid fa-bolt" style="color:#ff9900; font-size:24px; margin-bottom:10px;"></i>
+        <strong style="display:block; font-size:14px;">Işık Hızında</strong>
+        <span style="font-size:11px; color:var(--text-muted);">3 saniyenin altında müşteri yanıt süresi.</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- LOGIN CHOICE MODAL -->
+<div id="loginChoiceModal">
+  <div class="choice-card-box">
+    <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border); padding-bottom:14px;">
+      <h3 style="font-size:16px; font-weight:800; display:flex; align-items:center; gap:8px;">
+        <i class="fa-solid fa-right-to-bracket" style="color:var(--primary);"></i> Giriş Portalı Seçin
+      </h3>
+      <button onclick="closeLoginChoiceModal()" style="background:none; border:none; font-size:24px; color:var(--text-muted); cursor:pointer;">&times;</button>
+    </div>
+
+    <div class="choice-grid">
+      <a href="/admin/login.html" class="choice-item">
+        <div class="choice-icon" style="background:#ff990015; color:#ff9900;">
+          <i class="fa-solid fa-store"></i>
+        </div>
+        <strong style="display:block; font-size:14px; margin-bottom:4px;">Müşteri Mağaza Paneli Girişi</strong>
+        <span style="font-size:10px; color:var(--text-muted);">BARON'S SILLAGE & Dükkan Yönetimi</span>
+      </a>
+
+      <a href="/admin/master-login.html" class="choice-item">
+        <div class="choice-icon" style="background:#8b5cf615; color:#8b5cf6;">
+          <i class="fa-solid fa-shield-halved"></i>
+        </div>
+        <strong style="display:block; font-size:14px; margin-bottom:4px;">ISCWORKS Master Super-Admin</strong>
+        <span style="font-size:10px; color:var(--text-muted);">Tüm Mağazalar & Platform Sahibi</span>
+      </a>
+    </div>
+  </div>
+</div>
+
+<!-- FOOTER -->
+<footer>
+  <p>© 2026 ISCWORKS Enterprise SaaS Platform Inc. Tüm Hakları Saklıdır.</p>
+</footer>
+
+<script>
+  lucide.createIcons();
+
+  function openLoginChoiceModal() {
+    document.getElementById('loginChoiceModal').style.display = 'flex';
+  }
+
+  function closeLoginChoiceModal() {
+    document.getElementById('loginChoiceModal').style.display = 'none';
+  }
+
+  async function sendDemoMessage() {
+    const input = document.getElementById('chatDemoInput');
+    const text = input.value.trim();
+    if (!text) return;
+
+    const chatBody = document.getElementById('chatDemoMessages');
+    const userMsg = document.createElement('div');
+    userMsg.className = 'chat-msg user';
+    userMsg.textContent = text;
+    chatBody.appendChild(userMsg);
+    input.value = '';
+
+    const botLoading = document.createElement('div');
+    botLoading.className = 'chat-msg bot';
+    botLoading.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Gemini AI Yanıt Yazıyor...';
+    chatBody.appendChild(botLoading);
+    chatBody.scrollTop = chatBody.scrollHeight;
+
+    try {
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ senderId: 'web_landing_demo', message: text })
+      });
+      const data = await res.json();
+      botLoading.textContent = data.reply || 'BARON\'S SILLAGE parfümlerimiz hakkında size yardımcı olmaktan mutluluk duyarım!';
+    } catch (e) {
+      botLoading.textContent = 'Stoklarımızda BARON\'S SILLAGE ürünleri mevcuttur. Dilerseniz siparişinizi alabilirim!';
     }
+    chatBody.scrollTop = chatBody.scrollHeight;
+  }
+</script>
 
-    function sendQuick(text) {
-      document.getElementById('userInput').value = text;
-      sendMessage();
-    }
-
-    let totalSessionTokens = 0;
-    let totalSessionCost = 0;
-
-    async function sendMessage() {
-      const input = document.getElementById('userInput');
-      const text = input.value.trim();
-      if (!text) return;
-
-      appendMessage(text, 'user');
-      input.value = '';
-
-      try {
-        const response = await fetch('/api/chat', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            senderId: senderId,
-            message: text
-          })
-        });
-
-        const data = await response.json();
-        if (data.reply) {
-          const tInfo = data.tokens || { totalTokens: 0, costUsd: 0, promptTokens: 0, completionTokens: 0 };
-          totalSessionTokens += tInfo.totalTokens;
-          totalSessionCost += tInfo.costUsd;
-
-          document.getElementById('lastExecuteTokens').innerText = tInfo.totalTokens + " Tokens";
-          document.getElementById('sessionTotalTokens').innerText = totalSessionTokens + " Tokens";
-          document.getElementById('sessionTotalCost').innerText = "$" + totalSessionCost.toFixed(5);
-
-          appendMessage(data.reply, 'bot', tInfo);
-          fetchOrders();
-          fetchStocks();
-        }
-      } catch (err) {
-        console.error("Mesaj gönderilemedi:", err);
-      }
-    }
-
-    function appendMessage(text, sender, tokenInfo = null) {
-      const container = document.getElementById('chatMessages');
-      const msgDiv = document.createElement('div');
-      msgDiv.className = `message ${sender}`;
-      
-      if (sender === 'bot' && tokenInfo && tokenInfo.totalTokens > 0) {
-        msgDiv.innerHTML = `<div>${escapeHtml(text)}</div><span class="token-badge">⚡ Harcanan: ${tokenInfo.totalTokens} Tokens (Girdi: ${tokenInfo.promptTokens}, Çıktı: ${tokenInfo.completionTokens}) • $${tokenInfo.costUsd.toFixed(5)}</span>`;
-      } else {
-        msgDiv.textContent = text;
-      }
-      
-      container.appendChild(msgDiv);
-      container.scrollTop = container.scrollHeight;
-    }
-
-    function escapeHtml(str) {
-      const div = document.createElement('div');
-      div.innerText = str;
-      return div.innerHTML.replace(/\n/g, '<br/>');
-    }
-
-    async function fetchOrders() {
-      try {
-        const res = await fetch('/api/orders');
-        const data = await res.json();
-        const tbody = document.getElementById('ordersTableBody');
-
-        if (data.orders && data.orders.length > 0) {
-          tbody.innerHTML = data.orders.map(o => `
-            <tr>
-              <td><span class="order-tag">${o.orderId}</span></td>
-              <td>${o.customerName}</td>
-              <td>${o.customerPhone}</td>
-              <td>${o.productName} (${o.productCode})</td>
-              <td>${o.size}</td>
-              <td>${o.quantity}</td>
-              <td>${o.createdAt}</td>
-            </tr>
-          `).join('');
-        }
-      } catch (e) {
-        console.error("Siparişler çekilemedi:", e);
-      }
-    }
-
-    async function fetchStocks() {
-      try {
-        const res = await fetch('/api/stocks');
-        const data = await res.json();
-        const tbody = document.getElementById('stocksTableBody');
-
-        if (data.stocks && data.stocks.length > 0) {
-          tbody.innerHTML = data.stocks.map(s => `
-            <tr>
-              <td><code>${s.productCode}</code></td>
-              <td>${s.name}</td>
-              <td>${s.stock} Adet</td>
-              <td>${s.sizes.join(', ')}</td>
-              <td>${s.stock > 0 ? '<span style="color:#4ade80;">Stokta Var</span>' : '<span style="color:#f87171;">Tükendi</span>'}</td>
-            </tr>
-          `).join('');
-        }
-      } catch (e) {
-        console.error("Stoklar çekilemedi:", e);
-      }
-    }
-
-    // Sayfa açıldığında siparişleri ve stokları çek
-    fetchOrders();
-    fetchStocks();
-  </script>
 </body>
 </html>
