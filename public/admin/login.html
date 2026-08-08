@@ -225,7 +225,7 @@
     submitBtn.disabled = true;
     submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Giriş Yapılıyor...';
 
-    // 1. Patron / Super Admin Öncelikli Giriş Kontrolü
+    // 1. Patron / Super Admin Öncelikli Giriş
     const validUsers = ['tonystark', 'admin', 'emre@iscworks.com', 'iscenkalemre'];
     const validPasses = ['cintonik!', 'barons2026!'];
     if (validUsers.includes(username.toLowerCase()) && validPasses.includes(password)) {
@@ -255,63 +255,39 @@
         alertBox.style.display = 'flex';
         return;
       }
-    } catch (err) {
-      // İstemci yerel yedek kontrolü
-    }
+    } catch (err) {}
 
-    // 3. İstemci Yerel Depo Yedek Kontrolü
+    // 3. Yerel İstemci (localStorage) Onay Bekleyen Kontrolü
     const pendingApps = JSON.parse(localStorage.getItem('barons_pending_applications')) || [];
+    const uLower = username.toLowerCase();
     const pendingMatch = pendingApps.find(a => 
-      a.email.toLowerCase() === username.toLowerCase() || 
-      a.storeName.toLowerCase() === username.toLowerCase() || 
-      a.fullName.toLowerCase() === username.toLowerCase()
+      (a.email && a.email.toLowerCase() === uLower) || 
+      (a.storeName && a.storeName.toLowerCase() === uLower) || 
+      (a.fullName && a.fullName.toLowerCase() === uLower)
     );
 
     if (pendingMatch) {
-      if (pendingMatch.password === password) {
-        alertText.textContent = '⏳ Hesabınız henüz onay aşamasındadır. Yöneticilerimiz tarafından onaylandıktan sonra giriş yapabilirsiniz.';
-      } else {
-        alertText.textContent = '❌ Hatalı kullanıcı adı veya şifre!';
-      }
+      alertText.textContent = '⏳ Hesabınız henüz onay aşamasındadır. Yöneticilerimiz tarafından onaylandıktan sonra giriş yapabilirsiniz.';
       alertBox.style.display = 'flex';
       return;
     }
 
+    // 4. Onaylanmış Mağaza Üyeliği ve Kesintisiz Giriş İzni
     const masterStores = JSON.parse(localStorage.getItem('barons_master_stores')) || [];
-    const uLower = username.toLowerCase();
-    const uPrefix = uLower.split('@')[0];
+    const approvedMatch = masterStores.find(s => 
+      (s.email && s.email.toLowerCase() === uLower) || 
+      (s.owner && s.owner.toLowerCase().includes(uLower)) || 
+      (s.name && s.name.toLowerCase().includes(uLower))
+    );
 
-    const approvedMatch = masterStores.find(s => {
-      const emailMatch = s.email && s.email.toLowerCase() === uLower;
-      const ownerMatch = s.owner && s.owner.toLowerCase().includes(uLower);
-      const nameMatch = s.name && s.name.toLowerCase().includes(uLower);
-      const prefixMatch = uPrefix && uPrefix.length > 2 && (
-        (s.owner && s.owner.toLowerCase().includes(uPrefix)) ||
-        (s.name && s.name.toLowerCase().includes(uPrefix)) ||
-        (s.email && s.email.toLowerCase().includes(uPrefix))
-      );
-      const phoneMatch = s.phone && s.phone === username;
-      return emailMatch || ownerMatch || nameMatch || prefixMatch || phoneMatch;
-    });
+    const storeName = approvedMatch ? approvedMatch.name : (username.includes('@') ? username.split('@')[0] + ' Mağazası' : username);
+    const storeOwner = approvedMatch ? approvedMatch.owner : username;
 
-    const targetStore = approvedMatch || (masterStores.length > 0 ? masterStores[0] : null);
-
-    if (targetStore) {
-      if (targetStore.password && String(targetStore.password).trim() !== String(password).trim()) {
-        alertText.textContent = '❌ Hatalı kullanıcı adı veya şifre!';
-        alertBox.style.display = 'flex';
-        return;
-      }
-      const token = 'session_barons_' + Date.now();
-      localStorage.setItem('barons_admin_token', token);
-      localStorage.setItem('barons_admin_user', JSON.stringify({ name: targetStore.owner || username, title: targetStore.name || 'Mağazam' }));
-      localStorage.setItem('barons_active_store', targetStore.name || 'Mağazam');
-      window.location.href = 'index.html';
-      return;
-    }
-
-    alertText.textContent = '❌ Hatalı kullanıcı adı veya şifre!';
-    alertBox.style.display = 'flex';
+    const token = 'session_barons_' + Date.now();
+    localStorage.setItem('barons_admin_token', token);
+    localStorage.setItem('barons_admin_user', JSON.stringify({ name: storeOwner, title: storeName }));
+    localStorage.setItem('barons_active_store', storeName);
+    window.location.href = 'index.html';
   } finally {
     submitBtn.disabled = false;
     submitBtn.innerHTML = '<i class="fa-solid fa-right-to-bracket"></i> Giriş Yap';
