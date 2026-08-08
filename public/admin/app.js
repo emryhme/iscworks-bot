@@ -2097,7 +2097,7 @@ function approveApplication(appId) {
     owner: app.fullName,
     phone: app.phone,
     ig: `@${app.storeName.toLowerCase().replace(/\s+/g, '_')}`,
-    plan: 'Enterprise VIP',
+    plan: app.plan || 'Pro Store (₺6.000 / Ay)',
     botStatus: 'Aktif',
     ciro: '₺0'
   });

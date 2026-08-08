@@ -177,7 +177,7 @@
     <i class="fa-solid fa-clock-rotate-left" style="font-size:18px;"></i>
     <div>
       <strong>⏳ Başvurunuz Başarıyla Alındı!</strong><br>
-      T.C. Kimlik ve güvenlik incelemesinin ardından hesabınız <strong>Patron (Super Admin)</strong> tarafından onaylanacak ve SMS/E-Posta ile bilgilendirileceksiniz.
+      T.C. Kimlik ve güvenlik incelemesinin ardından hesabınız <strong>yöneticilerimiz tarafından onaylanacaktır</strong> ve SMS/E-Posta ile bilgilendirileceksiniz.
     </div>
   </div>
 
@@ -226,6 +226,18 @@
         <div class="input-wrapper">
           <i class="fa-solid fa-shop"></i>
           <input type="text" id="regStoreName" placeholder="Örn: Lüks Kozmetik & Parfüm Evi" required>
+        </div>
+      </div>
+
+      <div class="form-group full">
+        <label>Abonelik Paketi Seçimi</label>
+        <div class="input-wrapper">
+          <i class="fa-solid fa-box-open"></i>
+          <select id="regPlan" style="width:100%; padding:10px 12px 10px 36px; border-radius:8px; border:1px solid #334155; background:#0f172a; color:white; font-size:12px; outline:none;">
+            <option value="Pro Store (₺6.000 / Ay)">Pro Store (₺6.000 / Ay - ⭐ En Popüler)</option>
+            <option value="Basic Store (₺3.000 / Ay)">Basic Store (₺3.000 / Ay)</option>
+            <option value="Enterprise VIP (₺12.000 / Ay)">Enterprise VIP (₺12.000 / Ay - Sınırsız)</option>
+          </select>
         </div>
       </div>
 
@@ -289,6 +301,8 @@
       return;
     }
 
+    const plan = document.getElementById('regPlan')?.value || 'Pro Store (₺6.000 / Ay)';
+
     const application = {
       id: Date.now(),
       fullName,
@@ -296,6 +310,7 @@
       phone,
       email,
       storeName,
+      plan,
       password,
       status: 'İnceleme Bekliyor',
       createdAt: new Date().toLocaleString('tr-TR')
