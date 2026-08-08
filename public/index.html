@@ -607,9 +607,9 @@
   </nav>
 
   <div class="nav-actions">
-    <button class="btn btn-secondary" onclick="openLoginChoiceModal()">
+    <a href="/admin/login.html" class="btn btn-secondary">
       <i class="fa-solid fa-right-to-bracket"></i> Giriş Yap
-    </button>
+    </a>
     <a href="#fiyatlandirma" class="btn btn-primary">
       <i class="fa-solid fa-rocket"></i> Ücretsiz Deneyin
     </a>
@@ -625,9 +625,9 @@
   <p>Müşteri mesajlarını 3 saniyede yanıtlayın, stok durumunu canlı Google Sheet veritabanından çekin ve siparişleri otomatik toplayarak cironuzu 10 katına çıkarın.</p>
 
   <div class="hero-actions">
-    <button class="btn btn-primary" style="height:48px; padding:0 28px; font-size:15px;" onclick="openLoginChoiceModal()">
+    <a href="/admin/login.html" class="btn btn-primary" style="height:48px; padding:0 28px; font-size:15px;">
       <i class="fa-solid fa-crown"></i> Yönetim Paneline Giriş Yap
-    </button>
+    </a>
     <a href="#demo" class="btn btn-secondary" style="height:48px; padding:0 28px; font-size:15px;">
       <i class="fa-solid fa-play"></i> Canlı AI Botunu Dene
     </a>
@@ -771,7 +771,7 @@
         <li><i class="fa-solid fa-check"></i> Standart Destek</li>
       </ul>
 
-      <button class="btn btn-secondary" onclick="openLoginChoiceModal()">Hemen Başla</button>
+      <a href="/admin/login.html" class="btn btn-secondary">Hemen Başla</a>
     </div>
 
     <div class="pricing-card popular">
@@ -788,7 +788,7 @@
         <li><i class="fa-solid fa-check"></i> Öncelikli Destek</li>
       </ul>
 
-      <button class="btn btn-primary" onclick="openLoginChoiceModal()">Pro Paketi Seç</button>
+      <a href="/admin/login.html" class="btn btn-primary">Pro Paketi Seç</a>
     </div>
 
     <div class="pricing-card">
@@ -804,7 +804,7 @@
         <li><i class="fa-solid fa-check"></i> 7/24 Birebir VIP Destek</li>
       </ul>
 
-      <button class="btn btn-secondary" onclick="openLoginChoiceModal()">Enterprise Başvur</button>
+      <a href="/admin/login.html" class="btn btn-secondary">Enterprise Başvur</a>
     </div>
   </div>
 </section>
@@ -833,36 +833,6 @@
     </div>
   </div>
 </section>
-
-<!-- LOGIN CHOICE MODAL -->
-<div id="loginChoiceModal">
-  <div class="choice-card-box">
-    <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border); padding-bottom:14px;">
-      <h3 style="font-size:16px; font-weight:800; display:flex; align-items:center; gap:8px;">
-        <i class="fa-solid fa-right-to-bracket" style="color:var(--primary);"></i> Giriş Portalı Seçin
-      </h3>
-      <button onclick="closeLoginChoiceModal()" style="background:none; border:none; font-size:24px; color:var(--text-muted); cursor:pointer;">&times;</button>
-    </div>
-
-    <div class="choice-grid">
-      <a href="/admin/login.html" class="choice-item">
-        <div class="choice-icon" style="background:#ff990015; color:#ff9900;">
-          <i class="fa-solid fa-store"></i>
-        </div>
-        <strong style="display:block; font-size:14px; margin-bottom:4px;">Müşteri Mağaza Paneli Girişi</strong>
-        <span style="font-size:10px; color:var(--text-muted);">BARON'S SILLAGE & Dükkan Yönetimi</span>
-      </a>
-
-      <a href="/admin/master-login.html" class="choice-item">
-        <div class="choice-icon" style="background:#8b5cf615; color:#8b5cf6;">
-          <i class="fa-solid fa-shield-halved"></i>
-        </div>
-        <strong style="display:block; font-size:14px; margin-bottom:4px;">ISCWORKS Master Super-Admin</strong>
-        <span style="font-size:10px; color:var(--text-muted);">Tüm Mağazalar & Platform Sahibi</span>
-      </a>
-    </div>
-  </div>
-</div>
 
 <!-- FOOTER -->
 <footer>
