@@ -2681,6 +2681,72 @@ function copyStoreWebhookUrl() {
   showToast('📋 Mağazanıza özel bağımsız Webhook URL kopyalandı!', 'success');
 }
 
+// YENİ ÜRÜN VE STOK GİRİŞİ FORMU SÜRÜCÜSÜ
+async function handleNewProductSubmit(e) {
+  if (e) e.preventDefault();
+  const shortCodeElem = document.getElementById('shortCode');
+  const sizeElem = document.getElementById('sizeInput');
+  const codeElem = document.getElementById('productCode');
+  const nameElem = document.getElementById('productName');
+  const colorElem = document.getElementById('colorInput');
+  const stockElem = document.getElementById('stockInput');
+  const priceElem = document.getElementById('priceInput');
+  const catElem = document.getElementById('categoryInput');
+
+  if (!shortCodeElem || !nameElem) return;
+
+  const sc = shortCodeElem.value.toUpperCase().trim();
+  const size = sizeElem ? sizeElem.value.toUpperCase().trim() : 'M';
+  const code = (codeElem && codeElem.value.trim()) ? codeElem.value.trim().toUpperCase() : `${sc}-${size}`;
+  const name = nameElem.value.trim();
+  const color = colorElem ? colorElem.value.trim() : 'Standart';
+  const stock = Number(stockElem?.value) || 0;
+  const price = Number(priceElem?.value) || 299;
+  const category = catElem ? catElem.value.trim() : 'Genel';
+  const storeName = getActiveStoreName();
+
+  const newProduct = {
+    shortCode: sc,
+    productCode: code,
+    name: name,
+    color: color,
+    size: size,
+    stock: stock,
+    price: price,
+    category: category,
+    storeName: storeName
+  };
+
+  // 1. Mağaza özel yerel depolamaya anında kaydet
+  const currentProducts = getStoreProducts();
+  currentProducts.unshift(newProduct);
+  saveStoreProducts(currentProducts);
+
+  // 2. Sunucu veritabanına kaydet
+  try {
+    await fetch('/api/products', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(newProduct)
+    });
+  } catch (err) {
+    console.warn('[New Product Server Save Warning]:', err);
+  }
+
+  showToast(`🎉 "${name}" (${code}) mağazanıza başarıyla eklendi!`, 'success');
+  
+  const form = document.getElementById('newProductForm');
+  if (form) form.reset();
+
+  setTimeout(() => {
+    window.location.href = 'index.html';
+  }, 600);
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   setTimeout(loadStoreWebhookDetails, 100);
+  const npForm = document.getElementById('newProductForm');
+  if (npForm) {
+    npForm.addEventListener('submit', handleNewProductSubmit);
+  }
 });

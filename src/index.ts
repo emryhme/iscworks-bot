@@ -427,32 +427,34 @@ app.get('/api/stock/:code', async (req, res) => {
   res.json(result);
 });
 
-// Yeni Ürün Ekleme (Google Sheet Senkronizasyonu)
+// Yeni Ürün Ekleme (SQLite Veritabanı & Mağaza İzolasyonu)
 app.post('/api/products', async (req, res) => {
   try {
-    const { shortCode, productCode, name, color, size, stock, category } = req.body;
+    const { shortCode, productCode, name, color, size, stock, price, category, storeName } = req.body || {};
     if (!shortCode || !name || !size) {
-      return res.status(400).json({ success: false, error: 'Kısa kod, ürün ismi ve numara alanları zorunludur' });
+      return res.status(400).json({ success: false, error: 'Kısa kod, ürün ismi ve beden/numara alanları zorunludur.' });
     }
 
     const result = await StockService.addProduct({
       shortCode,
       productCode,
       name,
-      color,
+      color: color || 'Standart',
       size,
       stock: stock ? Number(stock) : 0,
-      category
+      price: price ? Number(price) : 299,
+      category: category || 'Genel',
+      storeName: storeName || ''
     });
 
     if (result.success) {
       res.json({
         success: true,
-        message: 'Ürün Google Sheets stok tablosuna başarıyla kaydedildi!',
+        message: 'Ürün mağaza stok veritabanınıza başarıyla eklendi!',
         productCode: result.productCode
       });
     } else {
-      res.status(500).json({ success: false, error: 'Google Sheets stok tablosuna kaydedilemedi' });
+      res.status(500).json({ success: false, error: 'Ürün veritabanına kaydedilemedi.' });
     }
   } catch (err: any) {
     console.error('[API /api/products Error]:', err);

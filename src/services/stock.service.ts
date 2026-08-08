@@ -217,7 +217,10 @@ export class StockService {
     color?: string;
     size: string;
     stock: number;
+    price?: number;
     category?: string;
+    storeName?: string;
+    storeId?: number;
   }): Promise<{ success: boolean; productCode: string }> {
     try {
       const shortCode = data.shortCode.trim().toUpperCase();
@@ -226,24 +229,29 @@ export class StockService {
         ? data.productCode.trim().toUpperCase() 
         : `${shortCode}-${size}`;
       const name = data.name.trim();
-      const color = (data.color || '').trim();
-      const stock = Number(data.stock) || 0;
-      const category = (data.category || '').trim();
+      const color = (data.color || 'Standart').trim();
+      const stock = Math.max(0, Number(data.stock) || 0);
+      const price = Number(data.price) || 299;
+      const category = (data.category || 'Genel').trim();
+      const storeName = (data.storeName || '').trim();
+      const storeId = data.storeId || 1;
 
-      const stmt = db.prepare(`
-        INSERT INTO products (short_code, product_code, name, color, size, stock, category, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-        ON CONFLICT(product_code) DO UPDATE SET
-          name = excluded.name,
-          color = excluded.color,
-          size = excluded.size,
-          stock = excluded.stock,
-          category = excluded.category,
-          updated_at = CURRENT_TIMESTAMP
-      `);
+      const existing = db.prepare('SELECT id FROM products WHERE product_code = ? OR (short_code = ? AND size = ?)').get(productCode, shortCode, size) as any;
 
-      stmt.run(shortCode, productCode, name, color, size, stock, category);
-      console.log(`[StockService SQLite] ✅ Ürün eklendi/güncellendi: ${productCode}`);
+      if (existing) {
+        db.prepare(`
+          UPDATE products 
+          SET name = ?, color = ?, size = ?, stock = ?, price = ?, category = ?, store_name = ?, store_id = ?, updated_at = CURRENT_TIMESTAMP
+          WHERE id = ?
+        `).run(name, color, size, stock, price, category, storeName, storeId, existing.id);
+      } else {
+        db.prepare(`
+          INSERT INTO products (short_code, product_code, name, color, size, stock, price, category, store_name, store_id, updated_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+        `).run(shortCode, productCode, name, color, size, stock, price, category, storeName, storeId);
+      }
+
+      console.log(`[StockService SQLite] ✅ Ürün eklendi/güncellendi: ${productCode} (Stok: ${stock}, Fiyat: ${price} TL)`);
       return { success: true, productCode };
     } catch (e: any) {
       console.error('[StockService SQLite] ❌ Ürün eklenemedi:', e.message);
