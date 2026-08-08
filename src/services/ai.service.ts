@@ -195,8 +195,14 @@ Yalnızca aşağıdaki JSON yapısını döndür (bilinmeyen alanlar için null 
           const pSize = (data.size || ctx.size || 'M').toUpperCase();
           const pQty = Number(data.quantity) || ctx.quantity || 1;
 
-          const prod = db.prepare('SELECT * FROM products WHERE product_code = ? OR short_code = ?').get(pCode, pCode) as any;
-          const unitPrice = prod?.price || 299;
+          const pCodeUpper = pCode.toUpperCase();
+          const prod = db.prepare(`
+            SELECT * FROM products 
+            WHERE UPPER(product_code) = ? 
+               OR UPPER(short_code) = ?
+            LIMIT 1
+          `).get(pCodeUpper, pCodeUpper) as any;
+          const unitPrice = (prod && prod.price > 0) ? prod.price : 299;
           const productName = prod?.name || pCode;
 
           const stockRes = await StockService.checkStock(pCode);
@@ -272,13 +278,19 @@ Yalnızca aşağıdaki JSON yapısını döndür (bilinmeyen alanlar için null 
             const pCode = (data.productCode || ctx.productCode || 'KGMLW').toUpperCase();
             const pSize = (data.size || ctx.size || 'M').toUpperCase();
             const pQty = Number(data.quantity) || ctx.quantity || 1;
-            const prod = db.prepare('SELECT * FROM products WHERE product_code = ? OR short_code = ?').get(pCode, pCode) as any;
+            const pCodeUpper = pCode.toUpperCase();
+            const prod = db.prepare(`
+              SELECT * FROM products 
+              WHERE UPPER(product_code) = ? 
+                 OR UPPER(short_code) = ?
+              LIMIT 1
+            `).get(pCodeUpper, pCodeUpper) as any;
             ctx.cart.push({
               productCode: pCode,
               productName: prod?.name || pCode,
               size: pSize,
               quantity: pQty,
-              unitPrice: prod?.price || 299
+              unitPrice: (prod && prod.price > 0) ? prod.price : 299
             });
           }
 
@@ -626,9 +638,12 @@ ${rewardText}
    👉 **SEPETTEKİ ÜRÜNLERİ, KARGO DURUMUNU VE TOPLAM SİPARİŞ TUTARINI (TL) MUTLAKA AÇIKÇA BELİRT!**
    
    Örnek Yanıt Formatı:
-   "🛒 **Sepet Özeti:**
-   {Ürün Kodları ve Adetleri}
-   💰 **Toplam Sipariş Tutarınız:** {Net Toplam Ödenecek Tutar} TL ({Kargo Durumu})
+   "🛒 *Sepet Özeti:*
+   - {Ürün İsmi} ({Beden}) x{Adet} - {Ürün Fiyatı x Adet} TL
+   - {Ürün İsmi} ({Beden}) x{Adet} - {Ürün Fiyatı x Adet} TL
+   💰 *Toplam Sipariş Tutarınız:* {Net Toplam Ödenecek Tutar} TL ({Kargo Durumu})
+
+   ⚠️ ÖNEMLI: Her ürün satırında fiyatı MUTLAKA yaz. Fiyat bilmiyorsan STOK_SORGULA'dan veya SEPETE_EKLE sonucundan al. ASLA "[Fiyat Bilgisi Mevcut Değil]" yazma — bunun yerine varsayılan 299 TL kullan.
 
    Siparişinizi tamamlamadan önce, lütfen aşağıdaki bilgileri paylaşın:
    1. Adınız ve Soyadınız
