@@ -87,18 +87,22 @@ function setupUserDropdown() {
     const userTitle = isMaster ? 'Super Admin (Patron)' : 'Mağaza Yöneticisi';
     const userName = isMaster ? 'Tony Stark' : (userObj.name || 'Mağaza Yöneticisi');
 
-    dropdown.innerHTML = `
-      <div style="padding: 10px 16px; border-bottom: 1px solid #f0f0f0;">
-        <strong style="font-size: 12px; display: block; color: #111827;">${escapeHtml(userName)}</strong>
-        <span style="font-size: 10px; color: #6b7280;">${escapeHtml(userTitle)}</span>
-      </div>
-      ${masterLinkHtml}
+    const sellerLinksHtml = isMaster ? '' : `
       <a href="api-settings.html" style="padding: 10px 16px; font-size: 11px; color: #374151; text-decoration: none; display: flex; align-items: center; gap: 8px;" onmouseover="this.style.background='#f3f4f6'" onmouseout="this.style.background='transparent'">
         <i class="fa-solid fa-sliders" style="color: #ff9900;"></i> API & AI Kişiselleştirme
       </a>
       <a href="settings.html" style="padding: 10px 16px; font-size: 11px; color: #374151; text-decoration: none; display: flex; align-items: center; gap: 8px;" onmouseover="this.style.background='#f3f4f6'" onmouseout="this.style.background='transparent'">
         <i class="fa-solid fa-gear" style="color: #3b82f6;"></i> Fiyat & Kargo Ayarları
       </a>
+    `;
+
+    dropdown.innerHTML = `
+      <div style="padding: 10px 16px; border-bottom: 1px solid #f0f0f0;">
+        <strong style="font-size: 12px; display: block; color: #111827;">${escapeHtml(userName)}</strong>
+        <span style="font-size: 10px; color: #6b7280;">${escapeHtml(userTitle)}</span>
+      </div>
+      ${masterLinkHtml}
+      ${sellerLinksHtml}
       <div style="border-top: 1px solid #f0f0f0; margin-top: 4px; padding-top: 4px;">
         <div onclick="logoutUser()" style="padding: 10px 16px; font-size: 11px; color: #ef4444; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 8px;" onmouseover="this.style.background='#fef2f2'" onmouseout="this.style.background='transparent'">
           <i class="fa-solid fa-right-from-bracket"></i> Çıkış Yap (Logout)
