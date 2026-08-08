@@ -235,9 +235,14 @@ function rejectMerchantApplication(id) {
     return stmt.run(id);
 }
 function findMerchantApplicationByIdentifier(identifier) {
+    const cleanId = (identifier || '').trim();
     const stmt = exports.db.prepare(`
     SELECT * FROM merchant_applications 
-    WHERE LOWER(email) = LOWER(?) OR LOWER(store_name) = LOWER(?) OR LOWER(full_name) = LOWER(?)
+    WHERE LOWER(email) = LOWER(?) 
+       OR LOWER(store_name) = LOWER(?) 
+       OR LOWER(full_name) = LOWER(?)
+       OR phone = ?
+       OR tc_no = ?
   `);
-    return stmt.get(identifier);
+    return stmt.get(cleanId, cleanId, cleanId, cleanId, cleanId);
 }

@@ -250,8 +250,8 @@
         localStorage.setItem('barons_admin_user', JSON.stringify(data.user || { name: username, title: 'Mağaza Yöneticisi' }));
         window.location.href = 'index.html';
         return;
-      } else if (data.error) {
-        alertText.textContent = data.error;
+      } else if (data.pending) {
+        alertText.textContent = data.error || '⏳ Hesabınız henüz onay aşamasındadır. Yöneticilerimiz tarafından onaylandıktan sonra giriş yapabilirsiniz.';
         alertBox.style.display = 'flex';
         return;
       }
