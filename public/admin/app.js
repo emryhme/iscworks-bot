@@ -65,7 +65,7 @@ function setupUserDropdown() {
         <span style="font-size: 10px; color: #6b7280;">Super Admin (Patron)</span>
       </div>
       <a href="master.html" style="padding: 10px 16px; font-size: 11px; color: #7c3aed; font-weight: 700; text-decoration: none; display: flex; align-items: center; gap: 8px; background: #f3e8ff;" onmouseover="this.style.background='#e9d5ff'" onmouseout="this.style.background='#f3e8ff'">
-        <i class="fa-solid fa-shield-halved" style="color: #8b5cf6;"></i> Master SaaS Super-Admin
+        <i class="fa-solid fa-shield-halved" style="color: #8b5cf6;"></i> ISCWORKS Master Konsolu
       </a>
       <a href="api-settings.html" style="padding: 10px 16px; font-size: 11px; color: #374151; text-decoration: none; display: flex; align-items: center; gap: 8px;" onmouseover="this.style.background='#f3f4f6'" onmouseout="this.style.background='transparent'">
         <i class="fa-solid fa-sliders" style="color: #ff9900;"></i> API & AI Kişiselleştirme
