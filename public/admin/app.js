@@ -15,6 +15,52 @@ const state = {
   isFetching: false
 };
 
+function applyDynamicStoreBranding() {
+  const isMaster = (localStorage.getItem('iscworks_is_master_admin') === 'true');
+  const userObj = JSON.parse(localStorage.getItem('barons_admin_user') || '{}');
+  const storeName = isMaster 
+    ? (localStorage.getItem('barons_active_store') || "BARON'S SILLAGE") 
+    : (userObj.title || localStorage.getItem('barons_active_store') || "Özel Mağaza");
+
+  // Document Title Güncelleme
+  document.title = `${storeName} — CommerceOS Engine`;
+
+  // Topbar Kullanıcı Kartı Güncelleme
+  const userNameElem = document.querySelector('.user strong');
+  const userTitleElem = document.querySelector('.user span');
+  if (userNameElem) {
+    userNameElem.textContent = isMaster ? 'Tony Stark' : (userObj.name || 'Mağaza Yöneticisi');
+  }
+  if (userTitleElem) {
+    userTitleElem.textContent = isMaster ? 'Super Admin (Patron)' : `${storeName} Yöneticisi`;
+  }
+
+  // Sidebar Sol Üst Logo ve Mağaza Adı Güncelleme
+  const logoElem = document.querySelector('.sidebar .logo');
+  if (logoElem) {
+    logoElem.innerHTML = `
+      <div class="logo-mark">
+        <i data-lucide="crown" size="20"></i>
+      </div>
+      ${escapeHtml(storeName)}
+    `;
+    if (window.lucide && typeof window.lucide.createIcons === 'function') {
+      try { window.lucide.createIcons(); } catch (e) {}
+    }
+  }
+
+  // Sidebar Sol Alt Kart Güncelleme
+  const storeAvatar = document.querySelector('.sidebar-bottom .store-avatar');
+  const storeTitle = document.querySelector('.sidebar-bottom .store-info strong');
+  const storeSub = document.querySelector('.sidebar-bottom .store-info small');
+  if (storeAvatar) {
+    const initials = storeName.split(' ').map(w => w[0]).join('').substring(0, 2).toUpperCase() || 'M';
+    storeAvatar.textContent = initials;
+  }
+  if (storeTitle) storeTitle.textContent = storeName;
+  if (storeSub) storeSub.textContent = isMaster ? 'Master Platform Admin' : 'Özel Mağaza Kontrol Paneli';
+}
+
 function checkAuthStatus() {
   const path = window.location.pathname;
   if (path.endsWith('login.html') || path.endsWith('master-login.html')) return;
@@ -31,6 +77,8 @@ function checkAuthStatus() {
   const token = localStorage.getItem('barons_admin_token');
   if (!token) {
     window.location.href = 'login.html';
+  } else {
+    setTimeout(applyDynamicStoreBranding, 50);
   }
 }
 
