@@ -271,7 +271,7 @@
 </div>
 
 <script>
-  document.getElementById('registerForm').addEventListener('submit', (e) => {
+  document.getElementById('registerForm').addEventListener('submit', async (e) => {
     e.preventDefault();
     const errorBox = document.getElementById('regErrorAlert');
     const errorText = document.getElementById('regErrorText');
@@ -303,25 +303,40 @@
 
     const plan = document.getElementById('regPlan')?.value || 'Pro Store (₺6.000 / Ay)';
 
-    const application = {
-      id: Date.now(),
-      fullName,
-      tcNo,
-      phone,
-      email,
-      storeName,
-      plan,
-      password,
-      status: 'İnceleme Bekliyor',
-      createdAt: new Date().toLocaleString('tr-TR')
-    };
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Kaydediliyor...';
 
-    let apps = JSON.parse(localStorage.getItem('barons_pending_applications')) || [];
-    apps.unshift(application);
-    localStorage.setItem('barons_pending_applications', JSON.stringify(apps));
+    try {
+      const res = await fetch('/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fullName, tcNo, phone, email, storeName, plan, password })
+      });
+      const data = await res.json();
 
-    form.style.display = 'none';
-    pendingBox.style.display = 'flex';
+      if (data.success) {
+        form.style.display = 'none';
+        pendingBox.style.display = 'flex';
+      } else {
+        errorText.textContent = `❌ ${data.error || 'Başvuru kaydedilemedi.'}`;
+        errorBox.style.display = 'flex';
+      }
+    } catch (err) {
+      let apps = JSON.parse(localStorage.getItem('barons_pending_applications')) || [];
+      apps.unshift({
+        id: Date.now(),
+        fullName, tcNo, phone, email, storeName, plan, password,
+        status: 'İnceleme Bekliyor',
+        createdAt: new Date().toLocaleString('tr-TR')
+      });
+      localStorage.setItem('barons_pending_applications', JSON.stringify(apps));
+
+      form.style.display = 'none';
+      pendingBox.style.display = 'flex';
+    } finally {
+      submitBtn.disabled = false;
+      submitBtn.innerHTML = '<i class="fa-solid fa-paper-plane"></i> Başvuruyu Tamamla & Onaya Gönder';
+    }
   });
 </script>
 

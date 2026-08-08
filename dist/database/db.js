@@ -5,6 +5,11 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.db = void 0;
 exports.initDatabase = initDatabase;
+exports.createMerchantApplication = createMerchantApplication;
+exports.getAllMerchantApplications = getAllMerchantApplications;
+exports.approveMerchantApplication = approveMerchantApplication;
+exports.rejectMerchantApplication = rejectMerchantApplication;
+exports.findMerchantApplicationByIdentifier = findMerchantApplicationByIdentifier;
 const better_sqlite3_1 = __importDefault(require("better-sqlite3"));
 const path_1 = __importDefault(require("path"));
 /**
@@ -87,6 +92,22 @@ function initDatabase() {
       is_used INTEGER NOT NULL DEFAULT 0,
       created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
       used_at TEXT DEFAULT NULL
+    );
+  `);
+    // 6. Üye / Mağaza Başvuruları Tablosu (merchant_applications)
+    exports.db.exec(`
+    CREATE TABLE IF NOT EXISTS merchant_applications (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      full_name TEXT NOT NULL,
+      tc_no TEXT NOT NULL,
+      phone TEXT NOT NULL,
+      email TEXT NOT NULL UNIQUE,
+      store_name TEXT NOT NULL,
+      plan TEXT NOT NULL DEFAULT 'Pro Store (₺6.000 / Ay)',
+      password TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'pending',
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
     );
   `);
     // Auto Migrations: Kolonlar eksikse otomatik ekle
@@ -194,3 +215,29 @@ function seedInitialCampaigns() {
 }
 // Veritabanını Otomatik İlklendir
 initDatabase();
+function createMerchantApplication(data) {
+    const stmt = exports.db.prepare(`
+    INSERT INTO merchant_applications (full_name, tc_no, phone, email, store_name, plan, password, status)
+    VALUES (?, ?, ?, ?, ?, ?, ?, 'pending')
+  `);
+    return stmt.run(data.fullName, data.tcNo, data.phone, data.email, data.storeName, data.plan || 'Pro Store (₺6.000 / Ay)', data.password || '123456');
+}
+function getAllMerchantApplications() {
+    const stmt = exports.db.prepare(`SELECT * FROM merchant_applications ORDER BY id DESC`);
+    return stmt.all();
+}
+function approveMerchantApplication(id) {
+    const stmt = exports.db.prepare(`UPDATE merchant_applications SET status = 'approved', updated_at = CURRENT_TIMESTAMP WHERE id = ?`);
+    return stmt.run(id);
+}
+function rejectMerchantApplication(id) {
+    const stmt = exports.db.prepare(`UPDATE merchant_applications SET status = 'rejected', updated_at = CURRENT_TIMESTAMP WHERE id = ?`);
+    return stmt.run(id);
+}
+function findMerchantApplicationByIdentifier(identifier) {
+    const stmt = exports.db.prepare(`
+    SELECT * FROM merchant_applications 
+    WHERE LOWER(email) = LOWER(?) OR LOWER(store_name) = LOWER(?) OR LOWER(full_name) = LOWER(?)
+  `);
+    return stmt.get(identifier);
+}

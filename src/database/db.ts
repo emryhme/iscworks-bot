@@ -91,6 +91,23 @@ export function initDatabase() {
     );
   `);
 
+  // 6. Üye / Mağaza Başvuruları Tablosu (merchant_applications)
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS merchant_applications (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      full_name TEXT NOT NULL,
+      tc_no TEXT NOT NULL,
+      phone TEXT NOT NULL,
+      email TEXT NOT NULL UNIQUE,
+      store_name TEXT NOT NULL,
+      plan TEXT NOT NULL DEFAULT 'Pro Store (₺6.000 / Ay)',
+      password TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'pending',
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
+
   // Auto Migrations: Kolonlar eksikse otomatik ekle
   try { db.exec(`ALTER TABLE products ADD COLUMN price REAL NOT NULL DEFAULT 299.00;`); } catch (e) {}
   try { db.exec(`ALTER TABLE orders ADD COLUMN unit_price REAL NOT NULL DEFAULT 0;`); } catch (e) {}
@@ -195,3 +212,50 @@ function seedInitialCampaigns() {
 
 // Veritabanını Otomatik İlklendir
 initDatabase();
+
+export function createMerchantApplication(data: {
+  fullName: string;
+  tcNo: string;
+  phone: string;
+  email: string;
+  storeName: string;
+  plan?: string;
+  password?: string;
+}) {
+  const stmt = db.prepare(`
+    INSERT INTO merchant_applications (full_name, tc_no, phone, email, store_name, plan, password, status)
+    VALUES (?, ?, ?, ?, ?, ?, ?, 'pending')
+  `);
+  return stmt.run(
+    data.fullName,
+    data.tcNo,
+    data.phone,
+    data.email,
+    data.storeName,
+    data.plan || 'Pro Store (₺6.000 / Ay)',
+    data.password || '123456'
+  );
+}
+
+export function getAllMerchantApplications() {
+  const stmt = db.prepare(`SELECT * FROM merchant_applications ORDER BY id DESC`);
+  return stmt.all();
+}
+
+export function approveMerchantApplication(id: number) {
+  const stmt = db.prepare(`UPDATE merchant_applications SET status = 'approved', updated_at = CURRENT_TIMESTAMP WHERE id = ?`);
+  return stmt.run(id);
+}
+
+export function rejectMerchantApplication(id: number) {
+  const stmt = db.prepare(`UPDATE merchant_applications SET status = 'rejected', updated_at = CURRENT_TIMESTAMP WHERE id = ?`);
+  return stmt.run(id);
+}
+
+export function findMerchantApplicationByIdentifier(identifier: string) {
+  const stmt = db.prepare(`
+    SELECT * FROM merchant_applications 
+    WHERE LOWER(email) = LOWER(?) OR LOWER(store_name) = LOWER(?) OR LOWER(full_name) = LOWER(?)
+  `);
+  return stmt.get(identifier);
+}

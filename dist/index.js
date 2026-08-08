@@ -30,7 +30,56 @@ app.use((req, res, next) => {
 });
 app.use(express_1.default.json());
 app.use(express_1.default.urlencoded({ extended: true }));
-// AUTH API REST ENDPOINTS
+const db_2 = require("./database/db");
+// AUTH API REST ENDPOINTS (SQLite Database Persistence)
+app.post('/api/auth/register', (req, res) => {
+    try {
+        const { fullName, tcNo, phone, email, storeName, plan, password } = req.body || {};
+        if (!fullName || !tcNo || !phone || !email || !storeName || !password) {
+            return res.status(400).json({ success: false, error: 'Lütfen tüm zorunlu alanları doldurun.' });
+        }
+        if (tcNo.length !== 11) {
+            return res.status(400).json({ success: false, error: 'T.C. Kimlik Numarası 11 haneli olmalıdır.' });
+        }
+        (0, db_2.createMerchantApplication)({ fullName, tcNo, phone, email, storeName, plan, password });
+        return res.json({ success: true, message: 'Başvuru veritabanına başarıyla kaydedildi.' });
+    }
+    catch (err) {
+        if (err.message && err.message.includes('UNIQUE')) {
+            return res.status(400).json({ success: false, error: 'Bu E-Posta adresi ile zaten bir başvuru mevcut.' });
+        }
+        return res.status(500).json({ success: false, error: 'Veritabanı kayıt hatası oluştu.' });
+    }
+});
+app.get('/api/admin/applications', (req, res) => {
+    try {
+        const applications = (0, db_2.getAllMerchantApplications)();
+        return res.json({ success: true, applications });
+    }
+    catch (err) {
+        return res.status(500).json({ success: false, applications: [] });
+    }
+});
+app.post('/api/admin/applications/:id/approve', (req, res) => {
+    try {
+        const id = parseInt(req.params.id, 10);
+        (0, db_2.approveMerchantApplication)(id);
+        return res.json({ success: true });
+    }
+    catch (err) {
+        return res.status(500).json({ success: false, error: 'Onaylama hatası' });
+    }
+});
+app.post('/api/admin/applications/:id/reject', (req, res) => {
+    try {
+        const id = parseInt(req.params.id, 10);
+        (0, db_2.rejectMerchantApplication)(id);
+        return res.json({ success: true });
+    }
+    catch (err) {
+        return res.status(500).json({ success: false, error: 'Reddetme hatası' });
+    }
+});
 app.post('/api/auth/login', (req, res) => {
     const { username, password } = req.body || {};
     const ADMIN_USER = process.env.ADMIN_USER || 'tonystark';
@@ -50,9 +99,42 @@ app.post('/api/auth/login', (req, res) => {
             }
         });
     }
-    else {
-        return res.status(401).json({ success: false, error: 'Hatalı kullanıcı adı veya şifre!' });
+    try {
+        const dbApp = (0, db_2.findMerchantApplicationByIdentifier)(username);
+        if (dbApp) {
+            if (dbApp.password !== password) {
+                return res.status(401).json({ success: false, error: '❌ Hatalı kullanıcı adı veya şifre!' });
+            }
+            if (dbApp.status === 'pending') {
+                return res.status(403).json({
+                    success: false,
+                    pending: true,
+                    error: '⏳ Hesabınız henüz onay aşamasındadır. Yöneticilerimiz tarafından onaylandıktan sonra giriş yapabilirsiniz.'
+                });
+            }
+            if (dbApp.status === 'rejected') {
+                return res.status(403).json({
+                    success: false,
+                    error: '❌ Hesabınız reddedilmiştir. Lütfen destek ekibi ile iletişime geçin.'
+                });
+            }
+            if (dbApp.status === 'approved') {
+                const token = 'session_barons_' + Date.now() + '_' + Math.random().toString(36).substring(2);
+                return res.json({
+                    success: true,
+                    token: token,
+                    user: {
+                        username: dbApp.email,
+                        name: dbApp.full_name,
+                        title: dbApp.store_name,
+                        role: 'Merchant'
+                    }
+                });
+            }
+        }
     }
+    catch (err) { }
+    return res.status(401).json({ success: false, error: '❌ Hatalı kullanıcı adı veya şifre!' });
 });
 app.get('/api/auth/verify', (req, res) => {
     return res.json({ success: true, valid: true });

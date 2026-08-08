@@ -2039,12 +2039,34 @@ state.pendingApplications = JSON.parse(localStorage.getItem('barons_pending_appl
   }
 ];
 
-function renderPendingApplicationsTable() {
+async function fetchServerApplications() {
+  try {
+    const res = await fetch('/api/admin/applications');
+    const data = await res.json();
+    if (data.success && Array.isArray(data.applications)) {
+      state.pendingApplications = data.applications.map(a => ({
+        id: a.id,
+        fullName: a.full_name,
+        tcNo: a.tc_no,
+        phone: a.phone,
+        email: a.email,
+        storeName: a.store_name,
+        plan: a.plan,
+        status: a.status === 'pending' ? 'İnceleme Bekliyor' : (a.status === 'approved' ? 'Onaylandı' : 'Reddedildi'),
+        createdAt: a.created_at
+      })).filter(a => a.status === 'İnceleme Bekliyor');
+
+      localStorage.setItem('barons_pending_applications', JSON.stringify(state.pendingApplications));
+    }
+  } catch (err) {}
+}
+
+async function renderPendingApplicationsTable() {
   const tbody = document.getElementById('pendingAppsTableBody');
   const countText = document.getElementById('pendingAppsCountText');
   if (!tbody) return;
 
-  state.pendingApplications = JSON.parse(localStorage.getItem('barons_pending_applications')) || state.pendingApplications;
+  await fetchServerApplications();
 
   if (countText) {
     countText.textContent = state.pendingApplications.length > 0
@@ -2088,37 +2110,40 @@ function renderPendingApplicationsTable() {
   `).join('');
 }
 
-function approveApplication(appId) {
+async function approveApplication(appId) {
+  try {
+    await fetch(`/api/admin/applications/${appId}/approve`, { method: 'POST' });
+  } catch (e) {}
+
   const appIndex = state.pendingApplications.findIndex(a => a.id === appId);
-  if (appIndex === -1) return;
+  if (appIndex !== -1) {
+    const app = state.pendingApplications[appIndex];
+    state.masterStores.unshift({
+      id: Date.now(),
+      name: app.storeName,
+      owner: app.fullName,
+      phone: app.phone,
+      ig: `@${app.storeName.toLowerCase().replace(/\s+/g, '_')}`,
+      plan: app.plan || 'Pro Store (₺6.000 / Ay)',
+      botStatus: 'Aktif',
+      ciro: '₺0'
+    });
+    state.pendingApplications.splice(appIndex, 1);
+    localStorage.setItem('barons_pending_applications', JSON.stringify(state.pendingApplications));
+    localStorage.setItem('barons_master_stores', JSON.stringify(state.masterStores));
+    showToast(`🎉 ${app.storeName} başvurusu onaylandı ve mağaza veritabanında aktif edildi!`, 'success');
+  }
 
-  const app = state.pendingApplications[appIndex];
-  
-  // Add to master stores list
-  state.masterStores.unshift({
-    id: Date.now(),
-    name: app.storeName,
-    owner: app.fullName,
-    phone: app.phone,
-    ig: `@${app.storeName.toLowerCase().replace(/\s+/g, '_')}`,
-    plan: app.plan || 'Pro Store (₺6.000 / Ay)',
-    botStatus: 'Aktif',
-    ciro: '₺0'
-  });
-
-  // Remove from pending
-  state.pendingApplications.splice(appIndex, 1);
-
-  localStorage.setItem('barons_pending_applications', JSON.stringify(state.pendingApplications));
-  localStorage.setItem('barons_master_stores', JSON.stringify(state.masterStores));
-
-  showToast(`🎉 ${app.storeName} başvurusu onaylandı ve mağaza aktif edildi!`, 'success');
   renderPendingApplicationsTable();
   renderMasterStoresTable();
 }
 
-function rejectApplication(appId) {
+async function rejectApplication(appId) {
   if (!confirm('Bu başvuruyu reddetmek istediğinize emin misiniz?')) return;
+  try {
+    await fetch(`/api/admin/applications/${appId}/reject`, { method: 'POST' });
+  } catch (e) {}
+
   state.pendingApplications = state.pendingApplications.filter(a => a.id !== appId);
   localStorage.setItem('barons_pending_applications', JSON.stringify(state.pendingApplications));
   showToast('❌ Başvuru reddedildi.', 'info');
