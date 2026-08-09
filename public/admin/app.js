@@ -2163,16 +2163,70 @@ function exportStoreDataToCSV() {
   showToast('📥 Mağaza stok verileriniz CSV dosyası olarak indirildi.', 'success');
 }
 
-// MAĞAZAYA ÖZEL WEBHOOK URL HESAPLAMA VE KOPYALAMA
-function loadStoreWebhookDetails() {
+// MAĞAZAYA ÖZEL WEBHOOK VE META ENTEGRASYON SÜRÜCÜSÜ
+async function loadStoreWebhookDetails() {
   const input = document.getElementById('storeWebhookUrl');
   if (!input) return;
 
-  const storeName = getActiveStoreName();
-  const slug = storeName.toLowerCase().replace(/[^a-z0-9]/g, '');
-  const origin = window.location.origin || 'http://34.179.173.204';
-  
-  input.value = `${origin}/api/webhook/${slug || 'magaza'}`;
+  const origin = window.location.origin || 'http://localhost:3000';
+
+  try {
+    const data = await apiFetch('/api/integration/status');
+    if (data && data.success) {
+      if (input) input.value = `${origin}/api/webhook/${data.storeSlug}`;
+      
+      const globalInput = document.getElementById('globalWebhookUrl');
+      if (globalInput) globalInput.value = `${origin}/webhook/instagram`;
+
+      const pageIdInput = document.getElementById('metaPageIdInput');
+      if (pageIdInput) pageIdInput.value = data.metaPageId || '';
+
+      const igAccountInput = document.getElementById('igAccountIdInput');
+      if (igAccountInput) igAccountInput.value = data.instagramAccountId || '';
+
+      const igUserInput = document.getElementById('igUsernameInput');
+      if (igUserInput) igUserInput.value = data.instagramUsername || '';
+
+      const statusBadge = document.getElementById('metaStatusBadge');
+      if (statusBadge) {
+        if (data.connected) {
+          statusBadge.className = 'status-badge in-stock';
+          statusBadge.innerHTML = '🟢 Bağlı (Connected)';
+        } else {
+          statusBadge.className = 'status-badge out-stock';
+          statusBadge.innerHTML = '🔴 Bağlı Değil (Not Connected)';
+        }
+      }
+
+      const lastEvtElem = document.getElementById('lastWebhookEventTime');
+      if (lastEvtElem) {
+        lastEvtElem.textContent = data.lastWebhookAt || 'Henüz event gelmedi';
+      }
+    }
+  } catch (e) {
+    const storeName = getActiveStoreName();
+    const slug = storeName.toLowerCase().replace(/[^a-z0-9]/g, '');
+    if (input) input.value = `${origin}/api/webhook/${slug || 'magaza'}`;
+  }
+}
+
+async function saveMetaIntegrationSettings() {
+  const pageId = document.getElementById('metaPageIdInput')?.value.trim();
+  const igAccountId = document.getElementById('igAccountIdInput')?.value.trim();
+  const igUsername = document.getElementById('igUsernameInput')?.value.trim();
+
+  try {
+    const data = await apiFetch('/api/integration/meta', {
+      method: 'POST',
+      body: JSON.stringify({
+        metaPageId: pageId,
+        instagramAccountId: igAccountId,
+        instagramUsername: igUsername
+      })
+    });
+    showToast(data.message || 'Meta entegrasyon ayarları kaydedildi!', 'success');
+    loadStoreWebhookDetails();
+  } catch (e) {}
 }
 
 function copyStoreWebhookUrl() {

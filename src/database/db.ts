@@ -322,6 +322,12 @@ export function initDatabase() {
   try { db.exec(`ALTER TABLE user_rewards ADD COLUMN store_id INTEGER NOT NULL DEFAULT 1;`); } catch (e) {}
   try { db.exec(`ALTER TABLE webhook_events ADD COLUMN store_id INTEGER NOT NULL DEFAULT 1;`); } catch (e) {}
   db.exec(`CREATE INDEX IF NOT EXISTS idx_webhook_events_store_event ON webhook_events(store_id, event_id);`);
+  try { db.exec(`ALTER TABLE stores ADD COLUMN meta_page_id TEXT DEFAULT '';`); } catch (e) {}
+  try { db.exec(`ALTER TABLE stores ADD COLUMN instagram_account_id TEXT DEFAULT '';`); } catch (e) {}
+  try { db.exec(`ALTER TABLE stores ADD COLUMN instagram_username TEXT DEFAULT '';`); } catch (e) {}
+  try { db.exec(`ALTER TABLE stores ADD COLUMN last_webhook_at TEXT DEFAULT NULL;`); } catch (e) {}
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_stores_meta_page ON stores(meta_page_id);`);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_stores_ig_account ON stores(instagram_account_id);`);
 
   // Multi-Tenant Migration 1: products tablosunu UNIQUE(store_id, product_code) yapısına geçir
   const productsSchema = db.prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'products'").get() as { sql: string } | undefined;

@@ -212,7 +212,26 @@ export class WebhookController {
   }
 
   /**
+   * Helper: Resolves store by Meta Page ID / Instagram Account ID / Entry ID
+   */
+  public static resolveStoreByMetaId(metaId: string): { id: number; name: string; slug: string; status: string } | null {
+    const cleanId = (metaId || '').trim();
+    if (!cleanId) return null;
+    try {
+      const store = db.prepare(`
+        SELECT id, name, slug, status FROM stores 
+        WHERE meta_page_id = ? OR instagram_account_id = ? OR slug = ? OR CAST(id AS TEXT) = ?
+      `).get(cleanId, cleanId, cleanId, cleanId) as any;
+      return store || null;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
    * Gelen Instagram / Messenger Mesajlarını İşleme (POST /webhook/instagram)
+   * Strictly resolves tenant via verified Meta Page ID / Entry ID or fallback default store.
+   * Client-supplied req.body.storeId or req.query.storeId is COMPLETELY IGNORED!
    */
   public static async handleWebhook(req: Request, res: Response): Promise<void> {
     const defaultStore = db.prepare("SELECT id, name, slug, status FROM stores WHERE slug = 'default' OR id = 1 LIMIT 1").get() as any;
@@ -222,13 +241,8 @@ export class WebhookController {
       return;
     }
 
-    if (defaultStore.status !== 'active') {
-      res.status(403).json({ success: false, error: 'Mağaza pasif/askıda durumdadır.' });
-      return;
-    }
-
     if (!WebhookController.verifySignature(req)) {
-      res.status(401).json({ success: false, error: 'Geçersiz Webhook İmzası.' });
+      res.status(401).json({ success: false, error: 'Geçersiz Webhook İmzası (Signature Verification Failed).' });
       return;
     }
 
@@ -238,6 +252,19 @@ export class WebhookController {
     if (!body || !body.entry || !Array.isArray(body.entry)) return;
 
     for (const entry of body.entry) {
+      const entryMetaId = String(entry.id || '');
+      const matchedStore = WebhookController.resolveStoreByMetaId(entryMetaId) || defaultStore;
+
+      if (!matchedStore || matchedStore.status !== 'active') {
+        console.warn(`[WebhookController] ⛔ Target store ${matchedStore?.slug || 'unknown'} is suspended or inactive. Skipping webhook event.`);
+        continue;
+      }
+
+      // Update last_webhook_at timestamp
+      try {
+        db.prepare('UPDATE stores SET last_webhook_at = CURRENT_TIMESTAMP WHERE id = ?').run(matchedStore.id);
+      } catch {}
+
       const messagingList = entry.messaging || [];
       for (const messagingEvent of messagingList) {
         const senderId = messagingEvent.sender?.id;
@@ -246,7 +273,7 @@ export class WebhookController {
         if (!senderId || !message || message.is_echo) continue;
 
         const eventId = String(message.mid || `${entry.id}_${messagingEvent.timestamp || Date.now()}`);
-        if (WebhookController.isDuplicateEvent(eventId, defaultStore.id)) {
+        if (WebhookController.isDuplicateEvent(eventId, matchedStore.id)) {
           continue;
         }
 
@@ -261,7 +288,8 @@ export class WebhookController {
         }
 
         if (incomingText.trim()) {
-          WebhookController.processAndReply(senderId, incomingText, defaultStore.slug, defaultStore.id);
+          console.log(`[Global Webhook -> Resolved Store: ${matchedStore.slug} (ID: ${matchedStore.id})] 🚀 DM Mesajı İşleniyor (${senderId}): "${incomingText}"`);
+          WebhookController.processAndReply(senderId, incomingText, matchedStore.slug, matchedStore.id);
         }
       }
 
@@ -274,13 +302,14 @@ export class WebhookController {
         if (!senderId) continue;
 
         const eventId = String(value.item_id || value.comment_id || `${entry.id}_${Date.now()}`);
-        if (WebhookController.isDuplicateEvent(eventId, defaultStore.id)) {
+        if (WebhookController.isDuplicateEvent(eventId, matchedStore.id)) {
           continue;
         }
 
         const incomingText = typeof message === 'string' ? message : message?.text || '';
         if (incomingText.trim()) {
-          WebhookController.processAndReply(senderId, incomingText, defaultStore.slug, defaultStore.id);
+          console.log(`[Global Webhook Changes -> Resolved Store: ${matchedStore.slug} (ID: ${matchedStore.id})] 🚀 Mesaj İşleniyor (${senderId}): "${incomingText}"`);
+          WebhookController.processAndReply(senderId, incomingText, matchedStore.slug, matchedStore.id);
         }
       }
     }
