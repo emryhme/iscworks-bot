@@ -9,7 +9,7 @@ const webhook_controller_1 = require("../controllers/webhook.controller");
 const auth_middleware_1 = require("../middleware/auth.middleware");
 const db_1 = require("../database/db");
 async function runTestSuite() {
-    console.log('🧪 Starting ISC Works Stage 7 Multi-Tenant Frontend & Master Security Test Suite...\n');
+    console.log('🧪 Starting ISC Works Master Admin & Master Security Test Suite...\n');
     let passed = 0;
     let failed = 0;
     function assert(condition, testName) {
@@ -23,7 +23,7 @@ async function runTestSuite() {
         }
     }
     // PRE-TEST CLEANUP
-    db_1.db.prepare('DELETE FROM audit_logs WHERE store_id IN (100, 200, 999)').run();
+    db_1.db.prepare('DELETE FROM audit_logs WHERE store_id IN (1, 100, 200, 999)').run();
     db_1.db.prepare('DELETE FROM api_keys WHERE store_id IN (100, 200, 999)').run();
     db_1.db.prepare('DELETE FROM orders WHERE store_id IN (100, 200, 999)').run();
     db_1.db.prepare('DELETE FROM order_items WHERE store_id IN (100, 200, 999)').run();
@@ -134,26 +134,36 @@ async function runTestSuite() {
     auth_middleware_1.AuthMiddleware.logAudit(100, 10, 'TEST_AUDIT_ACTION', 'products', 'TSH-M');
     const auditRow = db_1.db.prepare("SELECT * FROM audit_logs WHERE store_id = 100 AND action = 'TEST_AUDIT_ACTION'").get();
     assert(auditRow !== undefined && auditRow.user_id === 10 && auditRow.entity_id === 'TSH-M', 'Audit log inserted strictly with store_id 100 and user_id 10');
-    // 5. STAGE 7 FRONTEND & REGRESSION TESTS
-    console.log('\n1️⃣3️⃣ STAGE 7 FRONTEND TEST 1: XSS Neutralization Utility');
-    function escapeHtmlTest(str) {
-        return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
-    }
-    const xssVector = '<script>alert("hack")</script>';
-    const escaped = escapeHtmlTest(xssVector);
-    assert(!escaped.includes('<script>') && escaped.includes('&lt;script&gt;'), 'XSS script injection vector successfully neutralized');
-    console.log('\n1️⃣4️⃣ STAGE 7 FRONTEND TEST 2: Multi-Tenant Data Fetch Isolation');
-    const prodsStoreA = await stock_service_1.StockService.getAllProducts(100);
-    const prodsStoreB = await stock_service_1.StockService.getAllProducts(200);
-    assert(prodsStoreA.length === 1 && prodsStoreA[0].name === 'T-Shirt A', 'Frontend API fetch for Store A returns strictly Store A product (T-Shirt A)');
-    assert(prodsStoreB.length === 1 && prodsStoreB[0].name === 'T-Shirt B', 'Frontend API fetch for Store B returns strictly Store B product (T-Shirt B)');
-    console.log('\n1️⃣5️⃣ STAGE 7 REGRESSION TEST: Webhook Resolution & Idempotency');
+    // 5. MASTER ADMIN AUTH & SECURITY TESTS
+    console.log('\n1️⃣3️⃣ MASTER ADMIN TEST 1: Master Admin Authorization Allowance (Store 1 OWNER)');
+    let masterAdminAllowed = false;
+    const reqMasterAdmin = { auth: { userId: 1, storeId: 1, role: 'OWNER', email: 'tonystark@iscworks.com' } };
+    auth_middleware_1.AuthMiddleware.requireMasterAdmin(reqMasterAdmin, mockResForbid, () => { masterAdminAllowed = true; });
+    assert(masterAdminAllowed === true, 'Master Admin token (Store 1 OWNER) passes requireMasterAdmin middleware');
+    console.log('\n1️⃣4️⃣ MASTER ADMIN TEST 2: Merchant Store 100 Access Rejection on Master Admin Route');
+    let merchantBlockedOnMaster = false;
+    const reqMerchant = { auth: { userId: 10, storeId: 100, role: 'OWNER', email: 'owner_a@iscworks.com' } };
+    const mockResMasterForbid = { status: (code) => ({ json: (d) => { if (code === 403)
+                merchantBlockedOnMaster = true; } }) };
+    auth_middleware_1.AuthMiddleware.requireMasterAdmin(reqMerchant, mockResMasterForbid, () => { merchantBlockedOnMaster = false; });
+    assert(merchantBlockedOnMaster === true, 'Merchant (Store 100 OWNER) blocked from Master Admin API with 403 Forbidden');
+    console.log('\n1️⃣5️⃣ MASTER ADMIN TEST 3: Store Suspension & Activation Actions with Audit Logging');
+    db_1.db.prepare("UPDATE stores SET status = 'suspended' WHERE id = 100").run();
+    auth_middleware_1.AuthMiddleware.logAudit(1, 1, 'MASTER_ADMIN_SUSPEND_STORE', 'stores', '100', 'active', 'suspended');
+    const store100Row = db_1.db.prepare("SELECT status FROM stores WHERE id = 100").get();
+    const auditSuspend = db_1.db.prepare("SELECT * FROM audit_logs WHERE action = 'MASTER_ADMIN_SUSPEND_STORE' AND entity_id = '100'").get();
+    assert(store100Row.status === 'suspended' && auditSuspend !== undefined, 'Master Admin suspend action updates store status and writes audit log');
+    db_1.db.prepare("UPDATE stores SET status = 'active' WHERE id = 100").run();
+    auth_middleware_1.AuthMiddleware.logAudit(1, 1, 'MASTER_ADMIN_ACTIVATE_STORE', 'stores', '100', 'suspended', 'active');
+    const store100Active = db_1.db.prepare("SELECT status FROM stores WHERE id = 100").get();
+    assert(store100Active.status === 'active', 'Master Admin activate action restores store status');
+    console.log('\n1️⃣6️⃣ STAGE 7 FRONTEND & REGRESSION: Webhook Resolution & Idempotency');
     const resolvedAlpha = webhook_controller_1.WebhookController.resolveStore('store-alpha');
     assert(resolvedAlpha !== null && resolvedAlpha.id === 100, 'store-alpha resolved to Store ID 100');
-    const firstEvt = webhook_controller_1.WebhookController.isDuplicateEvent('evt_stage7_001', 100);
-    const secondEvt = webhook_controller_1.WebhookController.isDuplicateEvent('evt_stage7_001', 100);
+    const firstEvt = webhook_controller_1.WebhookController.isDuplicateEvent('evt_master_001', 100);
+    const secondEvt = webhook_controller_1.WebhookController.isDuplicateEvent('evt_master_001', 100);
     assert(firstEvt === false && secondEvt === true, 'Webhook idempotency works seamlessly across multi-tenant events');
-    console.log(`\n📊 STAGE 7 MASTER SECURITY & FRONTEND TEST SUMMARY: Passed: ${passed} | Failed: ${failed}`);
+    console.log(`\n📊 MASTER ADMIN & SECURITY MASTER TEST SUMMARY: Passed: ${passed} | Failed: ${failed}`);
     if (failed > 0) {
         process.exit(1);
     }

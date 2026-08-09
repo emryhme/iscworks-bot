@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ISCWORKS — Tüccarlar & Mağazalar</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<aside class="sidebar">
+  <div class="sidebar-header">
+    <div class="sidebar-logo-icon">
+      <i class="fa-solid fa-crown"></i>
+    </div>
+    <div>
+      <div class="sidebar-title">ISCWORKS</div>
+      <div class="sidebar-subtitle">PLATFORM CONSOLE</div>
+    </div>
+  </div>
+
+  <ul class="sidebar-menu">
+    <li><a href="index.html"><i class="fa-solid fa-chart-pie"></i> Dashboard</a></li>
+    <li class="active"><a href="merchants.html"><i class="fa-solid fa-store"></i> Tüccarlar & Mağazalar</a></li>
+    <li><a href="applications.html"><i class="fa-solid fa-file-signature"></i> Başvuru Yönetimi</a></li>
+    <li><a href="/admin/index.html" target="_blank"><i class="fa-solid fa-arrow-up-right-from-square"></i> Tüccar Paneli (Demo)</a></li>
+  </ul>
+
+  <div class="sidebar-footer">
+    🔐 Master Admin Core v2.0
+  </div>
+</aside>
+
+<div class="main-wrapper">
+  <header class="top-navbar">
+    <div class="navbar-badge">
+      <i class="fa-solid fa-shield-halved"></i> MASTER ADMIN PLATFORM SECURITY ACTIVE
+    </div>
+
+    <div class="user-profile" onclick="logoutMasterAdmin()">
+      <div class="user-avatar">TS</div>
+      <div style="font-size:12px;">
+        <strong style="display:block; color:white;">Tony Stark</strong>
+        <span style="color:#818cf8;">Platform Owner</span>
+      </div>
+      <i class="fa-solid fa-right-from-bracket" style="color:#ef4444; margin-left:8px;" title="Çıkış Yap"></i>
+    </div>
+  </header>
+
+  <main class="content-container">
+    <div class="page-header">
+      <div>
+        <h1>Tüccarlar & Mağazalar Yönetimi</h1>
+        <p>Sistemde kayıtlı tüm multi-tenant tüccarları arayın, filtreleyin ve yönetin.</p>
+      </div>
+    </div>
+
+    <!-- Filters Card -->
+    <div class="data-card" style="padding: 16px 22px;">
+      <div style="display: flex; gap: 16px; flex-wrap: wrap; align-items: center; justify-content: space-between;">
+        <div style="display: flex; gap: 12px; flex: 1; max-width: 500px;">
+          <input type="text" id="searchMerchantInput" placeholder="Mağaza adı, tüccar adı, e-posta veya telefon ile ara..." style="flex:1; padding: 10px 14px; background: #0f172a; border: 1px solid var(--card-border); color: white; border-radius: 8px; font-size: 13px;">
+        </div>
+
+        <div style="display: flex; gap: 12px; align-items: center;">
+          <label style="font-size: 12px; color: var(--text-muted);">Durum Filtresi:</label>
+          <select id="filterStatusSelect" style="padding: 9px 14px; background: #0f172a; border: 1px solid var(--card-border); color: white; border-radius: 8px; font-size: 12px;">
+            <option value="all">Tüm Durumlar</option>
+            <option value="active">Aktif (Active)</option>
+            <option value="pending">Beklemede (Pending)</option>
+            <option value="suspended">Askıya Alınmış (Suspended)</option>
+            <option value="rejected">Reddedilmiş (Rejected)</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <!-- Merchants Table -->
+    <div class="data-card">
+      <div class="table-responsive">
+        <table class="admin-table">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Mağaza Bilgisi</th>
+              <th>Tüccar Adı</th>
+              <th>İletişim</th>
+              <th>Paket</th>
+              <th>Durum</th>
+              <th>Kayıt Tarihi</th>
+              <th>İşlemler</th>
+            </tr>
+          </thead>
+          <tbody id="merchantsTableBody">
+            <tr><td colspan="9" style="text-align:center; padding: 1.5rem; color: #94a3b8;">Yükleniyor...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>

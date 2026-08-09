@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ISCWORKS — Master Admin Console</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<!-- Sidebar -->
+<aside class="sidebar">
+  <div class="sidebar-header">
+    <div class="sidebar-logo-icon">
+      <i class="fa-solid fa-crown"></i>
+    </div>
+    <div>
+      <div class="sidebar-title">ISCWORKS</div>
+      <div class="sidebar-subtitle">PLATFORM CONSOLE</div>
+    </div>
+  </div>
+
+  <ul class="sidebar-menu">
+    <li class="active"><a href="index.html"><i class="fa-solid fa-chart-pie"></i> Dashboard</a></li>
+    <li><a href="merchants.html"><i class="fa-solid fa-store"></i> Tüccarlar & Mağazalar</a></li>
+    <li><a href="applications.html"><i class="fa-solid fa-file-signature"></i> Başvuru Yönetimi</a></li>
+    <li><a href="/admin/index.html" target="_blank"><i class="fa-solid fa-arrow-up-right-from-square"></i> Tüccar Paneli (Demo)</a></li>
+  </ul>
+
+  <div class="sidebar-footer">
+    🔐 Master Admin Core v2.0
+  </div>
+</aside>
+
+<!-- Main Area -->
+<div class="main-wrapper">
+  <header class="top-navbar">
+    <div class="navbar-badge">
+      <i class="fa-solid fa-shield-halved"></i> MASTER ADMIN PLATFORM SECURITY ACTIVE
+    </div>
+
+    <div class="user-profile" onclick="logoutMasterAdmin()">
+      <div class="user-avatar">TS</div>
+      <div style="font-size:12px;">
+        <strong style="display:block; color:white;">Tony Stark</strong>
+        <span style="color:#818cf8;">Platform Owner</span>
+      </div>
+      <i class="fa-solid fa-right-from-bracket" style="color:#ef4444; margin-left:8px;" title="Çıkış Yap"></i>
+    </div>
+  </header>
+
+  <main class="content-container">
+    <div class="page-header">
+      <div>
+        <h1>SaaS Platform Overview</h1>
+        <p>Tüm tüccarları, aktif mağazaları, başvuruları ve AI/API sistem kullanımını merkezi olarak yönetin.</p>
+      </div>
+    </div>
+
+    <!-- Metrics Grid -->
+    <div class="metrics-grid">
+      <div class="metric-card">
+        <div class="metric-icon indigo"><i class="fa-solid fa-store"></i></div>
+        <div class="metric-data">
+          <h3 id="metricTotalMerchants">0</h3>
+          <p>Toplam Tüccar</p>
+        </div>
+      </div>
+
+      <div class="metric-card">
+        <div class="metric-icon green"><i class="fa-solid fa-circle-check"></i></div>
+        <div class="metric-data">
+          <h3 id="metricActiveStores">0</h3>
+          <p>Aktif Mağaza</p>
+        </div>
+      </div>
+
+      <div class="metric-card">
+        <div class="metric-icon amber"><i class="fa-solid fa-clock"></i></div>
+        <div class="metric-data">
+          <h3 id="metricPendingApps">0</h3>
+          <p>Bekleyen Başvuru</p>
+        </div>
+      </div>
+
+      <div class="metric-card">
+        <div class="metric-icon red"><i class="fa-solid fa-ban"></i></div>
+        <div class="metric-data">
+          <h3 id="metricSuspendedStores">0</h3>
+          <p>Askıya Alınmış Mağaza</p>
+        </div>
+      </div>
+
+      <div class="metric-card">
+        <div class="metric-icon purple"><i class="fa-solid fa-users"></i></div>
+        <div class="metric-data">
+          <h3 id="metricTotalUsers">0</h3>
+          <p>Toplam Kullanıcı</p>
+        </div>
+      </div>
+
+      <div class="metric-card">
+        <div class="metric-icon indigo"><i class="fa-solid fa-cart-shopping"></i></div>
+        <div class="metric-data">
+          <h3 id="metricTotalOrders">0</h3>
+          <p>Toplam Sipariş</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Dashboard Main Cards -->
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px;">
+      <!-- Recent Applications -->
+      <div class="data-card">
+        <div class="card-title">
+          <span><i class="fa-solid fa-clock text-amber"></i> Son Mağaza Başvuruları</span>
+          <a href="applications.html" class="btn btn-sm btn-outline">Tümünü Gör</a>
+        </div>
+        <div class="table-responsive">
+          <table class="admin-table">
+            <thead>
+              <tr>
+                <th>Mağaza Adı</th>
+                <th>Başvuran</th>
+                <th>Durum</th>
+                <th>Tarih</th>
+                <th>İşlem</th>
+              </tr>
+            </thead>
+            <tbody id="recentAppsTableBody">
+              <tr><td colspan="5" style="text-align:center; padding: 1.5rem; color: #94a3b8;">Yükleniyor...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Recent Merchants -->
+      <div class="data-card">
+        <div class="card-title">
+          <span><i class="fa-solid fa-store text-indigo"></i> Son Kayıt Olan Tüccarlar</span>
+          <a href="merchants.html" class="btn btn-sm btn-outline">Tümünü Gör</a>
+        </div>
+        <div class="table-responsive">
+          <table class="admin-table">
+            <thead>
+              <tr>
+                <th>Mağaza</th>
+                <th>Tüccar Adı</th>
+                <th>E-Posta</th>
+                <th>Durum</th>
+                <th>İşlem</th>
+              </tr>
+            </thead>
+            <tbody id="recentMerchantsTableBody">
+              <tr><td colspan="5" style="text-align:center; padding: 1.5rem; color: #94a3b8;">Yükleniyor...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>

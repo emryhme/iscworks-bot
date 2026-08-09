@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ISCWORKS — Tüccar Detayı</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<aside class="sidebar">
+  <div class="sidebar-header">
+    <div class="sidebar-logo-icon">
+      <i class="fa-solid fa-crown"></i>
+    </div>
+    <div>
+      <div class="sidebar-title">ISCWORKS</div>
+      <div class="sidebar-subtitle">PLATFORM CONSOLE</div>
+    </div>
+  </div>
+
+  <ul class="sidebar-menu">
+    <li><a href="index.html"><i class="fa-solid fa-chart-pie"></i> Dashboard</a></li>
+    <li class="active"><a href="merchants.html"><i class="fa-solid fa-store"></i> Tüccarlar & Mağazalar</a></li>
+    <li><a href="applications.html"><i class="fa-solid fa-file-signature"></i> Başvuru Yönetimi</a></li>
+    <li><a href="/admin/index.html" target="_blank"><i class="fa-solid fa-arrow-up-right-from-square"></i> Tüccar Paneli (Demo)</a></li>
+  </ul>
+
+  <div class="sidebar-footer">
+    🔐 Master Admin Core v2.0
+  </div>
+</aside>
+
+<div class="main-wrapper">
+  <header class="top-navbar">
+    <div class="navbar-badge">
+      <i class="fa-solid fa-shield-halved"></i> MASTER ADMIN PLATFORM SECURITY ACTIVE
+    </div>
+
+    <div class="user-profile" onclick="logoutMasterAdmin()">
+      <div class="user-avatar">TS</div>
+      <div style="font-size:12px;">
+        <strong style="display:block; color:white;">Tony Stark</strong>
+        <span style="color:#818cf8;">Platform Owner</span>
+      </div>
+      <i class="fa-solid fa-right-from-bracket" style="color:#ef4444; margin-left:8px;" title="Çıkış Yap"></i>
+    </div>
+  </header>
+
+  <main class="content-container">
+    <div class="page-header">
+      <div>
+        <a href="merchants.html" class="btn btn-sm btn-outline" style="margin-bottom:10px;"><i class="fa-solid fa-arrow-left"></i> Tüccarlar Listesine Dön</a>
+        <h1 id="detailStoreName">Mağaza Yükleniyor...</h1>
+        <p id="detailStoreSlug">Slug: -</p>
+      </div>
+
+      <div id="detailActionsContainer" style="display:flex; gap:10px;">
+        <!-- Action buttons rendered via app.js -->
+      </div>
+    </div>
+
+    <!-- Merchant Info Overview Card -->
+    <div class="data-card">
+      <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap:20px;">
+        <div>
+          <span style="font-size:11px; color:var(--text-muted); font-weight:700;">SAHİBİ (OWNER)</span>
+          <strong style="display:block; font-size:15px; color:white; margin-top:2px;" id="detailOwnerName">-</strong>
+        </div>
+
+        <div>
+          <span style="font-size:11px; color:var(--text-muted); font-weight:700;">E-POSTA</span>
+          <strong style="display:block; font-size:14px; color:white; margin-top:2px;" id="detailOwnerEmail">-</strong>
+        </div>
+
+        <div>
+          <span style="font-size:11px; color:var(--text-muted); font-weight:700;">TELEFON</span>
+          <strong style="display:block; font-size:14px; color:white; margin-top:2px;" id="detailOwnerPhone">-</strong>
+        </div>
+
+        <div>
+          <span style="font-size:11px; color:var(--text-muted); font-weight:700;">T.C. KİMLİK NO</span>
+          <strong style="display:block; font-size:14px; color:white; margin-top:2px;" id="detailOwnerTc">-</strong>
+        </div>
+
+        <div>
+          <span style="font-size:11px; color:var(--text-muted); font-weight:700;">PAKET</span>
+          <strong style="display:block; font-size:14px; color:#a5b4fc; margin-top:2px;" id="detailPlan">Pro Store</strong>
+        </div>
+
+        <div>
+          <span style="font-size:11px; color:var(--text-muted); font-weight:700;">DURUM</span>
+          <div style="margin-top:2px;"><span class="badge active" id="detailStatusBadge">active</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Metrics Cards -->
+    <div class="metrics-grid">
+      <div class="metric-card">
+        <div class="metric-icon indigo"><i class="fa-solid fa-box"></i></div>
+        <div class="metric-data"><h3 id="metricProducts">0</h3><p>Ürün Sayısı</p></div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-icon green"><i class="fa-solid fa-cart-shopping"></i></div>
+        <div class="metric-data"><h3 id="metricOrders">0</h3><p>Sipariş Sayısı</p></div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-icon amber"><i class="fa-solid fa-users"></i></div>
+        <div class="metric-data"><h3 id="metricCustomers">0</h3><p>Müşteri Sayısı</p></div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-icon purple"><i class="fa-solid fa-bullhorn"></i></div>
+        <div class="metric-data"><h3 id="metricCampaigns">0</h3><p>Kampanya Sayısı</p></div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-icon green"><i class="fa-solid fa-brain"></i></div>
+        <div class="metric-data"><h3 id="metricAiUsage">0</h3><p>AI Sorgu Sayısı</p></div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-icon red"><i class="fa-solid fa-key"></i></div>
+        <div class="metric-data"><h3 id="metricApiKeys">0</h3><p>API Anahtarları</p></div>
+      </div>
+    </div>
+
+    <!-- Tables Grid -->
+    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:24px;">
+      <!-- Products List -->
+      <div class="data-card">
+        <div class="card-title"><span><i class="fa-solid fa-box text-indigo"></i> Son Eklenen Ürünler</span></div>
+        <div class="table-responsive">
+          <table class="admin-table">
+            <thead>
+              <tr><th>Kod</th><th>Ürün Adı</th><th>Fiyat</th><th>Stok</th></tr>
+            </thead>
+            <tbody id="detailProductsBody">
+              <tr><td colspan="4" style="text-align:center; color:#94a3b8;">Yükleniyor...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Orders List -->
+      <div class="data-card">
+        <div class="card-title"><span><i class="fa-solid fa-cart-shopping text-green"></i> Son Siparişler</span></div>
+        <div class="table-responsive">
+          <table class="admin-table">
+            <thead>
+              <tr><th>ID</th><th>Müşteri</th><th>Tutar</th><th>Durum</th></tr>
+            </thead>
+            <tbody id="detailOrdersBody">
+              <tr><td colspan="4" style="text-align:center; color:#94a3b8;">Yükleniyor...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Audit Logs -->
+    <div class="data-card" style="margin-top:24px;">
+      <div class="card-title"><span><i class="fa-solid fa-history text-amber"></i> Mağaza Audit Geçmişi (Loglar)</span></div>
+      <div class="table-responsive">
+        <table class="admin-table">
+          <thead>
+            <tr><th>Log ID</th><th>Aksiyon</th><th>Entity</th><th>Tarih</th></tr>
+          </thead>
+          <tbody id="detailAuditLogsBody">
+            <tr><td colspan="4" style="text-align:center; color:#94a3b8;">Yükleniyor...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>

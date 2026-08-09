@@ -159,6 +159,25 @@ export class AuthMiddleware {
   }
 
   /**
+   * Master Admin Middleware - Enforces Master Admin (Store ID 1 & OWNER role)
+   */
+  public static requireMasterAdmin(req: AuthenticatedRequest, res: Response, next: NextFunction): void {
+    if (!req.auth) {
+      res.status(401).json({ success: false, error: { code: 'UNAUTHORIZED', message: 'Yetkisiz erişim.' } });
+      return;
+    }
+
+    if (req.auth.storeId === 1 && req.auth.role === 'OWNER') {
+      return next();
+    }
+
+    res.status(403).json({
+      success: false,
+      error: { code: 'FORBIDDEN', message: 'Bu işlem için Master Admin (Platform Yöneticisi) yetkisi gereklidir.' }
+    });
+  }
+
+  /**
    * RBAC Middleware - Enforces Required Role Matrix
    */
   public static requireRole(allowedRoles: string[]) {
