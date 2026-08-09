@@ -31,42 +31,55 @@ app.post('/api/auth/register', (req, res) => {
         if (!fullName || !tcNo || !phone || !email || !storeName || !password) {
             return res.status(400).json({ success: false, error: 'Lütfen tüm zorunlu alanları doldurun.' });
         }
-        if (String(tcNo).length !== 11) {
-            return res.status(400).json({ success: false, error: 'T.C. Kimlik Numarası 11 haneli olmalıdır.' });
+        const cleanTcNo = String(tcNo).trim();
+        if (cleanTcNo.length !== 11 || !/^\d{11}$/.test(cleanTcNo)) {
+            return res.status(400).json({ success: false, error: 'T.C. Kimlik Numarası tam 11 haneli olmalıdır.' });
         }
         const cleanEmail = String(email).trim().toLowerCase();
         const cleanStoreName = String(storeName).trim();
         const storeSlug = cleanStoreName.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '') || `store-${Date.now()}`;
+        // 1. Check existing Email
         const existingUser = db_1.db.prepare('SELECT id FROM users WHERE LOWER(email) = ?').get(cleanEmail);
         if (existingUser) {
             return res.status(400).json({ success: false, error: 'Bu E-Posta adresi ile zaten bir hesap veya başvuru mevcuttur.' });
         }
+        // 2. Check existing TC No
+        const existingTc = db_1.db.prepare('SELECT id FROM users WHERE tc_no = ?').get(cleanTcNo);
+        if (existingTc) {
+            return res.status(400).json({ success: false, error: 'Bu T.C. Kimlik Numarası ile zaten bir hesap mevcuttur.' });
+        }
+        // Hash password with PBKDF2 SHA-512 (Zero Plaintext Storage)
         const hashedPassword = (0, db_1.hashPassword)(String(password).trim());
-        // Atomic transaction for Registration: user -> store -> membership -> merchant_applications
+        // Atomic transaction for Registration: users -> stores -> memberships -> merchant_applications -> audit_logs
         let resultUser = null;
         let resultStore = null;
         db_1.db.transaction(() => {
+            // 1. Create User
             const userRes = db_1.db.prepare(`
         INSERT INTO users (full_name, email, phone, tc_no, password_hash, status)
         VALUES (?, ?, ?, ?, ?, 'active')
-      `).run(fullName, cleanEmail, phone, tcNo, hashedPassword);
+      `).run(fullName, cleanEmail, phone, cleanTcNo, hashedPassword);
             const userId = Number(userRes.lastInsertRowid);
+            // 2. Create Store
             const storeRes = db_1.db.prepare(`
         INSERT INTO stores (owner_id, name, slug, status)
         VALUES (?, ?, ?, 'active')
       `).run(userId, cleanStoreName, storeSlug);
             const storeId = Number(storeRes.lastInsertRowid);
+            // 3. Create Membership (OWNER / active)
             db_1.db.prepare(`
         INSERT INTO memberships (user_id, store_id, role, status)
         VALUES (?, ?, 'OWNER', 'active')
       `).run(userId, storeId);
+            // 4. Create Merchant Application History (Password field receives hashedPassword ONLY)
             db_1.db.prepare(`
         INSERT INTO merchant_applications (full_name, tc_no, phone, email, store_name, plan, password, status)
         VALUES (?, ?, ?, ?, ?, ?, ?, 'approved')
-      `).run(fullName, tcNo, phone, cleanEmail, cleanStoreName, plan || 'Pro Store', hashedPassword);
+      `).run(fullName, cleanTcNo, phone, cleanEmail, cleanStoreName, plan || 'Pro Store', hashedPassword);
+            // 5. Create Audit Log
+            auth_middleware_1.AuthMiddleware.logAudit(storeId, userId, 'REGISTER', 'users', String(userId), '', cleanEmail);
             resultUser = { id: userId, email: cleanEmail, name: fullName };
             resultStore = { id: storeId, name: cleanStoreName, slug: storeSlug };
-            auth_middleware_1.AuthMiddleware.logAudit(storeId, userId, 'REGISTER', 'users', String(userId), '', cleanEmail);
         })();
         const token = auth_middleware_1.AuthMiddleware.generateToken({
             userId: resultUser.id,
@@ -91,7 +104,7 @@ app.post('/api/auth/register', (req, res) => {
     catch (err) {
         console.error('[Register Error]:', err);
         if (err.message && err.message.includes('UNIQUE')) {
-            return res.status(400).json({ success: false, error: 'Bu E-Posta veya mağaza adı kullanılmaktadır.' });
+            return res.status(400).json({ success: false, error: 'Bu E-Posta, T.C. Kimlik Numarası veya mağaza adı kullanılmaktadır.' });
         }
         return res.status(500).json({ success: false, error: 'Kayıt esnasında sunucu hatası oluştu.' });
     }

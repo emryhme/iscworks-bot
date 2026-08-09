@@ -160,8 +160,10 @@ export function initDatabase() {
       store_id INTEGER NOT NULL,
       role TEXT NOT NULL DEFAULT 'OWNER',
       status TEXT NOT NULL DEFAULT 'active',
-      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(user_id, store_id)
     );
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_memberships_user_store ON memberships(user_id, store_id);
   `);
 
   // 11. Product Variants (SKU & Size/Color Level)
