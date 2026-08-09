@@ -7,6 +7,7 @@ import { TelegramService } from './telegram.service';
 import { FacebookService } from './facebook.service';
 
 export interface OrderData {
+  storeId?: number;
   customerName: string;
   customerPhone: string;
   address: string;
@@ -33,13 +34,17 @@ export interface SavedOrder extends OrderData {
 }
 
 /**
- * SQLite (barons.db) Destekli Ultra Hızlı Sipariş Servisi
+ * SQLite (barons.db) Destekli Ultra Hızlı Multi-Tenant Sipariş Servisi
  */
 export class OrderService {
+  private static validateStoreId(storeId: any): void {
+    if (typeof storeId !== 'number' || isNaN(storeId) || storeId <= 0) {
+      throw new Error('Store ID zorunludur ve geçerli bir pozitif sayı olmalıdır.');
+    }
+  }
+
   /**
    * Deterministik Temiz Sipariş Numarası Üreticisi
-   * Tekli Ürün Örn: BRN-KGMLW-712-4902
-   * Çoklu/Toplu Sipariş Örn: BRN-ORD-712-4902
    */
   public static generateOrderId(productCode: string, size: string, phone: string): string {
     const cleanPhone = (phone || '').trim().replace(/\D/g, '');
@@ -52,7 +57,6 @@ export class OrderService {
 
     const rawCode = (productCode || '').trim();
 
-    // Çoklu ürün kontrolü (virgül, boşluk veya çok uzun karakter var mı)
     let baseCode = 'ORD';
     if (rawCode && !rawCode.includes(',') && !rawCode.includes(' ') && rawCode.length <= 15) {
       baseCode = rawCode.toUpperCase().replace(/[^A-Z0-9-]/g, '').slice(0, 10);
@@ -62,9 +66,27 @@ export class OrderService {
   }
 
   /**
-   * Sipariş oluşturur, deterministik sipariş no basar, stoğu -1 eksiltir ve SQLite + Sheet'e yazar.
+   * Sipariş oluşturur (Strict Store Isolation & Transaction Support)
    */
-  public static async createOrder(data: OrderData): Promise<SavedOrder> {
+  public static async createOrder(storeId: number, data: OrderData): Promise<SavedOrder>;
+  public static async createOrder(data: OrderData): Promise<SavedOrder>;
+  public static async createOrder(storeIdOrData: any, dataInput?: OrderData): Promise<SavedOrder> {
+    let storeId: number;
+    let data: OrderData;
+
+    if (typeof storeIdOrData === 'number') {
+      storeId = storeIdOrData;
+      data = dataInput!;
+    } else if (storeIdOrData && typeof storeIdOrData.storeId === 'number') {
+      storeId = storeIdOrData.storeId;
+      data = storeIdOrData;
+    } else {
+      this.validateStoreId(undefined); // Throws Error immediately!
+      throw new Error('Store ID zorunludur');
+    }
+
+    this.validateStoreId(storeId);
+
     const orderId = this.generateOrderId(data.productCode, data.size, data.customerPhone);
     const createdAt = new Date().toLocaleString('tr-TR', { timeZone: 'Europe/Istanbul' });
     const status = 'BEKLEMEDE';
@@ -74,44 +96,74 @@ export class OrderService {
     const firstName = nameParts[0] || data.customerName;
     const lastName = nameParts.slice(1).join(' ') || '';
 
-    let unitPrice = data.unitPrice || 0;
     const quantity = Math.max(1, Number(data.quantity) || 1);
+    const pCode = (data.productCode || '').trim().toUpperCase();
 
-    // Atomik Veritabanı İşlemi (Transaction-Safe Order & Single Stock Deduction)
+    let unitPrice = data.unitPrice || 0;
+    let shippingFee = 0;
+    let discount = 0;
+    let totalPrice = 0;
+
+    // Atomik Veritabanı İşlemi (Transaction-Safe Multi-Tenant Order Creation)
     const createOrderTx = db.transaction(() => {
-      // 1. Ürün Yetkili Fiyatı — önce caller'dan gelen değeri kullan, yoksa DB'den bul
-      const pCode = (data.productCode || '').trim();
-      
-      if (!unitPrice || unitPrice <= 0) {
-        // Tek ürün kodu için fiyat ara (birleşik kod değilse)
-        const singleCode = pCode.split(/[,()/\s]/)[0].trim().toUpperCase();
-        const productObj = db.prepare('SELECT price FROM products WHERE UPPER(product_code) = ? OR UPPER(short_code) = ?').get(singleCode, singleCode) as any;
-        if (productObj && productObj.price > 0) {
-          unitPrice = productObj.price;
-        } else {
-          unitPrice = 299; // Varsayılan fiyat
-        }
+      // 1. Store Var Olma Kontrolü
+      const storeExists = db.prepare('SELECT id FROM stores WHERE id = ?').get(storeId);
+      if (!storeExists) {
+        throw new Error(`STORE_NOT_FOUND: Store ID ${storeId} veritabanında bulunamadı.`);
       }
 
-      const shippingFee = data.shippingFee !== undefined ? data.shippingFee : (unitPrice * quantity >= 1500 ? 0 : 49);
-      const discount = data.discount || 0;
-      const totalPrice = Math.max(0, (unitPrice * quantity) + shippingFee - discount);
+      // 2. Mağazaya Özel Ürün Fiyatı ve Stok Kontrolü
+      const singleCode = pCode.split(/[,()/\s]/)[0].trim().toUpperCase();
+      const prodObj = db.prepare(`
+        SELECT id, price, stock FROM products 
+        WHERE store_id = ? AND (UPPER(product_code) = ? OR UPPER(short_code) = ?)
+      `).get(storeId, singleCode, singleCode) as any;
 
-      // 2. Stok Adedini Atomik Olarak 1 Kez Düş
-      db.prepare(`
+      if (prodObj && prodObj.price > 0) {
+        unitPrice = prodObj.price; // Yetkili fiyat veritabanından alınır
+      } else if (!unitPrice || unitPrice <= 0) {
+        unitPrice = 299;
+      }
+
+      const availableStock = prodObj ? Number(prodObj.stock) || 0 : 0;
+      if (availableStock < quantity) {
+        throw new Error(`INSUFFICIENT_STOCK: İstenen ürün (${pCode}) stokta yetersiz! Mevcut Stok: ${availableStock}, İstenen: ${quantity}`);
+      }
+
+      shippingFee = data.shippingFee !== undefined ? data.shippingFee : (unitPrice * quantity >= 1500 ? 0 : 49);
+      discount = data.discount || 0;
+      totalPrice = Math.max(0, (unitPrice * quantity) + shippingFee - discount);
+
+      // 3. Stok Adedini Atomik Olarak Düş
+      const stockRes = db.prepare(`
         UPDATE products 
-        SET stock = MAX(0, stock - ?), updated_at = CURRENT_TIMESTAMP 
-        WHERE product_code = ? OR short_code = ?
-      `).run(quantity, pCode, pCode);
+        SET stock = stock - ?, updated_at = CURRENT_TIMESTAMP 
+        WHERE store_id = ? AND (UPPER(product_code) = ? OR UPPER(short_code) = ?) AND stock >= ?
+      `).run(quantity, storeId, singleCode, singleCode, quantity);
 
-      // 3. Siparişi Veritabanına Ekle
+      if (stockRes.changes === 0) {
+        throw new Error(`INSUFFICIENT_STOCK: Stok düşürme işlemi başarısız (Stok yetersiz veya çakışma var).`);
+      }
+
+      // Inventory senkronizasyonu
+      try {
+        db.prepare(`
+          UPDATE inventory 
+          SET stock = MAX(0, stock - ?), updated_at = CURRENT_TIMESTAMP 
+          WHERE store_id = ? AND UPPER(product_code) = ?
+        `).run(quantity, storeId, singleCode);
+      } catch (e) {}
+
+      // 4. Siparişi Veritabanına Ekle
       const stmt = db.prepare(`
-        INSERT INTO orders (order_id, first_name, last_name, customer_phone, address, product_code, product_name, size, quantity, unit_price, shipping_fee, discount, total_price, status, sender_id, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO orders (order_id, store_id, store_name, first_name, last_name, customer_phone, address, product_code, product_name, size, quantity, unit_price, shipping_fee, discount, total_price, status, sender_id, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `);
 
       stmt.run(
         orderId,
+        storeId,
+        'STORE-' + storeId,
         firstName,
         lastName,
         data.customerPhone,
@@ -129,19 +181,44 @@ export class OrderService {
         createdAt
       );
 
+      // 5. Order Item Kaydı (order_items tablosu)
+      try {
+        db.prepare(`
+          INSERT INTO order_items (order_id, store_id, product_id, product_name, sku, size, unit_price, quantity, total_price)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `).run(
+          orderId,
+          storeId,
+          prodObj ? prodObj.id : 0,
+          data.productName || data.productCode,
+          data.productCode,
+          data.size,
+          unitPrice,
+          quantity,
+          unitPrice * quantity
+        );
+      } catch (e) {}
+
+      // 6. Müşteri Dizini Güncelleme (customers tablosu - Mağazaya özel)
+      try {
+        const custName = `${firstName} ${lastName}`.trim();
+        const existingCust = db.prepare('SELECT id FROM customers WHERE store_id = ? AND (sender_id = ? OR phone = ?)').get(storeId, senderId || 'N/A', data.customerPhone) as any;
+        if (existingCust) {
+          db.prepare('UPDATE customers SET name = ?, phone = ?, address = ? WHERE store_id = ? AND id = ?').run(custName, data.customerPhone, data.address, storeId, existingCust.id);
+        } else {
+          db.prepare('INSERT INTO customers (store_id, sender_id, name, phone, address, created_at) VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)').run(storeId, senderId, custName, data.customerPhone, data.address);
+        }
+      } catch (e) {}
+
       return { unitPrice, shippingFee, discount, totalPrice };
     });
 
-    let calcResult = { unitPrice: data.unitPrice || 299, shippingFee: 0, discount: 0, totalPrice: (data.unitPrice || 299) * quantity };
-    try {
-      calcResult = createOrderTx();
-      console.log(`[OrderService SQLite] 🛍️ Sipariş Veritabanına Atomik İşlemle Kaydedildi: ${orderId} (senderId: ${senderId})`);
+    const calcResult = createOrderTx();
+    console.log(`[OrderService SQLite] 🛍️ Sipariş Veritabanına Atomik İşlemle Kaydedildi (Store: ${storeId}): ${orderId}`);
 
-      // Google Sheets 'SİPARİŞLER' Tablosuna Yaz
+    if (storeId === 1) {
       const rowValues = [firstName, lastName, data.customerPhone, data.address, quantity, data.productCode, createdAt, orderId, status, senderId];
       GoogleSheetsService.appendOrderRow(rowValues).catch(() => {});
-    } catch (e: any) {
-      console.error('[OrderService Transaction Error] ❌ Sipariş kaydı başarısız:', e.message);
     }
 
     return {
@@ -164,41 +241,22 @@ export class OrderService {
   }
 
   /**
-   * Tüm siparişleri SQLite veritabanından getirir (Self-Healing Korumalı).
+   * Siparişleri SQLite veritabanından mağaza bazında getirir (Strict Store Isolation).
    */
-  public static async getOrders(): Promise<SavedOrder[]> {
-    try {
-      // 1. Tablo veya Kolon Eksikse Anında Tamir Et (Self-Healing Schema)
-      try {
-        db.exec(`
-          CREATE TABLE IF NOT EXISTS orders (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            order_id TEXT UNIQUE NOT NULL,
-            first_name TEXT NOT NULL,
-            last_name TEXT DEFAULT '',
-            customer_phone TEXT NOT NULL,
-            address TEXT NOT NULL,
-            product_code TEXT NOT NULL,
-            product_name TEXT DEFAULT '',
-            size TEXT DEFAULT '',
-            quantity INTEGER NOT NULL DEFAULT 1,
-            unit_price REAL NOT NULL DEFAULT 0,
-            shipping_fee REAL NOT NULL DEFAULT 0,
-            discount REAL NOT NULL DEFAULT 0,
-            total_price REAL NOT NULL DEFAULT 0,
-            status TEXT NOT NULL DEFAULT 'BEKLEMEDE',
-            sender_id TEXT DEFAULT '',
-            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-          );
-        `);
-        try { db.exec(`ALTER TABLE orders ADD COLUMN unit_price REAL NOT NULL DEFAULT 0;`); } catch (e) {}
-        try { db.exec(`ALTER TABLE orders ADD COLUMN shipping_fee REAL NOT NULL DEFAULT 0;`); } catch (e) {}
-        try { db.exec(`ALTER TABLE orders ADD COLUMN discount REAL NOT NULL DEFAULT 0;`); } catch (e) {}
-        try { db.exec(`ALTER TABLE orders ADD COLUMN total_price REAL NOT NULL DEFAULT 0;`); } catch (e) {}
-        try { db.exec(`ALTER TABLE orders ADD COLUMN sender_id TEXT DEFAULT '';`); } catch (e) {}
-      } catch (err) {}
+  public static async getOrders(storeId: number): Promise<SavedOrder[]>;
+  public static async getOrders(): Promise<SavedOrder[]>;
+  public static async getOrders(storeIdOrAny?: any): Promise<SavedOrder[]> {
+    let storeId: number;
+    if (typeof storeIdOrAny === 'number') {
+      storeId = storeIdOrAny;
+    } else {
+      this.validateStoreId(undefined); // Throws Error
+      return [];
+    }
 
+    this.validateStoreId(storeId);
+
+    try {
       const stmt = db.prepare(`
         SELECT 
           order_id as orderId, 
@@ -218,9 +276,10 @@ export class OrderService {
           sender_id as senderId, 
           created_at as createdAt
         FROM orders
+        WHERE store_id = ?
         ORDER BY id DESC
       `);
-      const rows = stmt.all() as any[];
+      const rows = stmt.all(storeId) as any[];
 
       return rows.map(r => ({
         orderId: r.orderId,
@@ -240,19 +299,100 @@ export class OrderService {
         senderId: r.senderId || ''
       }));
     } catch (e: any) {
-      console.error('[OrderService SQLite] ❌ Siparişler çekilemedi:', e.message);
+      console.error(`[OrderService SQLite] ❌ Siparişler çekilemedi (Store: ${storeId}):`, e.message);
       return [];
     }
   }
 
   /**
-   * Sipariş Onay / Red İşlemi (Sipariş Reddedilirse (DEC) Stoğu +1 İade Eder, Red sebebini Instagram DM gönderir!)
+   * Mağazaya özel tek sipariş sorgulama
    */
-  public static async updateOrderStatus(orderId: string, status: 'OK' | 'DEC', reason?: string): Promise<boolean> {
+  public static async getOrder(storeId: number, orderId: string): Promise<SavedOrder | null>;
+  public static async getOrder(orderId: string): Promise<SavedOrder | null>;
+  public static async getOrder(storeIdOrId: any, orderId?: string): Promise<SavedOrder | null> {
+    let storeId: number;
+    let targetOrderId: string;
+
+    if (typeof storeIdOrId === 'number') {
+      storeId = storeIdOrId;
+      targetOrderId = String(orderId || '');
+    } else {
+      this.validateStoreId(undefined); // Throws Error
+      return null;
+    }
+
+    this.validateStoreId(storeId);
+
+    const r = db.prepare(`
+      SELECT 
+        order_id as orderId, 
+        first_name, 
+        last_name, 
+        customer_phone as customerPhone, 
+        address, 
+        product_code as productCode, 
+        product_name as productName, 
+        size, 
+        quantity, 
+        unit_price as unitPrice,
+        shipping_fee as shippingFee,
+        discount,
+        total_price as totalPrice,
+        status, 
+        sender_id as senderId, 
+        created_at as createdAt
+      FROM orders
+      WHERE store_id = ? AND order_id = ?
+    `).get(storeId, targetOrderId) as any;
+
+    if (!r) return null;
+
+    return {
+      orderId: r.orderId,
+      customerName: `${r.first_name || ''} ${r.last_name || ''}`.trim() || 'Müşteri',
+      customerPhone: r.customerPhone,
+      address: r.address,
+      productCode: r.productCode,
+      productName: r.productName || r.productCode,
+      size: r.size,
+      quantity: r.quantity,
+      unitPrice: Number(r.unitPrice) || 0,
+      shippingFee: Number(r.shippingFee) || 0,
+      discount: Number(r.discount) || 0,
+      totalPrice: Number(r.totalPrice) || 0,
+      createdAt: r.createdAt,
+      status: r.status,
+      senderId: r.senderId || ''
+    };
+  }
+
+  /**
+   * Sipariş Onay / Red İşlemi (Mağazaya Özel)
+   */
+  public static async updateOrderStatus(storeId: number, orderId: string, status: 'OK' | 'DEC', reason?: string): Promise<boolean>;
+  public static async updateOrderStatus(orderId: string, status: 'OK' | 'DEC', reason?: string): Promise<boolean>;
+  public static async updateOrderStatus(storeIdOrId: any, orderIdOrStatus?: any, statusOrReason?: any, reason?: string): Promise<boolean> {
+    let storeId: number;
+    let targetOrderId: string;
+    let targetStatus: 'OK' | 'DEC';
+    let targetReason: string | undefined;
+
+    if (typeof storeIdOrId === 'number') {
+      storeId = storeIdOrId;
+      targetOrderId = String(orderIdOrStatus || '');
+      targetStatus = statusOrReason;
+      targetReason = reason;
+    } else {
+      this.validateStoreId(undefined); // Throws Error
+      return false;
+    }
+
+    this.validateStoreId(storeId);
+
     try {
-      const existingOrder = db.prepare(`SELECT * FROM orders WHERE order_id = ?`).get(orderId) as any;
+      const existingOrder = db.prepare(`SELECT * FROM orders WHERE store_id = ? AND order_id = ?`).get(storeId, targetOrderId) as any;
       if (!existingOrder) {
-        console.warn(`[OrderService SQLite] ⚠️ Güncellenecek sipariş bulunamadı: ${orderId}`);
+        console.warn(`[OrderService SQLite] ⚠️ Güncellenecek sipariş bulunamadı veya yetkisiz erişim (Store: ${storeId}): ${targetOrderId}`);
         return false;
       }
 
@@ -260,123 +400,85 @@ export class OrderService {
       const targetProductCode = existingOrder.product_code;
       const qty = Number(existingOrder.quantity) || 1;
 
-      const stmt = db.prepare(`UPDATE orders SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE order_id = ?`);
-      const result = stmt.run(status, orderId);
+      const stmt = db.prepare(`UPDATE orders SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE store_id = ? AND order_id = ?`);
+      const result = stmt.run(targetStatus, storeId, targetOrderId);
 
       if (result.changes > 0) {
-        console.log(`[OrderService SQLite] ✅ Sipariş (${orderId}) Durumu Güncellendi: ${prevStatus} -> ${status}`);
+        console.log(`[OrderService SQLite] ✅ Sipariş (${targetOrderId}) Durumu Güncellendi (Store: ${storeId}): ${prevStatus} -> ${targetStatus}`);
 
-        // 1. SİPARİŞ REDDEDİLDİYSE (DEC): Stoğu +1 İade Et & Müşteriye Red Sebebini DM Gönder!
-        if (status === 'DEC' && prevStatus !== 'DEC') {
-          console.log(`[OrderService] 🔄 Sipariş reddedildi, ${targetProductCode} (${existingOrder.size}) stoğuna +${qty} iade ediliyor...`);
-          await StockService.restoreStock(targetProductCode, qty, existingOrder.size);
-
+        if (targetStatus === 'DEC' && prevStatus !== 'DEC') {
+          await StockService.restoreStock(storeId, targetProductCode, qty, existingOrder.size);
           const senderId = (existingOrder.sender_id || existingOrder.senderId || '').trim();
-          console.log(`[OrderService] 📤 Sipariş Red DM işlemi başlatıldı. OrderID: ${orderId}, SenderID: ${senderId}`);
-
           if (senderId) {
             const customerName = `${existingOrder.first_name || ''} ${existingOrder.last_name || ''}`.trim() || 'Müşterimiz';
             const defaultReason = 'Siparişiniz operasyonel nedenlerle onaylanamamıştır.';
-            const cleanReason = reason && reason.trim() ? reason.trim() : defaultReason;
-
-            const dmMessage = `Sayın ${customerName},\n\nSiparişiniz (#${orderId}) maalesef onaylanamamıştır.\n\nİptal / Red Nedeni:\n${cleanReason}\n\nAnlayışınız için teşekkür eder, keyifli günler dileriz. 🌸`;
-
-            const sent = await FacebookService.sendMessage(senderId, dmMessage);
-            console.log(`[OrderService] 📤 Red DM gönderim sonucu: ${sent}`);
-          } else {
-            console.warn(`[OrderService] ⚠️ Siparişte (ID: ${orderId}) sender_id bilgisi bulunamadığı için DM yollanamadı.`);
+            const cleanReason = targetReason && targetReason.trim() ? targetReason.trim() : defaultReason;
+            const dmMessage = `Sayın ${customerName},\n\nSiparişiniz (#${targetOrderId}) maalesef onaylanamamıştır.\n\nİptal / Red Nedeni:\n${cleanReason}\n\nAnlayışınız için teşekkür eder, keyifli günler dileriz. 🌸`;
+            FacebookService.sendMessage(senderId, dmMessage).catch(() => {});
           }
-        }
-        // 2. Sipariş ONAYLANDIYSA (OK): Müşteriye "Siparişiniz Onaylandı" Mesajı Gönder!
-        else if (status === 'OK') {
+        } else if (targetStatus === 'OK') {
           if (prevStatus === 'DEC') {
-            console.log(`[OrderService] 📦 Reddedilen sipariş onaylandı, ${targetProductCode} (${existingOrder.size}) stoğundan -${qty} tekrar düşülüyor...`);
-            await StockService.deductStock(targetProductCode, qty, existingOrder.size);
-          }
-
-          // Müşteriye "Siparişiniz Onaylandı" Bildirim Mesajı Gönder (Telegram & n8n)
-          const fullOrder: SavedOrder = {
-            orderId: existingOrder.order_id,
-            customerName: `${existingOrder.first_name || ''} ${existingOrder.last_name || ''}`.trim() || 'Müşteri',
-            customerPhone: existingOrder.customer_phone || '',
-            address: existingOrder.address || '',
-            productCode: existingOrder.product_code || '',
-            productName: existingOrder.product_name || existingOrder.product_code,
-            size: existingOrder.size || 'M',
-            quantity: qty,
-            senderId: existingOrder.sender_id || '',
-            createdAt: existingOrder.created_at || ''
-          };
-          await TelegramService.sendCustomerApprovalNotification(fullOrder);
-
-          // n8n Webhook Trigger Tanımlıysa n8n Akışına POST Et (Hem Test Hem Canlı Adrese)
-          if (env.n8nWebhookUrl) {
-            const webhookPayload = {
-              event: 'ORDER_APPROVED',
-              senderId: fullOrder.senderId || '',
-              orderId: fullOrder.orderId,
-              customerName: fullOrder.customerName,
-              customerPhone: fullOrder.customerPhone,
-              address: fullOrder.address,
-              productCode: fullOrder.productCode,
-              productName: fullOrder.productName,
-              size: fullOrder.size,
-              quantity: fullOrder.quantity,
-              message: `🎉 Sayın ${fullOrder.customerName}, ${fullOrder.orderId} numaralı siparişiniz onaylanmıştır!`
-            };
-
-            // 1. Ana Webhook Adresine Gönder
-            axios.post(env.n8nWebhookUrl, webhookPayload).then(() => {
-              console.log(`[n8n Webhook Main] 🚀 Sipariş Onay Webhook'u n8n'e yollandı (${fullOrder.orderId}, senderId: ${fullOrder.senderId})`);
-            }).catch((err: any) => console.warn('[n8n Webhook Main Error]:', err.message));
-
-            // 2. n8n Test veya Canlı Modundan Hangisindeyse Her İkisine de Gönder (Hiç Kaçırmasın)
-            const altWebhookUrl = env.n8nWebhookUrl.includes('/webhook-test/')
-              ? env.n8nWebhookUrl.replace('/webhook-test/', '/webhook/')
-              : env.n8nWebhookUrl.replace('/webhook/', '/webhook-test/');
-
-            axios.post(altWebhookUrl, webhookPayload).then(() => {
-              console.log(`[n8n Webhook Alt] 🚀 Sipariş Onay Webhook'u n8n Alt Adrese yollandı (${fullOrder.orderId})`);
-            }).catch(() => {});
+            await StockService.deductStock(storeId, targetProductCode, qty, existingOrder.size);
           }
         }
 
-        // Google Sheets Senkronizasyonu
-        GoogleSheetsService.updateOrderStatus(orderId, status).catch(() => {});
+        if (storeId === 1) {
+          GoogleSheetsService.updateOrderStatus(targetOrderId, targetStatus).catch(() => {});
+        }
         return true;
       }
       return false;
     } catch (e: any) {
-      console.error('[OrderService SQLite] ❌ Sipariş durumu güncellenemedi:', e.message);
+      console.error(`[OrderService SQLite] ❌ Sipariş durumu güncellenemedi (Store: ${storeId}):`, e.message);
       return false;
     }
   }
 
   /**
-   * Sipariş Silme (Eğer sipariş reddedilmemişse, silindiğinde stoğu iade eder)
+   * Sipariş Silme (Mağazaya Özel)
    */
-  public static async deleteOrder(orderId: string): Promise<boolean> {
-    try {
-      const existingOrder = db.prepare(`SELECT * FROM orders WHERE order_id = ?`).get(orderId) as any;
+  public static async deleteOrder(storeId: number, orderId: string): Promise<boolean>;
+  public static async deleteOrder(orderId: string): Promise<boolean>;
+  public static async deleteOrder(storeIdOrId: any, orderId?: string): Promise<boolean> {
+    let storeId: number;
+    let targetOrderId: string;
 
-      const stmt = db.prepare(`DELETE FROM orders WHERE order_id = ?`);
-      const result = stmt.run(orderId);
+    if (typeof storeIdOrId === 'number') {
+      storeId = storeIdOrId;
+      targetOrderId = String(orderId || '');
+    } else {
+      this.validateStoreId(undefined); // Throws Error
+      return false;
+    }
+
+    this.validateStoreId(storeId);
+
+    try {
+      const existingOrder = db.prepare(`SELECT * FROM orders WHERE store_id = ? AND order_id = ?`).get(storeId, targetOrderId) as any;
+      if (!existingOrder) {
+        return false;
+      }
+
+      const stmt = db.prepare(`DELETE FROM orders WHERE store_id = ? AND order_id = ?`);
+      const result = stmt.run(storeId, targetOrderId);
 
       if (result.changes > 0) {
-        console.log(`[OrderService SQLite] 🗑️ Sipariş (${orderId}) silindi!`);
+        try {
+          db.prepare('DELETE FROM order_items WHERE store_id = ? AND order_id = ?').run(storeId, targetOrderId);
+        } catch (e) {}
 
-        // Aktif sipariş silindiyse stoğunu +1 iade et
-        if (existingOrder && existingOrder.status !== 'DEC') {
-          await StockService.restoreStock(existingOrder.product_code, Number(existingOrder.quantity) || 1, existingOrder.size);
+        if (existingOrder.status !== 'DEC') {
+          await StockService.restoreStock(storeId, existingOrder.product_code, Number(existingOrder.quantity) || 1, existingOrder.size);
         }
 
-        // Google Sheets Senkronizasyonu
-        GoogleSheetsService.deleteOrderRow(orderId).catch(() => {});
+        if (storeId === 1) {
+          GoogleSheetsService.deleteOrderRow(targetOrderId).catch(() => {});
+        }
         return true;
       }
       return false;
     } catch (e: any) {
-      console.error('[OrderService SQLite] ❌ Sipariş silinemedi:', e.message);
+      console.error(`[OrderService SQLite] ❌ Sipariş silinemedi (Store: ${storeId}):`, e.message);
       return false;
     }
   }

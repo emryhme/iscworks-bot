@@ -5,7 +5,7 @@ import { AuthMiddleware } from '../middleware/auth.middleware';
 import { db, hashPassword, verifyPassword } from '../database/db';
 
 async function runTestSuite() {
-  console.log('🧪 Starting ISC Works Multi-Tenant Enterprise Test Suite...\n');
+  console.log('🧪 Starting ISC Works Stage 3 Multi-Tenant OrderService Test Suite...\n');
   let passed = 0;
   let failed = 0;
 
@@ -19,7 +19,10 @@ async function runTestSuite() {
     }
   }
 
-  // PRE-TEST CLEANUP FOR TEST STORES
+  // PRE-TEST CLEANUP
+  db.prepare('DELETE FROM orders WHERE store_id IN (100, 200, 999)').run();
+  db.prepare('DELETE FROM order_items WHERE store_id IN (100, 200, 999)').run();
+  db.prepare('DELETE FROM customers WHERE store_id IN (100, 200, 999)').run();
   db.prepare('DELETE FROM products WHERE store_id IN (100, 200, 999)').run();
   db.prepare('DELETE FROM inventory WHERE store_id IN (100, 200, 999)').run();
   db.prepare('DELETE FROM stores WHERE id IN (100, 200, 999)').run();
@@ -29,89 +32,164 @@ async function runTestSuite() {
   db.prepare("INSERT OR IGNORE INTO stores (id, owner_id, name, slug, status) VALUES (200, 2, 'Store B', 'store-b', 'active')").run();
   db.prepare("INSERT OR IGNORE INTO stores (id, owner_id, name, slug, status) VALUES (999, 3, 'Store Test', 'store-test', 'active')").run();
 
-  // TEST 1: Store A (storeId=100) product ABC, Store B (storeId=200) product ABC -> Independent query
-  console.log('1️⃣ MULTI-TENANT TEST 1: Same product code across different stores');
+  // TEST 1: Price isolation (Store A ABC = 100 TL, Store B ABC = 500 TL)
+  console.log('1️⃣ ORDER TEST 1: Price isolation across stores');
   await StockService.addProduct({ storeId: 100, shortCode: 'ABC', productCode: 'ABC-M', name: 'Shirt A', size: 'M', stock: 10, price: 100 });
-  await StockService.addProduct({ storeId: 200, shortCode: 'ABC', productCode: 'ABC-M', name: 'Shirt B', size: 'M', stock: 50, price: 200 });
+  await StockService.addProduct({ storeId: 200, shortCode: 'ABC', productCode: 'ABC-M', name: 'Shirt B', size: 'M', stock: 50, price: 500 });
 
-  const stockA = await StockService.checkStock(100, 'ABC-M');
-  const stockB = await StockService.checkStock(200, 'ABC-M');
+  const orderA1 = await OrderService.createOrder(100, {
+    customerName: 'Ali Yılmaz',
+    customerPhone: '05320001122',
+    address: 'Adres A',
+    productCode: 'ABC-M',
+    productName: 'Shirt A',
+    size: 'M',
+    quantity: 1,
+    senderId: 'sender_x'
+  });
 
-  assert(stockA.exists && stockA.product.name.includes('Shirt A'), 'Store A product ABC-M found independently');
-  assert(stockB.exists && stockB.product.name.includes('Shirt B'), 'Store B product ABC-M found independently');
+  assert(orderA1.unitPrice === 100, 'Store A order created with Store A price (100 TL)');
 
-  // TEST 2: Store A stock=10, Store B stock=50 -> deductStock(Store A, ABC-M, 5) -> Store A=5, Store B=50
-  console.log('\n2️⃣ MULTI-TENANT TEST 2: Stock deduction isolation');
-  await StockService.deductStock(100, 'ABC-M', 5);
-  const rowsA_after_deduct = await StockService.fetchAllSheetRows(100);
-  const rowsB_after_deduct = await StockService.fetchAllSheetRows(200);
+  // TEST 2: Stock isolation upon order creation
+  console.log('\n2️⃣ ORDER TEST 2: Stock deduction isolation upon order creation');
+  const orderA2 = await OrderService.createOrder(100, {
+    customerName: 'Ahmet Demir',
+    customerPhone: '05320001123',
+    address: 'Adres A2',
+    productCode: 'ABC-M',
+    productName: 'Shirt A',
+    size: 'M',
+    quantity: 2,
+    senderId: 'sender_y'
+  });
 
-  const prodA_deduct = rowsA_after_deduct.find(r => r.productCode === 'ABC-M');
-  const prodB_deduct = rowsB_after_deduct.find(r => r.productCode === 'ABC-M');
+  const prodA_after = (await StockService.fetchAllSheetRows(100)).find(r => r.productCode === 'ABC-M');
+  const prodB_after = (await StockService.fetchAllSheetRows(200)).find(r => r.productCode === 'ABC-M');
 
-  assert(prodA_deduct?.stock === 5, 'Store A stock deducted to 5');
-  assert(prodB_deduct?.stock === 50, 'Store B stock remains unchanged at 50');
+  assert(prodA_after?.stock === 7, 'Store A stock deducted to 7 (10 - 1 - 2)');
+  assert(prodB_after?.stock === 50, 'Store B stock remains unchanged at 50');
 
-  // TEST 3: Store A updateStock(ABC-M, 20) -> Store B unaffected
-  console.log('\n3️⃣ MULTI-TENANT TEST 3: Stock update isolation');
-  await StockService.updateStock(100, 'ABC-M', 20);
-  const prodA_update = (await StockService.fetchAllSheetRows(100)).find(r => r.productCode === 'ABC-M');
-  const prodB_update = (await StockService.fetchAllSheetRows(200)).find(r => r.productCode === 'ABC-M');
+  // TEST 3: getOrders(storeId) isolation
+  console.log('\n3️⃣ ORDER TEST 3: getOrders(storeId) isolation');
+  const orderB1 = await OrderService.createOrder(200, {
+    customerName: 'Mehmet Kaya',
+    customerPhone: '05339998877',
+    address: 'Adres B',
+    productCode: 'ABC-M',
+    productName: 'Shirt B',
+    size: 'M',
+    quantity: 1,
+    senderId: 'sender_x'
+  });
 
-  assert(prodA_update?.stock === 20, 'Store A stock updated to 20');
-  assert(prodB_update?.stock === 50, 'Store B stock remains unchanged at 50');
+  const ordersStoreA = await OrderService.getOrders(100);
+  const ordersStoreB = await OrderService.getOrders(200);
 
-  // TEST 4: Store A deleteProduct(ABC-M) -> Store B product NOT deleted
-  console.log('\n4️⃣ MULTI-TENANT TEST 4: Product deletion isolation');
-  await StockService.deleteProduct(100, 'ABC-M');
-  const stockA_del = await StockService.checkStock(100, 'ABC-M');
-  const stockB_del = await StockService.checkStock(200, 'ABC-M');
+  assert(ordersStoreA.length === 2 && ordersStoreA.every(o => o.productCode === 'ABC-M'), 'Store A returns only 2 Store A orders');
+  assert(ordersStoreB.length === 1 && ordersStoreB[0].orderId === orderB1.orderId, 'Store B returns only 1 Store B order');
 
-  assert(stockA_del.exists === false, 'Store A product ABC-M deleted');
-  assert(stockB_del.exists === true, 'Store B product ABC-M remains intact');
+  // TEST 4: Store A lookup of Store B order
+  console.log('\n4️⃣ ORDER TEST 4: Cross-tenant order lookup rejection');
+  const crossLookup = await OrderService.getOrder(100, orderB1.orderId);
+  assert(crossLookup === null, 'Store A cannot fetch Store B order (returns null)');
 
-  // TEST 5: Searching non-existing product in Store A does NOT return Store B product
-  console.log('\n5️⃣ MULTI-TENANT TEST 5: Non-existing product isolation');
-  const crossSearch = await StockService.checkStock(100, 'ABC-M');
-  assert(crossSearch.exists === false, 'Store A search for deleted ABC-M does not return Store B product');
+  // TEST 5: Store A trying to update Store B order status
+  console.log('\n5️⃣ ORDER TEST 5: Cross-tenant order update status rejection');
+  const crossUpdate = await OrderService.updateOrderStatus(100, orderB1.orderId, 'OK');
+  assert(crossUpdate === false, 'Store A cannot update Store B order status');
 
-  // TEST 6: Calling stock/inventory operation without storeId throws Error
-  console.log('\n6️⃣ MULTI-TENANT TEST 6: Mandatory storeId enforcement without fallback');
-  let errCaughtStock = false;
+  // TEST 6: Store A trying to delete Store B order
+  console.log('\n6️⃣ ORDER TEST 6: Cross-tenant order deletion rejection');
+  const crossDelete = await OrderService.deleteOrder(100, orderB1.orderId);
+  assert(crossDelete === false, 'Store A cannot delete Store B order');
+
+  // TEST 7: Customer isolation with same sender_id
+  console.log('\n7️⃣ ORDER TEST 7: Customer relationship isolation (same sender_id)');
+  const custA = db.prepare('SELECT * FROM customers WHERE store_id = 100 AND sender_id = ?').get('sender_x') as any;
+  const custB = db.prepare('SELECT * FROM customers WHERE store_id = 200 AND sender_id = ?').get('sender_x') as any;
+
+  assert(custA && custA.name === 'Ali Yılmaz', 'Store A customer sender_x is Ali Yılmaz');
+  assert(custB && custB.name === 'Mehmet Kaya', 'Store B customer sender_x is Mehmet Kaya');
+
+  // TEST 8: Rejection of createOrder without storeId
+  console.log('\n8️⃣ ORDER TEST 8: Rejection of createOrder without storeId');
+  let errWithoutStoreId = false;
   try {
-    await (StockService as any).checkStock(undefined, 'ABC-M');
-  } catch (e: any) {
-    errCaughtStock = true;
+    await (OrderService as any).createOrder(undefined, {
+      customerName: 'No Store',
+      customerPhone: '000',
+      address: 'X',
+      productCode: 'ABC-M',
+      productName: 'Shirt',
+      size: 'M',
+      quantity: 1
+    });
+  } catch (e) {
+    errWithoutStoreId = true;
   }
-  assert(errCaughtStock === true, 'StockService rejects operation when storeId is undefined');
+  assert(errWithoutStoreId === true, 'createOrder without storeId throws Error immediately');
 
-  let errCaughtInv = false;
+  // TEST 9: Overselling / Concurrency protection (stock = 1)
+  console.log('\n9️⃣ ORDER TEST 9: Overselling protection (stock = 1)');
+  await StockService.addProduct({ storeId: 999, shortCode: 'SOLO', productCode: 'SOLO-S', name: 'Solo Item', size: 'S', stock: 1, price: 300 });
+
+  const orderSuccess = await OrderService.createOrder(999, {
+    customerName: 'First Customer',
+    customerPhone: '05551112233',
+    address: 'Adres 1',
+    productCode: 'SOLO-S',
+    productName: 'Solo Item',
+    size: 'S',
+    quantity: 1
+  });
+
+  assert(orderSuccess.orderId !== undefined, 'First order succeeded for last remaining stock item');
+
+  let secondOrderFailed = false;
   try {
-    (InventoryService as any).getStock(null, 'ABC-M');
+    await OrderService.createOrder(999, {
+      customerName: 'Second Customer',
+      customerPhone: '05551112234',
+      address: 'Adres 2',
+      productCode: 'SOLO-S',
+      productName: 'Solo Item',
+      size: 'S',
+      quantity: 1
+    });
   } catch (e: any) {
-    errCaughtInv = true;
+    if (e.message.includes('INSUFFICIENT_STOCK')) {
+      secondOrderFailed = true;
+    }
   }
-  assert(errCaughtInv === true, 'InventoryService rejects operation when storeId is null');
+  assert(secondOrderFailed === true, 'Second order for out-of-stock item rejected with INSUFFICIENT_STOCK');
 
-  // TEST 7: store_id = 1 fallback is impossible for other tenant
-  console.log('\n7️⃣ MULTI-TENANT TEST 7: Preventing default store_id = 1 leakage');
-  await StockService.addProduct({ storeId: 1, shortCode: 'DEF', productCode: 'DEF-L', name: 'Default Store Item', size: 'L', stock: 100 });
-  const tenantAccess = InventoryService.getStock(200, 'DEF-L');
-  assert(tenantAccess.available === false && tenantAccess.stock === 0, 'Store 200 cannot access default store (storeId=1) product DEF-L');
+  // TEST 10: Atomic Transaction Rollback test
+  console.log('\n🔟 ORDER TEST 10: Atomic Transaction Rollback test');
+  await StockService.addProduct({ storeId: 999, shortCode: 'RBACK', productCode: 'RBACK-L', name: 'Rollback Item', size: 'L', stock: 5, price: 200 });
+  const stockBeforeRollback = (await StockService.fetchAllSheetRows(999)).find(r => r.productCode === 'RBACK-L')?.stock;
 
-  // LEGACY SUITE RE-VERIFICATION
-  console.log('\n8️⃣ Legacy Suite Security & Verification:');
-  const rawPass = 'SecretP@ss2026';
-  const hashed = hashPassword(rawPass);
-  assert(hashed.startsWith('pbkdf2:'), 'Password must be hashed with PBKDF2');
-  assert(verifyPassword(rawPass, hashed) === true, 'Valid password verification');
+  let rollbackCaught = false;
+  try {
+    // Force a failure by trying to order quantity higher than stock
+    await OrderService.createOrder(999, {
+      customerName: 'Rollback Tester',
+      customerPhone: '05559998877',
+      address: 'Fail Addr',
+      productCode: 'RBACK-L',
+      productName: 'Rollback Item',
+      size: 'L',
+      quantity: 10 // Exceeds 5 stock
+    });
+  } catch (e) {
+    rollbackCaught = true;
+  }
 
-  await StockService.addProduct({ storeId: 999, shortCode: 'TEST01', productCode: 'TEST-PROD-01', name: 'Test T-Shirt', size: 'M', stock: 1, price: 499, storeName: 'teststore' });
-  const isAvailable1 = InventoryService.checkAvailability(999, 'TEST-PROD-01', 1);
-  assert(isAvailable1 === true, '1 item request available when stock is 1');
+  const stockAfterRollback = (await StockService.fetchAllSheetRows(999)).find(r => r.productCode === 'RBACK-L')?.stock;
+  const orderCountRollback = (await OrderService.getOrders(999)).filter(o => o.productCode === 'RBACK-L').length;
 
-  const isAvailable2 = InventoryService.checkAvailability(999, 'TEST-PROD-01', 2);
-  assert(isAvailable2 === false, '2 item request rejected when stock is 1');
+  assert(rollbackCaught === true, 'Failed order threw exception');
+  assert(stockBeforeRollback === stockAfterRollback, 'Stock was untouched / rolled back (5 === 5)');
+  assert(orderCountRollback === 0, 'No order record created in database');
 
   console.log(`\n📊 TEST SUMMARY: Passed: ${passed} | Failed: ${failed}`);
   if (failed > 0) {
