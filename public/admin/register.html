@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ISCWORKS — Yeni Mağaza Kaydı</title>
+
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="styles.css">
+
+  <style>
+    body {
+      background: #0f172a;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      margin: 0;
+      padding: 30px 20px;
+    }
+
+    .register-card {
+      width: 100%;
+      max-width: 520px;
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 16px;
+      padding: 35px 30px;
+      box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5);
+      color: white;
+    }
+
+    .register-header {
+      text-align: center;
+      margin-bottom: 24px;
+    }
+
+    .register-logo {
+      width: 54px;
+      height: 54px;
+      border-radius: 14px;
+      background: var(--primary);
+      color: #111827;
+      display: grid;
+      place-items: center;
+      margin: 0 auto 14px;
+      font-size: 24px;
+      box-shadow: 0 8px 20px rgba(255,153,0,0.3);
+    }
+
+    .register-header h1 {
+      font-size: 20px;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+      margin-bottom: 6px;
+    }
+
+    .register-header p {
+      font-size: 12px;
+      color: #94a3b8;
+    }
+
+    .form-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+
+    @media (max-width: 560px) {
+      .form-grid {
+        grid-template-columns: 1fr;
+        gap: 0;
+      }
+    }
+
+    .form-group {
+      margin-bottom: 16px;
+    }
+
+    .form-group.full-width {
+      grid-column: 1 / -1;
+    }
+
+    .form-group label {
+      display: block;
+      font-size: 11px;
+      font-weight: 600;
+      color: #cbd5e1;
+      margin-bottom: 6px;
+    }
+
+    .input-wrapper {
+      position: relative;
+    }
+
+    .input-wrapper i {
+      position: absolute;
+      left: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: #64748b;
+      font-size: 14px;
+    }
+
+    .input-wrapper input, .input-wrapper select {
+      width: 100%;
+      padding: 11px 12px 11px 38px;
+      border-radius: 8px;
+      border: 1px solid #334155;
+      background: #0f172a;
+      color: white;
+      font-size: 13px;
+      outline: none;
+      transition: all 0.2s;
+      box-sizing: border-box;
+      appearance: none;
+    }
+
+    .input-wrapper select {
+      cursor: pointer;
+    }
+
+    .input-wrapper input:focus, .input-wrapper select:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(255,153,0,0.15);
+    }
+
+    .btn-register {
+      width: 100%;
+      height: 46px;
+      background: var(--primary);
+      color: #111827;
+      border: none;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      transition: all 0.2s;
+      margin-top: 10px;
+    }
+
+    .btn-register:hover {
+      background: var(--primary-dark);
+      transform: translateY(-1px);
+    }
+
+    .alert-danger {
+      background: rgba(239,68,68,0.15);
+      border: 1px solid #ef4444;
+      color: #fca5a5;
+      padding: 12px 14px;
+      border-radius: 8px;
+      font-size: 11px;
+      margin-bottom: 18px;
+      display: none;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .alert-success {
+      background: rgba(16,185,129,0.15);
+      border: 1px solid #10b981;
+      color: #6ee7b7;
+      padding: 16px;
+      border-radius: 10px;
+      font-size: 12px;
+      margin-bottom: 18px;
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      gap: 12px;
+    }
+
+    .alert-success a.btn-go-login {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: #10b981;
+      color: #064e3b;
+      padding: 8px 16px;
+      border-radius: 6px;
+      font-weight: 700;
+      text-decoration: none;
+      margin-top: 6px;
+      transition: all 0.2s;
+    }
+
+    .alert-success a.btn-go-login:hover {
+      background: #34d399;
+    }
+
+    .bottom-link {
+      text-align: center;
+      margin-top: 20px;
+      font-size: 12px;
+      color: #94a3b8;
+    }
+
+    .bottom-link a {
+      color: var(--primary);
+      font-weight: 700;
+      text-decoration: none;
+    }
+
+    .bottom-link a:hover {
+      text-decoration: underline;
+    }
+
+    .powered-by {
+      text-align: center;
+      margin-top: 20px;
+      font-size: 10px;
+      color: #475569;
+    }
+  </style>
+</head>
+<body>
+
+<div class="register-card">
+  <div class="register-header">
+    <div class="register-logo">
+      <i class="fa-solid fa-store"></i>
+    </div>
+    <h1>ISCWORKS</h1>
+    <p>Mağaza Oluşturun & Multi-Tenant Ekosisteme Katılın</p>
+  </div>
+
+  <div class="alert-danger" id="registerAlert">
+    <i class="fa-solid fa-circle-exclamation"></i>
+    <span id="registerAlertText">Lütfen form alanlarını kontrol edin.</span>
+  </div>
+
+  <div class="alert-success" id="registerSuccessAlert">
+    <i class="fa-solid fa-circle-check" style="font-size: 32px; color: #10b981;"></i>
+    <div>
+      <strong style="display: block; font-size: 14px; margin-bottom: 4px;">Başvurunuz ve Mağazanız Oluşturuldu!</strong>
+      <span>Yönetici onayından sonra giriş ekranından hesabınıza erişebilirsiniz.</span>
+    </div>
+    <a href="login.html" class="btn-go-login">
+      <i class="fa-solid fa-right-to-bracket"></i> Giriş Sayfasına Git
+    </a>
+  </div>
+
+  <form id="registerForm">
+    <div class="form-grid">
+      <div class="form-group">
+        <label>Ad Soyad *</label>
+        <div class="input-wrapper">
+          <i class="fa-solid fa-user"></i>
+          <input type="text" id="regFullName" placeholder="Örn: Ahmet Yılmaz" required autocomplete="name">
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>T.C. Kimlik No *</label>
+        <div class="input-wrapper">
+          <i class="fa-solid fa-id-card"></i>
+          <input type="text" id="regTcNo" placeholder="11 Haneli T.C. No" maxlength="11" required>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>Telefon *</label>
+        <div class="input-wrapper">
+          <i class="fa-solid fa-phone"></i>
+          <input type="tel" id="regPhone" placeholder="Örn: 0555 555 55 55" required autocomplete="tel">
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>E-Posta Adresi *</label>
+        <div class="input-wrapper">
+          <i class="fa-solid fa-envelope"></i>
+          <input type="email" id="regEmail" placeholder="ahmet@magaza.com" required autocomplete="email">
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>Mağaza Adı *</label>
+        <div class="input-wrapper">
+          <i class="fa-solid fa-shop"></i>
+          <input type="text" id="regStoreName" placeholder="Örn: Goril Butik" required>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>Paket Seçimi *</label>
+        <div class="input-wrapper">
+          <i class="fa-solid fa-box-open"></i>
+          <select id="regPlan" required>
+            <option value="Starter Store">Starter Store (Başlangıç)</option>
+            <option value="Pro Store" selected>Pro Store (Önerilen)</option>
+            <option value="Enterprise Store">Enterprise Store (Kurumsal)</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>Şifre *</label>
+        <div class="input-wrapper">
+          <i class="fa-solid fa-lock"></i>
+          <input type="password" id="regPassword" placeholder="Minimum 6 karakter" required autocomplete="new-password">
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>Şifre Tekrar *</label>
+        <div class="input-wrapper">
+          <i class="fa-solid fa-lock"></i>
+          <input type="password" id="regConfirmPassword" placeholder="Şifrenizi tekrar girin" required autocomplete="new-password">
+        </div>
+      </div>
+    </div>
+
+    <button type="submit" class="btn-register" id="btnRegisterSubmit">
+      <i class="fa-solid fa-paper-plane"></i>
+      Mağazayı Oluştur & Başvur
+    </button>
+  </form>
+
+  <div class="bottom-link" id="bottomLinkSection">
+    Zaten bir mağaza hesabınız var mı? <a href="login.html">Giriş Yapın</a>
+  </div>
+
+  <div class="powered-by">
+    🔐 Powered by ISCWORKS CommerceOS Engine
+  </div>
+</div>
+
+<script>
+  document.getElementById('registerForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const alertDanger = document.getElementById('registerAlert');
+    const alertDangerText = document.getElementById('registerAlertText');
+    const alertSuccess = document.getElementById('registerSuccessAlert');
+    const submitBtn = document.getElementById('btnRegisterSubmit');
+
+    alertDanger.style.display = 'none';
+
+    const fullName = document.getElementById('regFullName').value.trim();
+    const tcNo = document.getElementById('regTcNo').value.trim();
+    const phone = document.getElementById('regPhone').value.trim();
+    const email = document.getElementById('regEmail').value.trim();
+    const storeName = document.getElementById('regStoreName').value.trim();
+    const plan = document.getElementById('regPlan').value;
+    const password = document.getElementById('regPassword').value;
+    const confirmPassword = document.getElementById('regConfirmPassword').value;
+
+    // FRONTEND VALIDATION
+    if (!fullName || !tcNo || !phone || !email || !storeName || !password || !confirmPassword) {
+      alertDangerText.textContent = 'Lütfen tüm zorunlu alanları doldurun.';
+      alertDanger.style.display = 'flex';
+      return;
+    }
+
+    if (tcNo.length !== 11 || !/^\d{11}$/.test(tcNo)) {
+      alertDangerText.textContent = 'T.C. Kimlik Numarası tam olarak 11 haneli rakamlardan oluşmalıdır.';
+      alertDanger.style.display = 'flex';
+      return;
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      alertDangerText.textContent = 'Lütfen geçerli bir E-Posta adresi girin.';
+      alertDanger.style.display = 'flex';
+      return;
+    }
+
+    if (password.length < 6) {
+      alertDangerText.textContent = 'Şifreniz en az 6 karakter uzunluğunda olmalıdır.';
+      alertDanger.style.display = 'flex';
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      alertDangerText.textContent = 'Girdiğiniz şifreler birbiriyle eşleşmiyor.';
+      alertDanger.style.display = 'flex';
+      return;
+    }
+
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Mağaza Kaydediliyor...';
+
+    try {
+      const response = await fetch('/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fullName,
+          tcNo,
+          phone,
+          email,
+          storeName,
+          plan,
+          password
+        })
+      });
+
+      const data = await response.json();
+
+      if (response.ok && data.success) {
+        document.getElementById('registerForm').style.display = 'none';
+        document.getElementById('bottomLinkSection').style.display = 'none';
+        alertSuccess.style.display = 'flex';
+      } else {
+        const errorMsg = data.error || 'Kayıt esnasında bir hata oluştu.';
+        alertDangerText.textContent = typeof errorMsg === 'string' ? errorMsg : 'Kayıt başarısız.';
+        alertDanger.style.display = 'flex';
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = '<i class="fa-solid fa-paper-plane"></i> Mağazayı Oluştur & Başvur';
+      }
+    } catch (err) {
+      alertDangerText.textContent = 'Sunucuya bağlanırken bir hata oluştu. Lütfen tekrar deneyin.';
+      alertDanger.style.display = 'flex';
+      submitBtn.disabled = false;
+      submitBtn.innerHTML = '<i class="fa-solid fa-paper-plane"></i> Mağazayı Oluştur & Başvur';
+    }
+  });
+</script>
+
+</body>
+</html>
