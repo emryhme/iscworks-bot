@@ -243,14 +243,29 @@ app.post('/webhook/instagram', webhook_controller_1.WebhookController.handleWebh
 app.get('/api/webhook/:storeSlug', webhook_controller_1.WebhookController.verifyStoreWebhook);
 app.post('/api/webhook/:storeSlug', webhook_controller_1.WebhookController.handleStoreWebhook);
 // Static Admin UI Server (Merchant Panel)
-app.use('/admin', express_1.default.static(path_1.default.join(__dirname, '../public/admin')));
+app.use('/admin', express_1.default.static(path_1.default.resolve(__dirname, '../public/admin')));
 app.get(['/admin', '/admin/'], (req, res) => {
-    res.sendFile(path_1.default.join(__dirname, '../public/admin/index.html'));
+    res.sendFile(path_1.default.resolve(__dirname, '../public/admin/index.html'));
+});
+app.get(['/admin/login', '/admin/login.html'], (req, res) => {
+    res.sendFile(path_1.default.resolve(__dirname, '../public/admin/login.html'));
 });
 // Static Master Admin UI Server (Platform Owner Panel)
-app.use('/master-admin', express_1.default.static(path_1.default.join(__dirname, '../public/master-admin')));
+app.use('/master-admin', express_1.default.static(path_1.default.resolve(__dirname, '../public/master-admin')));
 app.get(['/master-admin', '/master-admin/'], (req, res) => {
-    res.sendFile(path_1.default.join(__dirname, '../public/master-admin/index.html'));
+    res.sendFile(path_1.default.resolve(__dirname, '../public/master-admin/index.html'));
+});
+app.get(['/master-admin/login', '/master-admin/login.html'], (req, res) => {
+    res.sendFile(path_1.default.resolve(__dirname, '../public/master-admin/login.html'));
+});
+app.get(['/master-admin/merchants', '/master-admin/merchants.html'], (req, res) => {
+    res.sendFile(path_1.default.resolve(__dirname, '../public/master-admin/merchants.html'));
+});
+app.get(['/master-admin/merchant', '/master-admin/merchant.html'], (req, res) => {
+    res.sendFile(path_1.default.resolve(__dirname, '../public/master-admin/merchant.html'));
+});
+app.get(['/master-admin/applications', '/master-admin/applications.html'], (req, res) => {
+    res.sendFile(path_1.default.resolve(__dirname, '../public/master-admin/applications.html'));
 });
 // ==========================================
 // MASTER ADMIN API ENDPOINTS (/api/master-admin/*)
