@@ -1,6 +1,10 @@
 "use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.WebhookController = void 0;
+const crypto_1 = __importDefault(require("crypto"));
 const env_1 = require("../config/env");
 const regex_util_1 = require("../utils/regex.util");
 const ai_service_1 = require("../services/ai.service");
@@ -8,19 +12,87 @@ const facebook_service_1 = require("../services/facebook.service");
 const db_1 = require("../database/db");
 class WebhookController {
     /**
-     * Facebook / Instagram Webhook Doğrulama (GET /webhook/instagram)
+     * Helper: Resolves store by slug strictly from database (No Fallbacks!)
+     */
+    static resolveStore(slug) {
+        const cleanSlug = (slug || '').trim().toLowerCase();
+        if (!cleanSlug)
+            return null;
+        try {
+            const store = db_1.db.prepare('SELECT id, name, slug, status FROM stores WHERE LOWER(slug) = ?').get(cleanSlug);
+            return store || null;
+        }
+        catch {
+            return null;
+        }
+    }
+    /**
+     * Helper: Verifies X-Hub-Signature-256 HMAC-SHA256 Header (Security Rule 7)
+     */
+    static verifySignature(req) {
+        const signatureHeader = (req.headers['x-hub-signature-256'] || req.headers['x-hub-signature']);
+        const appSecret = process.env.INSTAGRAM_APP_SECRET || env_1.env.instagramAppSecret;
+        if (!appSecret) {
+            if (signatureHeader) {
+                console.warn('[Webhook Signature] ⚠️ App secret is not configured in environment variables.');
+            }
+            return true;
+        }
+        if (!signatureHeader) {
+            console.warn('[Webhook Signature] ❌ X-Hub-Signature-256 header missing.');
+            return false;
+        }
+        try {
+            const parts = signatureHeader.split('=');
+            const expectedHash = parts.length === 2 ? parts[1] : parts[0];
+            const rawBody = req.rawBody || (typeof req.body === 'string' ? req.body : JSON.stringify(req.body || {}));
+            const computedHash = crypto_1.default.createHmac('sha256', appSecret).update(rawBody).digest('hex');
+            const isValid = crypto_1.default.timingSafeEqual(Buffer.from(computedHash, 'utf8'), Buffer.from(expectedHash, 'utf8'));
+            if (!isValid) {
+                console.error('[Webhook Signature] ❌ HMAC Signature Mismatch!');
+            }
+            return isValid;
+        }
+        catch (e) {
+            console.error('[Webhook Signature] ❌ Error computing HMAC signature:', e.message);
+            return false;
+        }
+    }
+    /**
+     * Helper: Tenant-Aware Webhook Event Idempotency Check (Security Rule 6)
+     */
+    static isDuplicateEvent(eventId, storeId) {
+        if (!eventId || !storeId)
+            return false;
+        try {
+            const existing = db_1.db.prepare('SELECT event_id FROM webhook_events WHERE store_id = ? AND event_id = ?').get(storeId, eventId);
+            if (existing) {
+                console.log(`[Webhook Idempotency] ⚠️ Duplicate webhook event ignored (eventId: ${eventId}, storeId: ${storeId})`);
+                return true;
+            }
+            db_1.db.prepare('INSERT INTO webhook_events (store_id, event_id, processed_at) VALUES (?, ?, CURRENT_TIMESTAMP)').run(storeId, eventId);
+            return false;
+        }
+        catch (e) {
+            console.warn('[Webhook Idempotency Error]:', e.message);
+            return false;
+        }
+    }
+    /**
+     * Facebook / Instagram Webhook Verification (GET /webhook/instagram)
      */
     static verifyWebhook(req, res) {
-        const mode = req.query['hub.mode'];
-        const token = req.query['hub.verify_token'];
+        const mode = String(req.query['hub.mode'] || '');
+        const token = String(req.query['hub.verify_token'] || '');
         const challenge = req.query['hub.challenge'];
         console.log(`[WebhookController] 🔍 Webhook Doğrulama İsteği Geldi: mode=${mode}, token=${token}`);
-        if (mode === 'subscribe' && token === env_1.env.fbVerifyToken) {
+        const expectedToken = process.env.FB_VERIFY_TOKEN || env_1.env.fbVerifyToken;
+        if (mode === 'subscribe' && token === expectedToken) {
             console.log('[WebhookController] ✅ Webhook Doğrulaması Başarılı!');
             res.status(200).send(challenge);
         }
         else {
-            console.warn(`[WebhookController] ❌ Webhook Doğrulama Başarısız! Beklenen Token: "${env_1.env.fbVerifyToken}", Gelen Token: "${token}"`);
+            console.warn(`[WebhookController] ❌ Webhook Verification Failed! Token: "${token}"`);
             res.sendStatus(403);
         }
     }
@@ -28,61 +100,96 @@ class WebhookController {
      * Mağazaya Özel Webhook Doğrulama (GET /api/webhook/:storeSlug)
      */
     static verifyStoreWebhook(req, res) {
-        const { storeSlug } = req.params;
-        const mode = req.query['hub.mode'];
-        const token = req.query['hub.verify_token'];
+        const storeSlug = String(req.params.storeSlug || '');
+        const mode = String(req.query['hub.mode'] || '');
+        const token = String(req.query['hub.verify_token'] || '');
         const challenge = req.query['hub.challenge'];
         console.log(`[WebhookController] 🔍 Store Webhook Doğrulama İsteği (${storeSlug}): token=${token}`);
-        if (mode === 'subscribe') {
+        const store = WebhookController.resolveStore(storeSlug);
+        if (!store) {
+            console.warn(`[WebhookController] ❌ Mağaza bulunamadı: "${storeSlug}"`);
+            res.status(404).json({ success: false, error: 'Mağaza bulunamadı.' });
+            return;
+        }
+        if (store.status !== 'active') {
+            console.warn(`[WebhookController] ⛔ Mağaza pasif durumda: "${storeSlug}" (status: ${store.status})`);
+            res.status(403).json({ success: false, error: 'Mağaza pasif durumda.' });
+            return;
+        }
+        const expectedToken = process.env.FB_VERIFY_TOKEN || env_1.env.fbVerifyToken;
+        if (mode === 'subscribe' && token === expectedToken) {
             console.log(`[WebhookController] ✅ ${storeSlug} Webhook Doğrulaması Başarılı!`);
             res.status(200).send(challenge);
         }
         else {
+            console.warn(`[WebhookController] ❌ ${storeSlug} Token Uyuşmazlığı!`);
             res.sendStatus(403);
-        }
-    }
-    static isDuplicateEvent(eventId, storeSlug = 'default') {
-        if (!eventId)
-            return false;
-        try {
-            const existing = db_1.db.prepare('SELECT event_id FROM webhook_events WHERE event_id = ?').get(eventId);
-            if (existing) {
-                console.log(`[Webhook Idempotency] ⚠️ Mükerrer Webhook paketi tespit edildi ve atlandı (eventId: ${eventId}, store: ${storeSlug})`);
-                return true;
-            }
-            db_1.db.prepare('INSERT INTO webhook_events (event_id, store_slug) VALUES (?, ?)').run(eventId, storeSlug);
-            return false;
-        }
-        catch (e) {
-            return false;
         }
     }
     /**
      * Mağazaya Özel Gelen DM Mesajlarını İşleme (POST /api/webhook/:storeSlug)
      */
     static async handleStoreWebhook(req, res) {
-        const storeSlugStr = String(req.params.storeSlug || 'default');
-        const body = req.body;
-        console.log(`[WebhookController] 📩 MAĞAZAYA ÖZEL WEBHOOK PAKETİ GELDİ (${storeSlugStr}):`);
-        res.status(200).send('EVENT_RECEIVED');
-        if (!body || !body.entry)
+        const storeSlug = String(req.params.storeSlug || '');
+        const store = WebhookController.resolveStore(storeSlug);
+        if (!store) {
+            console.warn(`[WebhookController] ❌ Mağaza bulunamadı: "${storeSlug}"`);
+            res.status(404).json({ success: false, error: 'Mağaza bulunamadı.' });
             return;
-        for (const entry of body.entry || []) {
+        }
+        if (store.status !== 'active') {
+            console.warn(`[WebhookController] ⛔ Mağaza pasif/askıda: "${storeSlug}" (status: ${store.status})`);
+            res.status(403).json({ success: false, error: 'Mağaza pasif/askıda durumdadır.' });
+            return;
+        }
+        if (!WebhookController.verifySignature(req)) {
+            res.status(401).json({ success: false, error: 'Geçersiz Webhook İmzası (Signature verification failed).' });
+            return;
+        }
+        res.status(200).send('EVENT_RECEIVED');
+        const body = req.body;
+        if (!body || !body.entry || !Array.isArray(body.entry))
+            return;
+        for (const entry of body.entry) {
             const messagingList = entry.messaging || [];
             for (const messagingEvent of messagingList) {
                 const senderId = messagingEvent.sender?.id;
                 const message = messagingEvent.message;
                 if (!senderId || !message || message.is_echo)
                     continue;
-                // Idempotency: Mükerrer mesaj paketlerini süz
                 const eventId = String(message.mid || `${entry.id}_${messagingEvent.timestamp || Date.now()}`);
-                if (WebhookController.isDuplicateEvent(eventId, storeSlugStr)) {
+                if (WebhookController.isDuplicateEvent(eventId, store.id)) {
                     continue;
                 }
                 let incomingText = message.text || '';
+                if (message.attachments && message.attachments.length > 0) {
+                    const attachment = message.attachments[0];
+                    const title = attachment.payload?.title || '';
+                    const extractedCode = (0, regex_util_1.extractProductCode)(title);
+                    if (extractedCode) {
+                        incomingText = `${extractedCode}\n\nMüşteri bu ürünü sipariş etmek istiyor. Lütfen stok durumunu kontrol et.`;
+                    }
+                }
                 if (incomingText.trim()) {
-                    console.log(`[Store Webhook: ${storeSlugStr}] 🚀 DM Mesajı İşleniyor (${senderId}): "${incomingText}"`);
-                    WebhookController.processAndReply(senderId, incomingText);
+                    console.log(`[Store Webhook: ${store.slug} (ID: ${store.id})] 🚀 DM Mesajı İşleniyor (${senderId}): "${incomingText}"`);
+                    WebhookController.processAndReply(senderId, incomingText, store.slug, store.id);
+                }
+            }
+            const changesList = entry.changes || [];
+            for (const change of changesList) {
+                const value = change.value || {};
+                const senderId = value.sender?.id || value.from?.id;
+                const message = value.message || value.text;
+                if (!senderId)
+                    continue;
+                const eventId = String(value.item_id || value.comment_id || `${entry.id}_${Date.now()}`);
+                if (WebhookController.isDuplicateEvent(eventId, store.id)) {
+                    continue;
+                }
+                const incomingText = typeof message === 'string' ? message : message?.text || '';
+                if (incomingText.trim()) {
+                    console.log(`[Store Webhook Changes: ${store.slug} (ID: ${store.id})] 🚀 Mesaj İşleniyor (${senderId}): "${incomingText}"`);
+                    WebhookController.processAndReply(senderId, incomingText, store.slug, store.id);
                 }
             }
         }
@@ -91,37 +198,47 @@ class WebhookController {
      * Gelen Instagram / Messenger Mesajlarını İşleme (POST /webhook/instagram)
      */
     static async handleWebhook(req, res) {
-        const body = req.body;
-        // Her gelen Webhook paketini konsola bas (Sıfır kayıp)
-        console.log('[WebhookController] 📩 META WEBHOOK PAKETİ GELDİ:');
-        console.log(JSON.stringify(body, null, 2));
-        // Meta Webhook paketini anında 200 OK yanıtla (Time-out olmasın)
-        res.status(200).send('EVENT_RECEIVED');
-        if (!body || !body.entry)
+        const defaultStore = db_1.db.prepare("SELECT id, name, slug, status FROM stores WHERE slug = 'default' OR id = 1 LIMIT 1").get();
+        if (!defaultStore) {
+            res.status(404).json({ success: false, error: 'Varsayılan mağaza veritabanında bulunamadı.' });
             return;
-        for (const entry of body.entry || []) {
-            // 1. Format: entry.messaging (Instagram DM & Messenger Standart)
+        }
+        if (defaultStore.status !== 'active') {
+            res.status(403).json({ success: false, error: 'Mağaza pasif/askıda durumdadır.' });
+            return;
+        }
+        if (!WebhookController.verifySignature(req)) {
+            res.status(401).json({ success: false, error: 'Geçersiz Webhook İmzası.' });
+            return;
+        }
+        res.status(200).send('EVENT_RECEIVED');
+        const body = req.body;
+        if (!body || !body.entry || !Array.isArray(body.entry))
+            return;
+        for (const entry of body.entry) {
             const messagingList = entry.messaging || [];
             for (const messagingEvent of messagingList) {
                 const senderId = messagingEvent.sender?.id;
                 const message = messagingEvent.message;
                 if (!senderId || !message || message.is_echo)
                     continue;
+                const eventId = String(message.mid || `${entry.id}_${messagingEvent.timestamp || Date.now()}`);
+                if (WebhookController.isDuplicateEvent(eventId, defaultStore.id)) {
+                    continue;
+                }
                 let incomingText = message.text || '';
                 if (message.attachments && message.attachments.length > 0) {
                     const attachment = message.attachments[0];
                     const title = attachment.payload?.title || '';
                     const extractedCode = (0, regex_util_1.extractProductCode)(title);
                     if (extractedCode) {
-                        incomingText = `${extractedCode}\n\nMüşteri bu ürünü sipariş etmek istiyor. Lütfen ürünün stok durumunu, beden seçeneklerini kontrol ederek müşteriye yardımcı ol.`;
+                        incomingText = `${extractedCode}\n\nMüşteri bu ürünü sipariş etmek istiyor. Lütfen stok durumunu kontrol et.`;
                     }
                 }
                 if (incomingText.trim()) {
-                    console.log(`[WebhookController] 🚀 Mesaj İşleniyor (senderId: ${senderId}): "${incomingText}"`);
-                    WebhookController.processAndReply(senderId, incomingText);
+                    WebhookController.processAndReply(senderId, incomingText, defaultStore.slug, defaultStore.id);
                 }
             }
-            // 2. Format: entry.changes (Instagram Graph API Alternate Webhook)
             const changesList = entry.changes || [];
             for (const change of changesList) {
                 const value = change.value || {};
@@ -129,24 +246,27 @@ class WebhookController {
                 const message = value.message || value.text;
                 if (!senderId)
                     continue;
+                const eventId = String(value.item_id || value.comment_id || `${entry.id}_${Date.now()}`);
+                if (WebhookController.isDuplicateEvent(eventId, defaultStore.id)) {
+                    continue;
+                }
                 const incomingText = typeof message === 'string' ? message : message?.text || '';
                 if (incomingText.trim()) {
-                    console.log(`[WebhookController Changes] 🚀 Mesaj İşleniyor (senderId: ${senderId}): "${incomingText}"`);
-                    WebhookController.processAndReply(senderId, incomingText);
+                    WebhookController.processAndReply(senderId, incomingText, defaultStore.slug, defaultStore.id);
                 }
             }
         }
     }
     /**
-     * AI Yanıtı Üretip Meta Graph API Üzerinden Müşteriye Gönderir
+     * AI Yanıtı Üretip Meta Graph API Üzerinden Müşteriye Gönderir (Store Scoped)
      */
-    static async processAndReply(senderId, text) {
+    static async processAndReply(senderId, text, storeSlug, storeId) {
         try {
-            const { reply } = await ai_service_1.AIService.processMessage(senderId, text);
+            const { reply } = await ai_service_1.AIService.processMessage(senderId, text, storeSlug, storeId);
             await facebook_service_1.FacebookService.sendMessage(senderId, reply);
         }
         catch (error) {
-            console.error(`[WebhookController] ❌ Mesaj işleme hatası (${senderId}):`, error);
+            console.error(`[WebhookController] ❌ Mesaj işleme hatası (Store: ${storeSlug}/${storeId}, Sender: ${senderId}):`, error?.message || error);
         }
     }
 }
