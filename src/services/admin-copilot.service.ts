@@ -7,28 +7,37 @@ import { OrderService } from './order.service';
 import { db } from '../database/db';
 
 /**
- * BARON'S SILLAGE - AI Admin & Copilot Management Service
+ * BARON'S SILLAGE - Multi-Tenant AI Admin & Copilot Management Service
  */
 export class AdminCopilotService {
+  private static validateStoreId(storeId: any): void {
+    if (typeof storeId !== 'number' || isNaN(storeId) || storeId <= 0) {
+      throw new Error('Store ID zorunludur ve geçerli bir pozitif sayı olmalıdır.');
+    }
+  }
+
   private static getApiKey(): string {
     return env.openaiApiKey || env.geminiApiKey || 'DUMMY_KEY';
   }
 
-  public static async processAdminCommand(userPrompt: string): Promise<string> {
+  public static async processAdminCommand(userPrompt: string, storeId: number = 1): Promise<string> {
+    this.validateStoreId(storeId);
     const apiKey = this.getApiKey();
 
     if (!apiKey || apiKey === 'DUMMY_KEY') {
       return "⚠️ Patron, geçerli bir OPENAI_API_KEY veya GEMINI_API_KEY bulunamadı. Lütfen .env dosyanızı kontrol ediniz.";
     }
 
-    // 1. Stok Güncelleme Aracı
+    // 1. Stok Güncelleme Aracı (Store Isolated)
     const stokGuncelleTool = new DynamicTool({
       name: 'STOK_GUNCELLE',
       description: 'Bir ürünün stok adedini günceller. Parametreler: productCode (string), newStock (number).',
-      func: async (inputStr: string) => {
+      func: async (inputStr: any) => {
         try {
-          const { productCode, newStock } = JSON.parse(inputStr);
-          const success = await StockService.updateStock(productCode, Number(newStock));
+          const data = typeof inputStr === 'object' ? inputStr : JSON.parse(inputStr || '{}');
+          const productCode = data.productCode;
+          const newStock = data.newStock;
+          const success = await StockService.updateStock(storeId, productCode, Number(newStock));
           if (success) {
             return `✅ ${productCode} stoğu ${newStock} adet olarak güncellendi!`;
           } else {
@@ -40,35 +49,41 @@ export class AdminCopilotService {
       }
     });
 
-    // 2. Fiyat Güncelleme Aracı
+    // 2. Fiyat Güncelleme Aracı (Store Isolated)
     const fiyatGuncelleTool = new DynamicTool({
       name: 'FIYAT_GUNCELLE',
       description: 'Bir ürünün satış fiyatını TL olarak günceller. Parametreler: productCode (string), price (number).',
-      func: async (inputStr: string) => {
+      func: async (inputStr: any) => {
         try {
-          const { productCode, price } = JSON.parse(inputStr);
+          const data = typeof inputStr === 'object' ? inputStr : JSON.parse(inputStr || '{}');
+          const productCode = data.productCode;
+          const price = data.price;
           const numPrice = Number(price);
-          db.prepare('UPDATE products SET price = ?, updated_at = CURRENT_TIMESTAMP WHERE product_code = ?').run(numPrice, productCode);
-          return `✅ ${productCode} ürününün fiyatı ${numPrice} TL olarak kaydedildi!`;
+          const res = db.prepare('UPDATE products SET price = ?, updated_at = CURRENT_TIMESTAMP WHERE store_id = ? AND (product_code = ? OR short_code = ?)').run(numPrice, storeId, productCode, productCode);
+          if (res.changes > 0) {
+            return `✅ ${productCode} ürününün fiyatı ${numPrice} TL olarak kaydedildi!`;
+          } else {
+            return `❌ ${productCode} ürünü bu mağazada bulunamadı.`;
+          }
         } catch (e: any) {
           return `❌ Fiyat güncelleme hatası: ${e.message}`;
         }
       }
     });
 
-    // 3. Sipariş Sorgulama Aracı
+    // 3. Sipariş Sorgulama Aracı (Store Isolated)
     const siparisSorgulaTool = new DynamicTool({
       name: 'SIPARIS_SORGULA',
       description: 'Veritabanındaki siparişleri listeler veya sorgular. Parametreler: query (string, opsiyonel - isim, telefon veya orderId).',
-      func: async (inputStr: string) => {
+      func: async (inputStr: any) => {
         try {
-          const parsed = inputStr ? JSON.parse(inputStr) : {};
+          const parsed = typeof inputStr === 'object' ? inputStr : (inputStr ? JSON.parse(inputStr) : {});
           const query = parsed.query || '';
-          const orders = await OrderService.getOrders();
+          const orders = await OrderService.getOrders(storeId);
           
           let filtered = orders;
           if (query) {
-            const q = query.toLowerCase().trim();
+            const q = String(query).toLowerCase().trim();
             filtered = orders.filter(o => 
               (o.orderId || '').toLowerCase().includes(q) ||
               (o.customerName || '').toLowerCase().includes(q) ||
@@ -90,19 +105,28 @@ export class AdminCopilotService {
       }
     });
 
-    // 4. Yeni Ürün Ekleme Aracı
+    // 4. Yeni Ürün Ekleme Aracı (Store Isolated)
     const urunEkleTool = new DynamicTool({
       name: 'URUN_EKLE',
       description: 'Yapay zeka analizli yeni ürün ekler. Parametreler: shortCode (string), productName (string), color (string), size (string), stock (number), price (number, opsiyonel), category (string, opsiyonel).',
-      func: async (inputStr: string) => {
+      func: async (inputStr: any) => {
         try {
-          const { shortCode, productName, color, size, stock, price, category } = JSON.parse(inputStr);
+          const data = typeof inputStr === 'object' ? inputStr : JSON.parse(inputStr || '{}');
+          const shortCode = data.shortCode;
+          const productName = data.productName;
+          const color = data.color;
+          const size = data.size;
+          const stock = data.stock;
+          const price = data.price;
+          const category = data.category;
+
           const sc = (shortCode || 'KGMLW').toUpperCase().trim();
           const sz = (size || 'M').toUpperCase().trim();
           const computedProductCode = `${sc}-${sz}`;
           const numPrice = Number(price) || 299;
 
           const res = await StockService.addProduct({
+            storeId: storeId,
             shortCode: sc,
             productCode: computedProductCode,
             name: productName || 'BARON SILLAGE Ürün',
@@ -113,7 +137,7 @@ export class AdminCopilotService {
           });
 
           if (res.success) {
-            db.prepare('UPDATE products SET price = ? WHERE product_code = ?').run(numPrice, computedProductCode);
+            db.prepare('UPDATE products SET price = ? WHERE store_id = ? AND product_code = ?').run(numPrice, storeId, computedProductCode);
             return `✨ Yeni ürün başarıyla eklendi!\n• Kod: ${computedProductCode}\n• İsim: ${productName}\n• Beden: ${sz}\n• Stok: ${stock}\n• Fiyat: ${numPrice} TL`;
           } else {
             return '❌ Ürün eklenemedi.';
@@ -124,19 +148,19 @@ export class AdminCopilotService {
       }
     });
 
-    // 5. Ürün ve Stok Listeleme / Sorgulama Aracı (Database Product Search)
+    // 5. Ürün ve Stok Listeleme / Sorgulama Aracı (Store Isolated)
     const urunListeleSorgulaTool = new DynamicTool({
       name: 'URUN_LISTELE_SORGULA',
-      description: 'Veritabanındaki tüm ürünleri ve stok durumlarını listeler veya kelimeye göre arar. Parametreler: query (string, opsiyonel - ürün adı, kod, kısa kod, renk veya kategori).',
-      func: async (inputStr: string) => {
+      description: 'Veritabanındaki tüm ürünleri ve stok durumlarını listeler veya kelimeye göre arar. Parametreler: query (string, opsiyonel).',
+      func: async (inputStr: any) => {
         try {
-          const parsed = inputStr ? JSON.parse(inputStr) : {};
+          const parsed = typeof inputStr === 'object' ? inputStr : (inputStr ? JSON.parse(inputStr) : {});
           const query = parsed.query || '';
-          const products = await StockService.fetchAllSheetRows();
+          const products = await StockService.fetchAllSheetRows(storeId);
 
           let filtered = products;
           if (query) {
-            const q = query.toLowerCase().trim();
+            const q = String(query).toLowerCase().trim();
             filtered = products.filter(p => 
               (p.productCode || '').toLowerCase().includes(q) ||
               (p.shortCode || '').toLowerCase().includes(q) ||
@@ -169,8 +193,8 @@ export class AdminCopilotService {
     const boundModel = model.bindTools(tools);
 
     const systemPrompt = new SystemMessage(`
-Sen BARON'S SILLAGE Yönetici ve Mağaza Copilot Asistanısın (F.R.I.D.A.Y.).
-Kullanıcın Sayın Tony Stark (Patron)'dır.
+Sen Mağaza Yönetici ve Copilot Asistanısın (F.R.I.D.A.Y.).
+Kullanıcın Patron'dur.
 
 VERİTABANI VE ARAÇ YETKİLERİN:
 Sen veritabanındaki ürünleri, stokları, fiyatları ve siparişleri Doğrudan Sorgulama ve Değiştirme Yetkisine SAHİPSİN!
@@ -179,12 +203,6 @@ Sen veritabanındaki ürünleri, stokları, fiyatları ve siparişleri Doğrudan
 - Fiyat değiştirmek için FIYAT_GUNCELLE aracını kullan.
 - Sipariş sorgulamak için SIPARIS_SORGULA aracını kullan.
 - Yeni ürün eklemek için URUN_EKLE aracını kullan.
-
-⚠️ KESİNLİKLE "ürün listenizi görüntülemek için bir araç kullanamıyorum" DEME! Senin URUN_LISTELE_SORGULA aracın var ve veritabanına %100 erişimin var.
-
-Görevlerin:
-1. Patron'un Türkçe doğal dille verdiği yönetim emirlerini anlayıp araçları çalıştırarak işlemi gerçekleştirmek.
-2. İşlem tamamlandığında Patron'a saygılı, samimi, karizmatik ve net bir Türkçe yanıt sunmak.
     `);
 
     let messages: BaseMessage[] = [systemPrompt, new HumanMessage(userPrompt)];
@@ -196,11 +214,11 @@ Görevlerin:
       messages.push(response);
       for (const tc of response.tool_calls) {
         let toolResult = "";
-        if (tc.name === 'STOK_GUNCELLE') toolResult = await stokGuncelleTool.invoke(JSON.stringify(tc.args));
-        else if (tc.name === 'FIYAT_GUNCELLE') toolResult = await fiyatGuncelleTool.invoke(JSON.stringify(tc.args));
-        else if (tc.name === 'SIPARIS_SORGULA') toolResult = await siparisSorgulaTool.invoke(JSON.stringify(tc.args));
-        else if (tc.name === 'URUN_EKLE') toolResult = await urunEkleTool.invoke(JSON.stringify(tc.args));
-        else if (tc.name === 'URUN_LISTELE_SORGULA') toolResult = await urunListeleSorgulaTool.invoke(JSON.stringify(tc.args));
+        if (tc.name === 'STOK_GUNCELLE') toolResult = await stokGuncelleTool.invoke(tc.args);
+        else if (tc.name === 'FIYAT_GUNCELLE') toolResult = await fiyatGuncelleTool.invoke(tc.args);
+        else if (tc.name === 'SIPARIS_SORGULA') toolResult = await siparisSorgulaTool.invoke(tc.args);
+        else if (tc.name === 'URUN_EKLE') toolResult = await urunEkleTool.invoke(tc.args);
+        else if (tc.name === 'URUN_LISTELE_SORGULA') toolResult = await urunListeleSorgulaTool.invoke(tc.args);
 
         messages.push(new ToolMessage({ content: toolResult, tool_call_id: tc.id! }));
       }

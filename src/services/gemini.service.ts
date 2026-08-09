@@ -21,21 +21,27 @@ export interface AIBatchResult {
 }
 
 /**
- * Google Gemini Yapay Zeka Tabanlı Akıllı Ürün Oluşturucu Servisi
+ * Google Gemini Yapay Zeka Tabanlı Multi-Tenant Akıllı Ürün Oluşturucu Servisi
  */
 export class GeminiService {
+  private static validateStoreId(storeId: any): void {
+    if (typeof storeId !== 'number' || isNaN(storeId) || storeId <= 0) {
+      throw new Error('Store ID zorunludur ve geçerli bir pozitif sayı olmalıdır.');
+    }
+  }
+
   /**
-   * Doğal dil komutundan (Örn: "SİYAH KOT GÖMLEK GELDİ HER BEDENDEN 50 TANE VAR XS S M L XL BEDENLERİ VAR ÜRÜN KODU SKG")
-   * Gemini AI kullanarak 1 veya birden fazla beden için ürün dizisi oluşturur ve Google Sheets'e kaydeder.
+   * Doğal dil komutundan Gemini AI kullanarak ürün dizisi oluşturur ve veritabanına kaydedici (Store Isolated).
    */
-  public static async createProductFromPrompt(prompt: string): Promise<AIBatchResult> {
+  public static async createProductFromPrompt(prompt: string, storeId: number = 1): Promise<AIBatchResult> {
+    this.validateStoreId(storeId);
     try {
       const apiKey = env.geminiApiKey || process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
       let parsedProducts: AIProductItem[] = [];
       let customAiMessage = '';
 
       if (apiKey) {
-        console.log('[GeminiService] 🤖 Google Gemini AI ile ürün(ler) ayrıştırılıyor...');
+        console.log(`[GeminiService] 🤖 Google Gemini AI ile ürün(ler) ayrıştırılıyor (Store: ${storeId})...`);
         const geminiResult = await this.callGeminiAPI(prompt, apiKey);
         if (geminiResult && geminiResult.products && geminiResult.products.length > 0) {
           parsedProducts = geminiResult.products;
@@ -45,7 +51,6 @@ export class GeminiService {
         console.log('[GeminiService] 🔑 Gemini API key bulunamadı, Akıllı Kural Motoru çalışıyor...');
       }
 
-      // Gemini API çıktısı alınamadıysa veya boşsa akıllı kural ayrıştırıcısını çalıştır
       if (!parsedProducts || parsedProducts.length === 0) {
         parsedProducts = this.fallbackSmartBatchParser(prompt);
       }
@@ -54,47 +59,62 @@ export class GeminiService {
         return { success: false, error: 'Ürün bilgisi ayrıştırılamadı.' };
       }
 
-      // Google Sheets'e tek bir toplu istek (batch) atarak ultra hızlı kaydet
-      const rowsToAppend = parsedProducts.map(item => {
+      const rowsToAppend: string[][] = [];
+      const savedProducts: AIProductItem[] = [];
+
+      for (const item of parsedProducts) {
         const cleanShortCode = (item.shortCode || 'SKG').toUpperCase().trim();
         const cleanSize = (item.size || 'M').toUpperCase().trim();
         const cleanProductCode = item.productCode || `${cleanShortCode}-${cleanSize}`;
-        return [
+        const cleanName = item.name || 'Siyah Kot Gömlek';
+        const cleanColor = item.color || 'Siyah';
+        const cleanStock = Number(item.stock) || 50;
+        const cleanCategory = item.category || 'Gömlek';
+
+        await StockService.addProduct({
+          storeId: storeId,
+          shortCode: cleanShortCode,
+          productCode: cleanProductCode,
+          name: cleanName,
+          color: cleanColor,
+          size: cleanSize,
+          stock: cleanStock,
+          category: cleanCategory
+        });
+
+        savedProducts.push({
+          shortCode: cleanShortCode,
+          productCode: cleanProductCode,
+          name: cleanName,
+          color: cleanColor,
+          size: cleanSize,
+          stock: cleanStock,
+          category: cleanCategory
+        });
+
+        rowsToAppend.push([
           cleanShortCode,
           cleanProductCode,
-          item.name || 'Siyah Kot Gömlek',
-          item.color || 'Siyah',
+          cleanName,
+          cleanColor,
           cleanSize,
-          Number(item.stock) || 50,
-          item.category || 'Gömlek'
-        ];
-      });
-
-      const batchSuccess = await GoogleSheetsService.appendProductRowsBatch(rowsToAppend);
-
-      if (batchSuccess) {
-        const savedProducts: AIProductItem[] = parsedProducts.map((item, idx) => ({
-          ...item,
-          shortCode: String(rowsToAppend[idx][0]),
-          productCode: String(rowsToAppend[idx][1]),
-          name: String(rowsToAppend[idx][2]),
-          color: String(rowsToAppend[idx][3]),
-          size: String(rowsToAppend[idx][4]),
-          stock: Number(rowsToAppend[idx][5]),
-          category: String(rowsToAppend[idx][6])
-        }));
-
-        const totalStockAdded = savedProducts.reduce((acc, p) => acc + p.stock, 0);
-        const sizesStr = savedProducts.map(p => p.size).join(', ');
-        
-        return {
-          success: true,
-          products: savedProducts,
-          aiMessage: customAiMessage || `⚡ ${savedProducts.length} farklı beden (${sizesStr}) için toplam ${totalStockAdded} adet ürün Google Sheets stok tablosuna anında eklendi!`
-        };
-      } else {
-        return { success: false, error: 'Google Sheets tablosuna kaydedilemedi.' };
+          String(cleanStock),
+          cleanCategory
+        ]);
       }
+
+      if (storeId === 1) {
+        GoogleSheetsService.appendProductRowsBatch(rowsToAppend).catch(() => {});
+      }
+
+      const totalStockAdded = savedProducts.reduce((acc, p) => acc + p.stock, 0);
+      const sizesStr = savedProducts.map(p => p.size).join(', ');
+
+      return {
+        success: true,
+        products: savedProducts,
+        aiMessage: customAiMessage || `⚡ ${savedProducts.length} farklı beden (${sizesStr}) için toplam ${totalStockAdded} adet ürün stok tablosuna anında eklendi!`
+      };
 
     } catch (error: any) {
       console.error('[GeminiService Error]:', error?.message || error);
@@ -103,7 +123,7 @@ export class GeminiService {
   }
 
   /**
-   * Google Gemini REST API Çağrısı (gemini-2.5-flash / gemini-1.5-flash)
+   * Google Gemini REST API Çağrısı
    */
   private static async callGeminiAPI(prompt: string, apiKey: string): Promise<{ products: AIProductItem[]; aiMessage: string } | null> {
     try {
@@ -112,19 +132,19 @@ export class GeminiService {
       const systemInstruction = `
 Sen BARON'S SILLAGE e-ticaret yönetim paneli için Akıllı Ürün Ekleyici yapay zeka asistanısın.
 Kullanıcının doğal dille yazdığı Türkçe metinden ürün bilgilerini çıkar.
-Eğer kullanıcı tek bir cümlede birden fazla beden (Örn: XS, S, M, L, XL veya 36, 38, 40, 42) belirttiyse, HER BEDEN İÇİN AYRI BIR ÜRÜN OBJESİ OLUŞTUR.
+Eğer kullanıcı tek bir cümlede birden fazla beden belirttiyse, HER BEDEN İÇİN AYRI BIR ÜRÜN OBJESİ OLUŞTUR.
 
 ZORUNLU JSON ŞEMASI:
 {
   "products": [
     {
-      "shortCode": "Ürün modelinin kısa koda eşleşimi (Örn: SKG, KGMLW). Kullanıcı metinde 'ÜRÜN KODU SKG' dediyse tam olarak 'SKG' al.",
-      "productCode": "Tam ürün kodu (Örn: SKG-XS, SKG-S). KISAKOD-BEDEN formatında.",
-      "name": "Temiz ürün tam adı (Örn: Siyah Kot Gömlek). Türkçe harfleri eksiksiz koru.",
-      "color": "Ürün rengi (Örn: Siyah, Mavi).",
-      "size": "Yalnızca bu varyantın bedeni/numarası (Örn: XS, S, M, L, XL).",
-      "stock": 50 (Varyant stok adedi. 'HER BEDENDEN 50 TANE' dendiğinde 50 al),
-      "category": "Kategori (Örn: Gömlek, Pantolon, Ceket)."
+      "shortCode": "Ürün koda eşleşimi (Örn: SKG, KGMLW).",
+      "productCode": "Tam ürün kodu (Örn: SKG-XS, SKG-S).",
+      "name": "Temiz ürün tam adı.",
+      "color": "Ürün rengi.",
+      "size": "Yalnızca bu varyantın bedeni.",
+      "stock": 50,
+      "category": "Kategori."
     }
   ],
   "aiMessage": "Kullanıcıya bilgi veren Türkçe kısa özet açıklama."
@@ -163,13 +183,12 @@ ZORUNLU JSON ŞEMASI:
   }
 
   /**
-   * Çoklu Beden (Multi-size Batch) Destekli Akıllı Kural Motoru
+   * Çoklu Beden Destekli Akıllı Kural Motoru
    */
   private static fallbackSmartBatchParser(prompt: string): AIProductItem[] {
     const rawText = prompt.trim();
     const upperText = rawText.toUpperCase();
 
-    // 1. KISA KOD Tespiti ("ÜRÜN KODU SKG", "KISA KOD SKG", "KOD SKG")
     let shortCode = '';
     const codeMatch = upperText.match(/(?:ÜRÜN KODU|KISA KOD|KODU|KOD)[:\s]+([A-Z0-9]{2,8})/);
     if (codeMatch) {
@@ -180,19 +199,15 @@ ZORUNLU JSON ŞEMASI:
       shortCode = candidates.length > 0 ? candidates[candidates.length - 1] : 'SKG';
     }
 
-    // 2. RENK Tespiti
     const colors = ['Siyah', 'Beyaz', 'Mavi', 'Kırmızı', 'Yeşil', 'Sarı', 'Kahverengi', 'Gri', 'Lacivert', 'Kırmızı-Siyah'];
     const foundColor = colors.find(c => rawText.toLowerCase().includes(c.toLowerCase())) || 'Siyah';
 
-    // 3. KATEGORİ Tespiti
     const categories = ['Gömlek', 'Pantolon', 'T-Shirt', 'Ceket', 'Ayakkabı', 'Parfüm', 'Aksesuar'];
     const foundCategory = categories.find(c => rawText.toLowerCase().includes(c.toLowerCase())) || 'Gömlek';
 
-    // 4. STOK Tespiti ("HER BEDENDEN 50 TANE", "50 STOK", "50 ADET")
     const stockMatch = rawText.match(/(\d+)\s*(?:TANE|ADET|STOK|KADAR)?/i);
     const stock = stockMatch ? parseInt(stockMatch[1], 10) : 50;
 
-    // 5. BEDENLER Tespiti (XS, S, M, L, XL, XXL, 36, 38, 40, 42, 44 vb.)
     const possibleSizes = ['XXL', '2XL', '3XL', 'XL', 'XS', 'S', 'M', 'L', '36', '37', '38', '39', '40', '41', '42', '43', '44', '45'];
     const detectedSizes: string[] = [];
 
@@ -205,26 +220,19 @@ ZORUNLU JSON ŞEMASI:
 
     const finalSizes = detectedSizes.length > 0 ? Array.from(new Set(detectedSizes)) : ['M'];
 
-    // 6. ÜRÜN İSMİ Temizleme (Türkçe Harfleri & 'S' Harfini Kesmeden)
     let titlePart = rawText.split(/GELDİ|HER BEDENDEN|BEDENLERİ|ÜRÜN KODU|KISA KOD|STOK|VAR/i)[0].trim();
     if (!titlePart || titlePart.length < 3) {
       titlePart = `${foundColor} Kot ${foundCategory}`;
     }
 
-    // Türkçe Title Case Dönüşümü
     const cleanName = titlePart.split(/\s+/).map(w => {
       if (!w) return '';
       const lower = w.toLowerCase();
-      if (w.startsWith('İ') || w.startsWith('i')) {
-        return 'İ' + lower.slice(1);
-      }
-      if (w.startsWith('I') || w.startsWith('ı')) {
-        return 'I' + lower.slice(1);
-      }
+      if (w.startsWith('İ') || w.startsWith('i')) return 'İ' + lower.slice(1);
+      if (w.startsWith('I') || w.startsWith('ı')) return 'I' + lower.slice(1);
       return w.charAt(0).toUpperCase() + lower.slice(1);
     }).join(' ');
 
-    // 7. Varyant Ürünleri Oluştur
     return finalSizes.map(sz => ({
       shortCode,
       productCode: `${shortCode}-${sz}`,

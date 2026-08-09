@@ -91,7 +91,8 @@ class StockService {
                 productCode: match.productCode,
                 name: `${match.name} (${match.size})`,
                 stock: match.stock,
-                size: match.size
+                size: match.size,
+                price: match.price
             }
         };
     }

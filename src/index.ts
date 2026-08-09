@@ -390,7 +390,7 @@ app.post('/api/n8n/chat', async (req, res) => {
     }
 
     // Senkron Yanıt Modu (Standart)
-    const result = await AIService.processMessage(senderId, finalMessage);
+    const result = await AIService.processMessage(senderId, finalMessage, 'default', 1);
     res.json({
       success: true,
       senderId,
@@ -413,17 +413,17 @@ app.post('/api/webhook/:storeSlug', WebhookController.handleStoreWebhook);
 
 // Admin API End-point'leri (Siparişleri Görme & Stok Listesi)
 app.get('/api/orders', async (req, res) => {
-  const orders = await OrderService.getOrders();
+  const orders = await OrderService.getOrders(1);
   res.json({ success: true, count: orders.length, orders });
 });
 
 app.get('/api/stocks', async (req, res) => {
-  const stocks = await StockService.getAllProducts();
+  const stocks = await StockService.getAllProducts(1);
   res.json({ success: true, stocks });
 });
 
 app.get('/api/stock/:code', async (req, res) => {
-  const result = await StockService.checkStock(req.params.code);
+  const result = await StockService.checkStock(1, req.params.code);
   res.json(result);
 });
 
@@ -436,6 +436,7 @@ app.post('/api/products', async (req, res) => {
     }
 
     const result = await StockService.addProduct({
+      storeId: 1,
       shortCode,
       productCode,
       name,
@@ -530,7 +531,7 @@ app.post('/api/orders/status', async (req, res) => {
       return res.status(400).json({ success: false, error: 'orderId ve geçerli bir status (OK veya DEC) gereklidir' });
     }
 
-    const success = await OrderService.updateOrderStatus(orderId, status, reason);
+    const success = await OrderService.updateOrderStatus(1, orderId, status, reason);
     if (success) {
       res.json({
         success: true,
@@ -555,7 +556,7 @@ app.post('/api/products/delete', async (req, res) => {
       return res.status(400).json({ success: false, error: 'productCode parametresi gereklidir' });
     }
 
-    const success = await StockService.deleteProduct(productCode);
+    const success = await StockService.deleteProduct(1, productCode);
     if (success) {
       res.json({ success: true, message: `Ürün (${productCode}) Google Sheets stok tablosundan silindi.` });
     } else {
@@ -575,7 +576,7 @@ app.post('/api/orders/delete', async (req, res) => {
       return res.status(400).json({ success: false, error: 'orderId parametresi gereklidir' });
     }
 
-    const success = await OrderService.deleteOrder(orderId);
+    const success = await OrderService.deleteOrder(1, orderId);
     if (success) {
       res.json({ success: true, message: `Sipariş (${orderId}) Google Sheets siparişler tablosundan silindi.` });
     } else {

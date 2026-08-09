@@ -339,7 +339,7 @@ app.post('/api/n8n/chat', async (req, res) => {
             return;
         }
         // Senkron Yanıt Modu (Standart)
-        const result = await ai_service_1.AIService.processMessage(senderId, finalMessage);
+        const result = await ai_service_1.AIService.processMessage(senderId, finalMessage, 'default', 1);
         res.json({
             success: true,
             senderId,
@@ -360,15 +360,15 @@ app.get('/api/webhook/:storeSlug', webhook_controller_1.WebhookController.verify
 app.post('/api/webhook/:storeSlug', webhook_controller_1.WebhookController.handleStoreWebhook);
 // Admin API End-point'leri (Siparişleri Görme & Stok Listesi)
 app.get('/api/orders', async (req, res) => {
-    const orders = await order_service_1.OrderService.getOrders();
+    const orders = await order_service_1.OrderService.getOrders(1);
     res.json({ success: true, count: orders.length, orders });
 });
 app.get('/api/stocks', async (req, res) => {
-    const stocks = await stock_service_1.StockService.getAllProducts();
+    const stocks = await stock_service_1.StockService.getAllProducts(1);
     res.json({ success: true, stocks });
 });
 app.get('/api/stock/:code', async (req, res) => {
-    const result = await stock_service_1.StockService.checkStock(req.params.code);
+    const result = await stock_service_1.StockService.checkStock(1, req.params.code);
     res.json(result);
 });
 // Yeni Ürün Ekleme (SQLite Veritabanı & Mağaza İzolasyonu)
@@ -379,6 +379,7 @@ app.post('/api/products', async (req, res) => {
             return res.status(400).json({ success: false, error: 'Kısa kod, ürün ismi ve beden/numara alanları zorunludur.' });
         }
         const result = await stock_service_1.StockService.addProduct({
+            storeId: 1,
             shortCode,
             productCode,
             name,
@@ -467,7 +468,7 @@ app.post('/api/orders/status', async (req, res) => {
         if (!orderId || !status || (status !== 'OK' && status !== 'DEC')) {
             return res.status(400).json({ success: false, error: 'orderId ve geçerli bir status (OK veya DEC) gereklidir' });
         }
-        const success = await order_service_1.OrderService.updateOrderStatus(orderId, status, reason);
+        const success = await order_service_1.OrderService.updateOrderStatus(1, orderId, status, reason);
         if (success) {
             res.json({
                 success: true,
@@ -492,7 +493,7 @@ app.post('/api/products/delete', async (req, res) => {
         if (!productCode) {
             return res.status(400).json({ success: false, error: 'productCode parametresi gereklidir' });
         }
-        const success = await stock_service_1.StockService.deleteProduct(productCode);
+        const success = await stock_service_1.StockService.deleteProduct(1, productCode);
         if (success) {
             res.json({ success: true, message: `Ürün (${productCode}) Google Sheets stok tablosundan silindi.` });
         }
@@ -512,7 +513,7 @@ app.post('/api/orders/delete', async (req, res) => {
         if (!orderId) {
             return res.status(400).json({ success: false, error: 'orderId parametresi gereklidir' });
         }
-        const success = await order_service_1.OrderService.deleteOrder(orderId);
+        const success = await order_service_1.OrderService.deleteOrder(1, orderId);
         if (success) {
             res.json({ success: true, message: `Sipariş (${orderId}) Google Sheets siparişler tablosundan silindi.` });
         }
