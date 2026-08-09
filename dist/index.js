@@ -5,148 +5,165 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = __importDefault(require("express"));
 const path_1 = __importDefault(require("path"));
-const axios_1 = __importDefault(require("axios"));
+const crypto_1 = __importDefault(require("crypto"));
 const env_1 = require("./config/env");
 const webhook_controller_1 = require("./controllers/webhook.controller");
 const order_service_1 = require("./services/order.service");
 const stock_service_1 = require("./services/stock.service");
-const ai_service_1 = require("./services/ai.service");
 const gemini_service_1 = require("./services/gemini.service");
-const regex_util_1 = require("./utils/regex.util");
+const admin_copilot_service_1 = require("./services/admin-copilot.service");
 const db_1 = require("./database/db");
-// Veritabanını Uygulama Başlarken Anında Teyit Et
+const auth_middleware_1 = require("./middleware/auth.middleware");
+// Initialize Database & Migrations
 (0, db_1.initDatabase)();
 const app = (0, express_1.default)();
-// CORS Middleware
-app.use((req, res, next) => {
-    res.header('Access-Control-Allow-Origin', '*');
-    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, bypass-tunnel-reminder');
-    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-    res.header('Bypass-Tunnel-Reminder', 'true');
-    if (req.method === 'OPTIONS') {
-        return res.sendStatus(200);
-    }
-    next();
-});
+// Apply Global CORS Middleware
+app.use(auth_middleware_1.AuthMiddleware.cors);
 app.use(express_1.default.json());
 app.use(express_1.default.urlencoded({ extended: true }));
-const db_2 = require("./database/db");
-// AUTH API REST ENDPOINTS (SQLite Database Persistence)
+// ==========================================
+// 1. PUBLIC AUTHENTICATION ROUTES
+// ==========================================
+// Merchant User Registration
 app.post('/api/auth/register', (req, res) => {
     try {
         const { fullName, tcNo, phone, email, storeName, plan, password } = req.body || {};
         if (!fullName || !tcNo || !phone || !email || !storeName || !password) {
             return res.status(400).json({ success: false, error: 'Lütfen tüm zorunlu alanları doldurun.' });
         }
-        if (tcNo.length !== 11) {
+        if (String(tcNo).length !== 11) {
             return res.status(400).json({ success: false, error: 'T.C. Kimlik Numarası 11 haneli olmalıdır.' });
         }
-        const hashedPassword = (0, db_2.hashPassword)(password);
-        (0, db_2.createMerchantApplication)({ fullName, tcNo, phone, email, storeName, plan, password: hashedPassword });
-        return res.json({ success: true, message: 'Başvuru veritabanına başarıyla kaydedildi.' });
-    }
-    catch (err) {
-        if (err.message && err.message.includes('UNIQUE')) {
-            return res.status(400).json({ success: false, error: 'Bu E-Posta adresi ile zaten bir başvuru mevcut.' });
+        const cleanEmail = String(email).trim().toLowerCase();
+        const cleanStoreName = String(storeName).trim();
+        const storeSlug = cleanStoreName.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '') || `store-${Date.now()}`;
+        const existingUser = db_1.db.prepare('SELECT id FROM users WHERE LOWER(email) = ?').get(cleanEmail);
+        if (existingUser) {
+            return res.status(400).json({ success: false, error: 'Bu E-Posta adresi ile zaten bir hesap veya başvuru mevcuttur.' });
         }
-        return res.status(500).json({ success: false, error: 'Veritabanı kayıt hatası oluştu.' });
-    }
-});
-app.get('/api/admin/applications', (req, res) => {
-    try {
-        const applications = (0, db_2.getAllMerchantApplications)();
-        return res.json({ success: true, applications });
-    }
-    catch (err) {
-        return res.status(500).json({ success: false, applications: [] });
-    }
-});
-app.post('/api/admin/applications/:id/approve', (req, res) => {
-    try {
-        const target = req.body?.email || req.body?.storeName || req.params.id;
-        (0, db_2.approveMerchantApplication)(target);
-        return res.json({ success: true });
-    }
-    catch (err) {
-        return res.status(500).json({ success: false, error: 'Onaylama hatası' });
-    }
-});
-app.post('/api/admin/applications/:id/reject', (req, res) => {
-    try {
-        const target = req.body?.email || req.body?.storeName || req.params.id;
-        (0, db_2.rejectMerchantApplication)(target);
-        return res.json({ success: true });
-    }
-    catch (err) {
-        return res.status(500).json({ success: false, error: 'Reddetme hatası' });
-    }
-});
-app.post('/api/auth/login', (req, res) => {
-    const { username, password } = req.body || {};
-    const cleanUser = (username || '').trim().toLowerCase();
-    const cleanPass = (password || '').trim();
-    const ADMIN_USER = (process.env.ADMIN_USER || 'tonystark').toLowerCase();
-    const ADMIN_PASS = process.env.ADMIN_PASS || 'cintonik!';
-    const isUserValid = (cleanUser === ADMIN_USER || cleanUser === 'admin' || cleanUser === 'emre@iscworks.com' || cleanUser === 'iscenkalemre');
-    const isPassValid = (cleanPass === ADMIN_PASS || cleanPass === 'cintonik!' || cleanPass === 'barons2026!');
-    if (isUserValid && isPassValid) {
-        const token = 'session_barons_' + Date.now() + '_' + Math.random().toString(36).substring(2);
+        const hashedPassword = (0, db_1.hashPassword)(String(password).trim());
+        // Atomic transaction for Registration: user -> store -> membership -> merchant_applications
+        let resultUser = null;
+        let resultStore = null;
+        db_1.db.transaction(() => {
+            const userRes = db_1.db.prepare(`
+        INSERT INTO users (full_name, email, phone, tc_no, password_hash, status)
+        VALUES (?, ?, ?, ?, ?, 'active')
+      `).run(fullName, cleanEmail, phone, tcNo, hashedPassword);
+            const userId = Number(userRes.lastInsertRowid);
+            const storeRes = db_1.db.prepare(`
+        INSERT INTO stores (owner_id, name, slug, status)
+        VALUES (?, ?, ?, 'active')
+      `).run(userId, cleanStoreName, storeSlug);
+            const storeId = Number(storeRes.lastInsertRowid);
+            db_1.db.prepare(`
+        INSERT INTO memberships (user_id, store_id, role, status)
+        VALUES (?, ?, 'OWNER', 'active')
+      `).run(userId, storeId);
+            db_1.db.prepare(`
+        INSERT INTO merchant_applications (full_name, tc_no, phone, email, store_name, plan, password, status)
+        VALUES (?, ?, ?, ?, ?, ?, ?, 'approved')
+      `).run(fullName, tcNo, phone, cleanEmail, cleanStoreName, plan || 'Pro Store', hashedPassword);
+            resultUser = { id: userId, email: cleanEmail, name: fullName };
+            resultStore = { id: storeId, name: cleanStoreName, slug: storeSlug };
+            auth_middleware_1.AuthMiddleware.logAudit(storeId, userId, 'REGISTER', 'users', String(userId), '', cleanEmail);
+        })();
+        const token = auth_middleware_1.AuthMiddleware.generateToken({
+            userId: resultUser.id,
+            storeId: resultStore.id,
+            role: 'OWNER',
+            email: resultUser.email
+        });
         return res.json({
             success: true,
-            token: token,
+            message: 'Kayıt ve mağaza kurulumu başarıyla tamamlandı.',
+            token,
             user: {
-                username: 'tonystark',
-                name: 'Tony Stark',
-                title: 'Mağaza Sahibi (Patron)',
-                role: 'Administrator'
+                id: resultUser.id,
+                email: resultUser.email,
+                name: resultUser.name,
+                storeId: resultStore.id,
+                storeSlug: resultStore.slug,
+                role: 'OWNER'
             }
         });
     }
-    try {
-        const userPrefix = cleanUser.split('@')[0];
-        let dbApp = (0, db_2.findMerchantApplicationByIdentifier)(cleanUser);
-        if (!dbApp && userPrefix) {
-            dbApp = (0, db_2.findMerchantApplicationByIdentifier)(userPrefix);
+    catch (err) {
+        console.error('[Register Error]:', err);
+        if (err.message && err.message.includes('UNIQUE')) {
+            return res.status(400).json({ success: false, error: 'Bu E-Posta veya mağaza adı kullanılmaktadır.' });
         }
-        if (dbApp) {
-            if (!(0, db_2.verifyPassword)(cleanPass, dbApp.password)) {
-                return res.status(401).json({ success: false, error: '❌ Hatalı kullanıcı adı veya şifre!' });
-            }
-            if (dbApp.status === 'pending') {
-                return res.status(403).json({
-                    success: false,
-                    pending: true,
-                    error: '⏳ Hesabınız henüz onay aşamasındadır. Yöneticilerimiz tarafından onaylandıktan sonra giriş yapabilirsiniz.'
-                });
-            }
-            if (dbApp.status === 'rejected') {
-                return res.status(403).json({
-                    success: false,
-                    error: '❌ Hesabınız reddedilmiştir. Lütfen destek ekibi ile iletişime geçin.'
-                });
-            }
-            if (dbApp.status === 'approved') {
-                const token = 'session_barons_' + Date.now() + '_' + Math.random().toString(36).substring(2);
-                return res.json({
-                    success: true,
-                    token: token,
-                    user: {
-                        username: dbApp.email,
-                        name: dbApp.full_name,
-                        title: dbApp.store_name,
-                        role: 'Merchant'
-                    }
-                });
-            }
-        }
+        return res.status(500).json({ success: false, error: 'Kayıt esnasında sunucu hatası oluştu.' });
     }
-    catch (err) { }
-    return res.status(401).json({ success: false, error: '❌ Hatalı kullanıcı adı veya şifre!' });
 });
-app.get('/api/auth/verify', (req, res) => {
-    return res.json({ success: true, valid: true });
+// Merchant User Login
+app.post('/api/auth/login', (req, res) => {
+    const { username, email, password } = req.body || {};
+    const cleanEmail = (email || username || '').trim().toLowerCase();
+    const cleanPass = (password || '').trim();
+    if (!cleanEmail || !cleanPass) {
+        return res.status(400).json({ success: false, error: 'Kullanıcı adı/E-Posta ve şifre zorunludur.' });
+    }
+    // 1. Fetch user by email
+    const user = db_1.db.prepare('SELECT id, full_name, email, password_hash, status FROM users WHERE LOWER(email) = ?').get(cleanEmail);
+    if (!user || !(0, db_1.verifyPassword)(cleanPass, user.password_hash)) {
+        return res.status(401).json({ success: false, error: 'Geçersiz kullanıcı adı veya şifre.' });
+    }
+    if (user.status !== 'active') {
+        return res.status(403).json({ success: false, error: 'Hesabınız pasif durumdadır.' });
+    }
+    // 2. Fetch active memberships
+    const memberships = db_1.db.prepare(`
+    SELECT m.store_id, m.role, s.name as store_name, s.slug as store_slug, s.status as store_status
+    FROM memberships m
+    JOIN stores s ON s.id = m.store_id
+    WHERE m.user_id = ? AND m.status = 'active' AND s.status = 'active'
+    ORDER BY m.id ASC
+  `).all(user.id);
+    if (!memberships || memberships.length === 0) {
+        return res.status(403).json({ success: false, error: 'Aktif bir mağaza üyeliğiniz bulunmamaktadır.' });
+    }
+    // Pick target store (or requested storeId if valid)
+    const reqStoreId = Number(req.body?.storeId);
+    let activeMem = memberships[0];
+    if (reqStoreId) {
+        const found = memberships.find(m => m.store_id === reqStoreId);
+        if (found)
+            activeMem = found;
+    }
+    const token = auth_middleware_1.AuthMiddleware.generateToken({
+        userId: user.id,
+        storeId: activeMem.store_id,
+        role: activeMem.role,
+        email: user.email
+    });
+    auth_middleware_1.AuthMiddleware.logAudit(activeMem.store_id, user.id, 'LOGIN', 'users', String(user.id), '', user.email);
+    return res.json({
+        success: true,
+        token,
+        user: {
+            id: user.id,
+            email: user.email,
+            name: user.full_name,
+            storeId: activeMem.store_id,
+            storeName: activeMem.store_name,
+            storeSlug: activeMem.store_slug,
+            role: activeMem.role
+        }
+    });
 });
-// Yönetim Paneli ve Static Sunucu (Login Esnek Sunumu)
+// Verify Auth Token Endpoint
+app.get('/api/auth/verify', auth_middleware_1.AuthMiddleware.authenticate, (req, res) => {
+    return res.json({ success: true, valid: true, user: req.auth });
+});
+// ==========================================
+// 2. WEBHOOK ENDPOINTS (Stage 5 Security Rules)
+// ==========================================
+app.get('/webhook/instagram', webhook_controller_1.WebhookController.verifyWebhook);
+app.post('/webhook/instagram', webhook_controller_1.WebhookController.handleWebhook);
+app.get('/api/webhook/:storeSlug', webhook_controller_1.WebhookController.verifyStoreWebhook);
+app.post('/api/webhook/:storeSlug', webhook_controller_1.WebhookController.handleStoreWebhook);
+// Static Admin UI Server
 app.use('/admin', express_1.default.static(path_1.default.join(__dirname, '../public/admin')));
 app.get('/admin', (req, res) => {
     res.sendFile(path_1.default.join(__dirname, '../public/admin/index.html'));
@@ -157,96 +174,246 @@ app.use('/', (req, res, next) => {
     }
     return next();
 }, express_1.default.static(path_1.default.join(__dirname, '../public')));
-// Müşteri Sadakat Ödülleri API (user_rewards)
-app.get('/api/rewards', (req, res) => {
-    try {
-        const rewards = db_1.db.prepare(`
-      SELECT id, sender_id as senderId, reward_code as rewardCode, discount_percent as discountPercent, min_qualifying_amount as minQualifyingAmount, is_used as isUsed, created_at as createdAt, used_at as usedAt
-      FROM user_rewards
-      ORDER BY id DESC
-    `).all();
-        res.json({ success: true, rewards });
-    }
-    catch (e) {
-        res.status(500).json({ success: false, error: e.message });
-    }
+// ==========================================
+// 3. PROTECTED MERCHANT API ENDPOINTS (Authenticated & Scoped by req.auth.storeId)
+// ==========================================
+// --- PRODUCTS & STOCKS ---
+app.get('/api/stocks', auth_middleware_1.AuthMiddleware.authenticate, auth_middleware_1.AuthMiddleware.requireRole(['OWNER', 'ADMIN', 'MANAGER', 'STAFF']), async (req, res) => {
+    const storeId = req.auth.storeId;
+    const stocks = await stock_service_1.StockService.getAllProducts(storeId);
+    res.json({ success: true, stocks });
 });
-const facebook_service_1 = require("./services/facebook.service");
-app.post('/api/rewards', (req, res) => {
+app.get('/api/stock/:code', auth_middleware_1.AuthMiddleware.authenticate, auth_middleware_1.AuthMiddleware.requireRole(['OWNER', 'ADMIN', 'MANAGER', 'STAFF']), async (req, res) => {
+    const storeId = req.auth.storeId;
+    const result = await stock_service_1.StockService.checkStock(storeId, String(req.params.code));
+    res.json(result);
+});
+app.post('/api/products', auth_middleware_1.AuthMiddleware.authenticate, auth_middleware_1.AuthMiddleware.requireRole(['OWNER', 'ADMIN', 'MANAGER']), async (req, res) => {
     try {
-        const { senderId, rewardCode, discountPercent, minQualifyingAmount } = req.body;
-        if (!senderId || !discountPercent) {
-            return res.status(400).json({ success: false, error: 'Instagram/Müşteri ID ve İndirim Oranı zorunludur.' });
+        const storeId = req.auth.storeId;
+        const { shortCode, productCode, name, color, size, stock, price, category, storeName } = req.body || {};
+        if (!shortCode || !name || !size) {
+            return res.status(400).json({ success: false, error: 'Kısa kod, ürün ismi ve beden/numara alanları zorunludur.' });
         }
-        const sId = senderId.trim();
-        const code = (rewardCode || 'YINEBEKLERIZ').trim().toUpperCase();
-        const percent = Number(discountPercent) || 20;
-        const minAmt = Number(minQualifyingAmount) || 2000;
-        // Müşteri Adını Veritabanındaki Son Siparişinden Çek
-        const lastOrder = db_1.db.prepare('SELECT first_name, last_name FROM orders WHERE sender_id = ? ORDER BY id DESC LIMIT 1').get(sId);
-        const customerNameDisplay = lastOrder ? `${lastOrder.first_name || ''} ${lastOrder.last_name || ''}`.trim() || 'Müşterimiz' : 'Müşterimiz';
-        const stmt = db_1.db.prepare(`
-      INSERT INTO user_rewards (sender_id, reward_code, discount_percent, min_qualifying_amount, is_used)
-      VALUES (?, ?, ?, ?, 0)
-    `);
-        stmt.run(sId, code, percent, minAmt);
-        const dmNotice = `🎉 TEBRİKLER / VIP ÖDÜL KAZANDINIZ!\nSayın ${customerNameDisplay}, instagram profilinize özel %${percent} VIP İNDİRİM tanımlanmıştır! (Ödül Kodu: ${code})\nBir sonraki siparişinizde bu indirim otomatik olarak uygulanacaktır. Keyifli alışverişler dileriz! 🎁✨`;
-        // Müşteriye Instagram DM Bildirimi Gönder
-        facebook_service_1.FacebookService.sendMessage(sId, dmNotice).catch(err => {
-            console.error('[Manual Reward DM Error]:', err.message);
+        const result = await stock_service_1.StockService.addProduct({
+            storeId,
+            shortCode,
+            productCode,
+            name,
+            color: color || 'Standart',
+            size,
+            stock: stock ? Number(stock) : 0,
+            price: price ? Number(price) : 299,
+            category: category || 'Genel',
+            storeName: storeName || ''
         });
-        res.json({ success: true, message: `Müşteri (${sId}) için %${percent} VIP indirim tanımlandı.` });
+        if (result.success) {
+            auth_middleware_1.AuthMiddleware.logAudit(storeId, req.auth.userId, 'ADD_PRODUCT', 'products', result.productCode || '');
+            res.json({
+                success: true,
+                message: 'Ürün mağaza stok veritabanınıza başarıyla eklendi!',
+                productCode: result.productCode
+            });
+        }
+        else {
+            res.status(500).json({ success: false, error: 'Ürün veritabanına kaydedilemedi.' });
+        }
+    }
+    catch (err) {
+        res.status(500).json({ success: false, error: err.message || 'Sunucu hatası' });
+    }
+});
+app.post('/api/products/price', auth_middleware_1.AuthMiddleware.authenticate, auth_middleware_1.AuthMiddleware.requireRole(['OWNER', 'ADMIN']), (req, res) => {
+    try {
+        const storeId = req.auth.storeId;
+        const { productCode, price } = req.body;
+        if (!productCode || price === undefined) {
+            return res.status(400).json({ success: false, error: 'productCode ve price zorunludur.' });
+        }
+        const numPrice = Number(price);
+        if (isNaN(numPrice) || numPrice < 0) {
+            return res.status(400).json({ success: false, error: 'Geçersiz fiyat.' });
+        }
+        const stmt = db_1.db.prepare('UPDATE products SET price = ?, updated_at = CURRENT_TIMESTAMP WHERE store_id = ? AND (product_code = ? OR short_code = ?)');
+        const result = stmt.run(numPrice, storeId, productCode, productCode);
+        if (result.changes > 0) {
+            auth_middleware_1.AuthMiddleware.logAudit(storeId, req.auth.userId, 'UPDATE_PRICE', 'products', productCode, '', String(numPrice));
+            res.json({ success: true, message: `Ürün (${productCode}) fiyatı ${numPrice} TL olarak güncellendi.` });
+        }
+        else {
+            res.status(404).json({ success: false, error: 'Ürün bu mağazada bulunamadı.' });
+        }
     }
     catch (e) {
         res.status(500).json({ success: false, error: e.message });
     }
 });
-app.delete('/api/rewards/:id', (req, res) => {
+app.post('/api/products/bulk-update', auth_middleware_1.AuthMiddleware.authenticate, auth_middleware_1.AuthMiddleware.requireRole(['OWNER', 'ADMIN']), (req, res) => {
     try {
-        db_1.db.prepare('DELETE FROM user_rewards WHERE id = ?').run(req.params.id);
-        res.json({ success: true, message: 'VIP Ödülü silindi.' });
+        const storeId = req.auth.storeId;
+        const { updates } = req.body;
+        if (!Array.isArray(updates) || updates.length === 0) {
+            return res.status(400).json({ success: false, error: 'Güncellenecek veri listesi boş veya geçersiz.' });
+        }
+        const updatePriceStmt = db_1.db.prepare('UPDATE products SET price = ?, updated_at = CURRENT_TIMESTAMP WHERE store_id = ? AND (product_code = ? OR short_code = ?)');
+        const updateStockStmt = db_1.db.prepare('UPDATE products SET stock = ?, updated_at = CURRENT_TIMESTAMP WHERE store_id = ? AND (product_code = ? OR short_code = ?)');
+        let updatedCount = 0;
+        const bulkTransaction = db_1.db.transaction((items) => {
+            for (const item of items) {
+                if (item.productCode) {
+                    if (item.price !== undefined && !isNaN(Number(item.price))) {
+                        updatePriceStmt.run(Number(item.price), storeId, item.productCode, item.productCode);
+                        updatedCount++;
+                    }
+                    if (item.stock !== undefined && !isNaN(Number(item.stock))) {
+                        updateStockStmt.run(Number(item.stock), storeId, item.productCode, item.productCode);
+                        updatedCount++;
+                    }
+                }
+            }
+        });
+        bulkTransaction(updates);
+        auth_middleware_1.AuthMiddleware.logAudit(storeId, req.auth.userId, 'BULK_UPDATE_PRODUCTS', 'products', `${updates.length} items`);
+        res.json({ success: true, message: `${updates.length} adet ürünün fiyat ve stok verileri başarıyla kaydedildi!`, updatedCount });
     }
     catch (e) {
         res.status(500).json({ success: false, error: e.message });
     }
 });
-// Kampanyalar GET API
-app.get('/api/campaigns', (req, res) => {
+app.post('/api/products/delete', auth_middleware_1.AuthMiddleware.authenticate, auth_middleware_1.AuthMiddleware.requireRole(['OWNER', 'ADMIN']), async (req, res) => {
     try {
-        const campaigns = db_1.db.prepare('SELECT * FROM campaigns ORDER BY id DESC').all();
+        const storeId = req.auth.storeId;
+        const { productCode } = req.body;
+        if (!productCode) {
+            return res.status(400).json({ success: false, error: 'productCode parametresi gereklidir' });
+        }
+        const success = await stock_service_1.StockService.deleteProduct(storeId, productCode);
+        if (success) {
+            auth_middleware_1.AuthMiddleware.logAudit(storeId, req.auth.userId, 'DELETE_PRODUCT', 'products', productCode);
+            res.json({ success: true, message: `Ürün (${productCode}) silindi.` });
+        }
+        else {
+            res.status(500).json({ success: false, error: 'Ürün silinemedi veya bulunamadı.' });
+        }
+    }
+    catch (err) {
+        res.status(500).json({ success: false, error: err.message || 'Sunucu hatası' });
+    }
+});
+app.post('/api/products/update-stock', auth_middleware_1.AuthMiddleware.authenticate, auth_middleware_1.AuthMiddleware.requireRole(['OWNER', 'ADMIN', 'MANAGER']), async (req, res) => {
+    try {
+        const storeId = req.auth.storeId;
+        const { productCode, newStock } = req.body;
+        if (!productCode || newStock === undefined || newStock === null) {
+            return res.status(400).json({ success: false, error: 'productCode ve newStock parametreleri gereklidir' });
+        }
+        const success = await stock_service_1.StockService.updateStock(storeId, productCode, Number(newStock));
+        if (success) {
+            auth_middleware_1.AuthMiddleware.logAudit(storeId, req.auth.userId, 'UPDATE_STOCK', 'products', productCode, '', String(newStock));
+            res.json({ success: true, message: `Ürün (${productCode}) stoğu ${newStock} olarak güncellendi.`, productCode, newStock: Number(newStock) });
+        }
+        else {
+            res.status(500).json({ success: false, error: 'Ürün stoğu güncellenemedi.' });
+        }
+    }
+    catch (err) {
+        res.status(500).json({ success: false, error: err.message || 'Sunucu hatası' });
+    }
+});
+// --- ORDERS ---
+app.get('/api/orders', auth_middleware_1.AuthMiddleware.authenticate, auth_middleware_1.AuthMiddleware.requireRole(['OWNER', 'ADMIN', 'MANAGER', 'STAFF']), async (req, res) => {
+    const storeId = req.auth.storeId;
+    const orders = await order_service_1.OrderService.getOrders(storeId);
+    res.json({ success: true, count: orders.length, orders });
+});
+app.post('/api/orders/status', auth_middleware_1.AuthMiddleware.authenticate, auth_middleware_1.AuthMiddleware.requireRole(['OWNER', 'ADMIN', 'MANAGER', 'STAFF']), async (req, res) => {
+    try {
+        const storeId = req.auth.storeId;
+        const { orderId, status, reason } = req.body;
+        if (!orderId || !status || (status !== 'OK' && status !== 'DEC')) {
+            return res.status(400).json({ success: false, error: 'orderId ve geçerli bir status (OK veya DEC) gereklidir' });
+        }
+        const success = await order_service_1.OrderService.updateOrderStatus(storeId, orderId, status, reason);
+        if (success) {
+            auth_middleware_1.AuthMiddleware.logAudit(storeId, req.auth.userId, 'UPDATE_ORDER_STATUS', 'orders', orderId, '', status);
+            res.json({
+                success: true,
+                message: `Sipariş ${orderId} durumu '${status}' olarak güncellendi.`,
+                orderId,
+                status
+            });
+        }
+        else {
+            res.status(500).json({ success: false, error: 'Sipariş durumu güncellenemedi.' });
+        }
+    }
+    catch (err) {
+        res.status(500).json({ success: false, error: err.message || 'Sunucu hatası' });
+    }
+});
+app.post('/api/orders/delete', auth_middleware_1.AuthMiddleware.authenticate, auth_middleware_1.AuthMiddleware.requireRole(['OWNER', 'ADMIN']), async (req, res) => {
+    try {
+        const storeId = req.auth.storeId;
+        const { orderId } = req.body;
+        if (!orderId) {
+            return res.status(400).json({ success: false, error: 'orderId parametresi gereklidir' });
+        }
+        const success = await order_service_1.OrderService.deleteOrder(storeId, orderId);
+        if (success) {
+            auth_middleware_1.AuthMiddleware.logAudit(storeId, req.auth.userId, 'DELETE_ORDER', 'orders', orderId);
+            res.json({ success: true, message: `Sipariş (${orderId}) silindi.` });
+        }
+        else {
+            res.status(500).json({ success: false, error: 'Sipariş silinemedi.' });
+        }
+    }
+    catch (err) {
+        res.status(500).json({ success: false, error: err.message || 'Sunucu hatası' });
+    }
+});
+// --- CAMPAIGNS ---
+app.get('/api/campaigns', auth_middleware_1.AuthMiddleware.authenticate, auth_middleware_1.AuthMiddleware.requireRole(['OWNER', 'ADMIN', 'MANAGER', 'STAFF']), (req, res) => {
+    try {
+        const storeId = req.auth.storeId;
+        const campaigns = db_1.db.prepare('SELECT * FROM campaigns WHERE store_id = ? ORDER BY id DESC').all(storeId);
         res.json({ success: true, campaigns });
     }
     catch (e) {
         res.status(500).json({ success: false, error: e.message });
     }
 });
-app.post('/api/campaigns', (req, res) => {
+app.post('/api/campaigns', auth_middleware_1.AuthMiddleware.authenticate, auth_middleware_1.AuthMiddleware.requireRole(['OWNER', 'ADMIN', 'MANAGER']), (req, res) => {
     try {
+        const storeId = req.auth.storeId;
         const { title, description, code, discountPercent, discountAmount, minOrderAmount, startDate, endDate } = req.body;
         const stmt = db_1.db.prepare(`
-      INSERT INTO campaigns (title, description, code, discount_percent, discount_amount, min_order_amount, start_date, end_date, active)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)
+      INSERT INTO campaigns (store_id, title, description, code, discount_percent, discount_amount, min_order_amount, start_date, end_date, active)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
     `);
-        stmt.run(title, description, code || '', discountPercent || 0, discountAmount || 0, minOrderAmount || 0, startDate || null, endDate || null);
+        stmt.run(storeId, title, description, code || '', discountPercent || 0, discountAmount || 0, minOrderAmount || 0, startDate || null, endDate || null);
+        auth_middleware_1.AuthMiddleware.logAudit(storeId, req.auth.userId, 'CREATE_CAMPAIGN', 'campaigns', code || title);
         res.json({ success: true, message: 'Kampanya başarıyla oluşturuldu.' });
     }
     catch (e) {
         res.status(500).json({ success: false, error: e.message });
     }
 });
-app.delete('/api/campaigns/:id', (req, res) => {
+app.delete('/api/campaigns/:id', auth_middleware_1.AuthMiddleware.authenticate, auth_middleware_1.AuthMiddleware.requireRole(['OWNER', 'ADMIN', 'MANAGER']), (req, res) => {
     try {
-        db_1.db.prepare('DELETE FROM campaigns WHERE id = ?').run(req.params.id);
+        const storeId = req.auth.storeId;
+        db_1.db.prepare('DELETE FROM campaigns WHERE store_id = ? AND id = ?').run(storeId, String(req.params.id));
+        auth_middleware_1.AuthMiddleware.logAudit(storeId, req.auth.userId, 'DELETE_CAMPAIGN', 'campaigns', String(req.params.id));
         res.json({ success: true, message: 'Kampanya silindi.' });
     }
     catch (e) {
         res.status(500).json({ error: e.message });
     }
 });
-// Sistem Ayarları & Kargo Fiyatı API
-app.get('/api/settings', (req, res) => {
+// --- SETTINGS ---
+app.get('/api/settings', auth_middleware_1.AuthMiddleware.authenticate, auth_middleware_1.AuthMiddleware.requireRole(['OWNER', 'ADMIN', 'MANAGER', 'STAFF']), (req, res) => {
     try {
-        const rows = db_1.db.prepare('SELECT * FROM settings').all();
+        const storeId = req.auth.storeId;
+        const rows = db_1.db.prepare('SELECT * FROM settings WHERE store_id = ?').all(storeId);
         const settingsObj = {};
         for (const r of rows) {
             if (r && r.key) {
@@ -259,302 +426,107 @@ app.get('/api/settings', (req, res) => {
         res.status(500).json({ success: false, error: e.message, settings: {} });
     }
 });
-app.post('/api/settings', (req, res) => {
+app.post('/api/settings', auth_middleware_1.AuthMiddleware.authenticate, auth_middleware_1.AuthMiddleware.requireRole(['OWNER', 'ADMIN']), (req, res) => {
     try {
+        const storeId = req.auth.storeId;
         const { key, value, settings, shippingFee, freeShippingThreshold } = req.body;
         if (key && value !== undefined) {
-            db_1.db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)').run(String(key), String(value));
+            db_1.db.prepare('INSERT OR REPLACE INTO settings (store_id, key, value) VALUES (?, ?, ?)').run(storeId, String(key), String(value));
         }
         if (shippingFee !== undefined) {
-            db_1.db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES ("shipping_fee", ?)').run(String(shippingFee));
+            db_1.db.prepare('INSERT OR REPLACE INTO settings (store_id, key, value) VALUES (?, "shipping_fee", ?)').run(storeId, String(shippingFee));
         }
         if (freeShippingThreshold !== undefined) {
-            db_1.db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES ("free_shipping_threshold", ?)').run(String(freeShippingThreshold));
+            db_1.db.prepare('INSERT OR REPLACE INTO settings (store_id, key, value) VALUES (?, "free_shipping_threshold", ?)').run(storeId, String(freeShippingThreshold));
         }
         if (settings && typeof settings === 'object') {
             for (const [k, v] of Object.entries(settings)) {
-                db_1.db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)').run(String(k), String(v));
+                db_1.db.prepare('INSERT OR REPLACE INTO settings (store_id, key, value) VALUES (?, ?, ?)').run(storeId, String(k), String(v));
             }
         }
+        auth_middleware_1.AuthMiddleware.logAudit(storeId, req.auth.userId, 'UPDATE_SETTINGS', 'settings', 'all');
         res.json({ success: true, message: 'Ayarlar güncellendi.' });
     }
     catch (e) {
         res.status(500).json({ success: false, error: e.message });
     }
 });
-const admin_copilot_service_1 = require("./services/admin-copilot.service");
-// Admin Copilot Chat Endpoint
-app.post('/api/ai/admin-copilot', async (req, res) => {
+// --- VIP REWARDS ---
+app.get('/api/rewards', auth_middleware_1.AuthMiddleware.authenticate, auth_middleware_1.AuthMiddleware.requireRole(['OWNER', 'ADMIN', 'MANAGER', 'STAFF']), (req, res) => {
     try {
+        const storeId = req.auth.storeId;
+        const rewards = db_1.db.prepare(`
+      SELECT id, sender_id as senderId, reward_code as rewardCode, discount_percent as discountPercent, min_qualifying_amount as minQualifyingAmount, is_used as isUsed, created_at as createdAt, used_at as usedAt
+      FROM user_rewards
+      WHERE store_id = ?
+      ORDER BY id DESC
+    `).all(storeId);
+        res.json({ success: true, rewards });
+    }
+    catch (e) {
+        res.status(500).json({ success: false, error: e.message });
+    }
+});
+app.post('/api/rewards', auth_middleware_1.AuthMiddleware.authenticate, auth_middleware_1.AuthMiddleware.requireRole(['OWNER', 'ADMIN', 'MANAGER']), (req, res) => {
+    try {
+        const storeId = req.auth.storeId;
+        const { senderId, rewardCode, discountPercent, minQualifyingAmount } = req.body;
+        if (!senderId || !discountPercent) {
+            return res.status(400).json({ success: false, error: 'Müşteri ID ve İndirim Oranı zorunludur.' });
+        }
+        const sId = senderId.trim();
+        const code = (rewardCode || 'YINEBEKLERIZ').trim().toUpperCase();
+        const percent = Number(discountPercent) || 20;
+        const minAmt = Number(minQualifyingAmount) || 2000;
+        const stmt = db_1.db.prepare(`
+      INSERT INTO user_rewards (store_id, sender_id, reward_code, discount_percent, min_qualifying_amount, is_used)
+      VALUES (?, ?, ?, ?, ?, 0)
+    `);
+        stmt.run(storeId, sId, code, percent, minAmt);
+        auth_middleware_1.AuthMiddleware.logAudit(storeId, req.auth.userId, 'CREATE_REWARD', 'user_rewards', sId);
+        res.json({ success: true, message: `Müşteri (${sId}) için %${percent} VIP indirim tanımlandı.` });
+    }
+    catch (e) {
+        res.status(500).json({ success: false, error: e.message });
+    }
+});
+app.delete('/api/rewards/:id', auth_middleware_1.AuthMiddleware.authenticate, auth_middleware_1.AuthMiddleware.requireRole(['OWNER', 'ADMIN', 'MANAGER']), (req, res) => {
+    try {
+        const storeId = req.auth.storeId;
+        db_1.db.prepare('DELETE FROM user_rewards WHERE store_id = ? AND id = ?').run(storeId, String(req.params.id));
+        auth_middleware_1.AuthMiddleware.logAudit(storeId, req.auth.userId, 'DELETE_REWARD', 'user_rewards', String(req.params.id));
+        res.json({ success: true, message: 'VIP Ödülü silindi.' });
+    }
+    catch (e) {
+        res.status(500).json({ success: false, error: e.message });
+    }
+});
+// --- ADMIN COPILOT & AI PRODUCT CREATION ---
+app.post('/api/ai/admin-copilot', auth_middleware_1.AuthMiddleware.authenticate, auth_middleware_1.AuthMiddleware.requireRole(['OWNER', 'ADMIN']), async (req, res) => {
+    try {
+        const storeId = req.auth.storeId;
         const { prompt } = req.body;
         if (!prompt || !prompt.trim()) {
             return res.status(400).json({ success: false, error: 'Lütfen bir yönetim komutu yazınız.' });
         }
-        const reply = await admin_copilot_service_1.AdminCopilotService.processAdminCommand(prompt.trim());
+        const reply = await admin_copilot_service_1.AdminCopilotService.processAdminCommand(prompt.trim(), storeId);
+        auth_middleware_1.AuthMiddleware.logAudit(storeId, req.auth.userId, 'ADMIN_COPILOT_CMD', 'ai', prompt.substring(0, 50));
         res.json({ success: true, reply });
     }
     catch (err) {
-        console.error('[API /api/ai/admin-copilot Error]:', err);
         res.status(500).json({ success: false, error: err.message || 'Sunucu hatası' });
     }
 });
-// Web Chat & Simulator API End-point'i
-app.post('/api/chat', async (req, res) => {
-    const { senderId, message } = req.body;
-    if (!senderId || !message) {
-        return res.status(400).json({ error: 'senderId and message required' });
-    }
-    const result = await ai_service_1.AIService.processMessage(senderId, message);
-    res.json({ success: true, reply: result.reply, tokens: result.tokens });
-});
-// n8n Entegrasyon Uç Noktası (Instagram Meta -> n8n -> Backend)
-app.post('/api/n8n/chat', async (req, res) => {
+app.post('/api/ai/create-product', auth_middleware_1.AuthMiddleware.authenticate, auth_middleware_1.AuthMiddleware.requireRole(['OWNER', 'ADMIN', 'MANAGER']), async (req, res) => {
     try {
-        const { senderId, message, attachmentTitle, callbackUrl } = req.body;
-        if (!senderId) {
-            return res.status(400).json({ success: false, error: 'senderId parametresi zorunludur' });
-        }
-        let finalMessage = message || '';
-        if (attachmentTitle) {
-            const extractedCode = (0, regex_util_1.extractProductCode)(attachmentTitle);
-            if (extractedCode) {
-                finalMessage = `${extractedCode}\n\nMüşteri bu ürünü sipariş etmek istiyor. Lütfen ürünün stok durumunu, beden seçeneklerini kontrol ederek müşteriye yardımcı ol.`;
-            }
-        }
-        if (!finalMessage) {
-            return res.status(400).json({ success: false, error: 'message veya attachmentTitle parametresi zorunludur' });
-        }
-        // Eğer callbackUrl verilmişse (Asenkron Webhook Modu)
-        if (callbackUrl) {
-            res.json({ success: true, status: 'processing', message: 'Yanıt hazırlanıyor, Webhook adresine yollanacak.' });
-            // Arka planda AI yanıtını üretip Webhook'a yolla
-            ai_service_1.AIService.processMessage(senderId, finalMessage).then(result => {
-                axios_1.default.post(callbackUrl, {
-                    success: true,
-                    senderId,
-                    reply: result.reply,
-                    tokens: result.tokens
-                }).catch((err) => console.error('[Webhook Callback Error]:', err.message));
-            }).catch((err) => console.error('[AI Processing Error]:', err.message));
-            return;
-        }
-        // Senkron Yanıt Modu (Standart)
-        const result = await ai_service_1.AIService.processMessage(senderId, finalMessage, 'default', 1);
-        res.json({
-            success: true,
-            senderId,
-            reply: result.reply,
-            tokens: result.tokens
-        });
-    }
-    catch (err) {
-        console.error('[API /api/n8n/chat Error]:', err);
-        res.status(500).json({ success: false, error: err.message || 'Sunucu hatası' });
-    }
-});
-// Webhook End-point'leri (Genel & Mağazaya Özel İzole Webhook'lar)
-app.get('/webhook/instagram', webhook_controller_1.WebhookController.verifyWebhook);
-app.post('/webhook/instagram', webhook_controller_1.WebhookController.handleWebhook);
-// Multi-Tenant Per-Store Webhook Endpoints (/api/webhook/:storeSlug)
-app.get('/api/webhook/:storeSlug', webhook_controller_1.WebhookController.verifyStoreWebhook);
-app.post('/api/webhook/:storeSlug', webhook_controller_1.WebhookController.handleStoreWebhook);
-// Admin API End-point'leri (Siparişleri Görme & Stok Listesi)
-app.get('/api/orders', async (req, res) => {
-    const orders = await order_service_1.OrderService.getOrders(1);
-    res.json({ success: true, count: orders.length, orders });
-});
-app.get('/api/stocks', async (req, res) => {
-    const stocks = await stock_service_1.StockService.getAllProducts(1);
-    res.json({ success: true, stocks });
-});
-app.get('/api/stock/:code', async (req, res) => {
-    const result = await stock_service_1.StockService.checkStock(1, req.params.code);
-    res.json(result);
-});
-// Yeni Ürün Ekleme (SQLite Veritabanı & Mağaza İzolasyonu)
-app.post('/api/products', async (req, res) => {
-    try {
-        const { shortCode, productCode, name, color, size, stock, price, category, storeName } = req.body || {};
-        if (!shortCode || !name || !size) {
-            return res.status(400).json({ success: false, error: 'Kısa kod, ürün ismi ve beden/numara alanları zorunludur.' });
-        }
-        const result = await stock_service_1.StockService.addProduct({
-            storeId: 1,
-            shortCode,
-            productCode,
-            name,
-            color: color || 'Standart',
-            size,
-            stock: stock ? Number(stock) : 0,
-            price: price ? Number(price) : 299,
-            category: category || 'Genel',
-            storeName: storeName || ''
-        });
-        if (result.success) {
-            res.json({
-                success: true,
-                message: 'Ürün mağaza stok veritabanınıza başarıyla eklendi!',
-                productCode: result.productCode
-            });
-        }
-        else {
-            res.status(500).json({ success: false, error: 'Ürün veritabanına kaydedilemedi.' });
-        }
-    }
-    catch (err) {
-        console.error('[API /api/products Error]:', err);
-        res.status(500).json({ success: false, error: err.message || 'Sunucu hatası' });
-    }
-});
-// Ürün Fiyatı Güncelleme (SQLite & Admin Panel)
-app.post('/api/products/price', (req, res) => {
-    try {
-        const { productCode, price } = req.body;
-        if (!productCode || price === undefined) {
-            return res.status(400).json({ success: false, error: 'productCode ve price zorunludur.' });
-        }
-        const numPrice = Number(price);
-        if (isNaN(numPrice) || numPrice < 0) {
-            return res.status(400).json({ success: false, error: 'Geçersiz fiyat.' });
-        }
-        const stmt = db_1.db.prepare('UPDATE products SET price = ?, updated_at = CURRENT_TIMESTAMP WHERE product_code = ? OR short_code = ?');
-        const result = stmt.run(numPrice, productCode, productCode);
-        if (result.changes > 0) {
-            res.json({ success: true, message: `Ürün (${productCode}) fiyatı ${numPrice} TL olarak güncellendi.` });
-        }
-        else {
-            res.status(404).json({ success: false, error: 'Ürün bulunamadı.' });
-        }
-    }
-    catch (e) {
-        res.status(500).json({ success: false, error: e.message });
-    }
-});
-// Toplu Fiyat ve Stok Güncelleme (Bulk Save API)
-app.post('/api/products/bulk-update', (req, res) => {
-    try {
-        const { updates } = req.body; // Array<{ productCode: string, stock?: number, price?: number }>
-        if (!Array.isArray(updates) || updates.length === 0) {
-            return res.status(400).json({ success: false, error: 'Güncellenecek veri listesi boş veya geçersiz.' });
-        }
-        const updatePriceStmt = db_1.db.prepare('UPDATE products SET price = ?, updated_at = CURRENT_TIMESTAMP WHERE product_code = ? OR short_code = ?');
-        const updateStockStmt = db_1.db.prepare('UPDATE products SET stock = ?, updated_at = CURRENT_TIMESTAMP WHERE product_code = ? OR short_code = ?');
-        let updatedCount = 0;
-        const bulkTransaction = db_1.db.transaction((items) => {
-            for (const item of items) {
-                if (item.productCode) {
-                    if (item.price !== undefined && !isNaN(Number(item.price))) {
-                        updatePriceStmt.run(Number(item.price), item.productCode, item.productCode);
-                        updatedCount++;
-                    }
-                    if (item.stock !== undefined && !isNaN(Number(item.stock))) {
-                        updateStockStmt.run(Number(item.stock), item.productCode, item.productCode);
-                        updatedCount++;
-                    }
-                }
-            }
-        });
-        bulkTransaction(updates);
-        res.json({ success: true, message: `${updates.length} adet ürünün fiyat ve stok verileri başarıyla kaydedildi!`, updatedCount });
-    }
-    catch (e) {
-        res.status(500).json({ success: false, error: e.message });
-    }
-});
-// Sipariş Onay / Red İşlemi (Google Sheet DURUM = OK veya DEC güncellemesi)
-app.post('/api/orders/status', async (req, res) => {
-    try {
-        const { orderId, status, reason } = req.body;
-        if (!orderId || !status || (status !== 'OK' && status !== 'DEC')) {
-            return res.status(400).json({ success: false, error: 'orderId ve geçerli bir status (OK veya DEC) gereklidir' });
-        }
-        const success = await order_service_1.OrderService.updateOrderStatus(1, orderId, status, reason);
-        if (success) {
-            res.json({
-                success: true,
-                message: `Sipariş ${orderId} durumu '${status}' olarak güncellendi.`,
-                orderId,
-                status
-            });
-        }
-        else {
-            res.status(500).json({ success: false, error: 'Sipariş durumu veritabanında güncellenemedi.' });
-        }
-    }
-    catch (err) {
-        console.error('[API /api/orders/status Error]:', err);
-        res.status(500).json({ success: false, error: err.message || 'Sunucu hatası' });
-    }
-});
-// Ürün Silme API
-app.post('/api/products/delete', async (req, res) => {
-    try {
-        const { productCode } = req.body;
-        if (!productCode) {
-            return res.status(400).json({ success: false, error: 'productCode parametresi gereklidir' });
-        }
-        const success = await stock_service_1.StockService.deleteProduct(1, productCode);
-        if (success) {
-            res.json({ success: true, message: `Ürün (${productCode}) Google Sheets stok tablosundan silindi.` });
-        }
-        else {
-            res.status(500).json({ success: false, error: 'Ürün Google Sheets stok tablosundan silinemedi.' });
-        }
-    }
-    catch (err) {
-        console.error('[API /api/products/delete Error]:', err);
-        res.status(500).json({ success: false, error: err.message || 'Sunucu hatası' });
-    }
-});
-// Sipariş Silme API
-app.post('/api/orders/delete', async (req, res) => {
-    try {
-        const { orderId } = req.body;
-        if (!orderId) {
-            return res.status(400).json({ success: false, error: 'orderId parametresi gereklidir' });
-        }
-        const success = await order_service_1.OrderService.deleteOrder(1, orderId);
-        if (success) {
-            res.json({ success: true, message: `Sipariş (${orderId}) Google Sheets siparişler tablosundan silindi.` });
-        }
-        else {
-            res.status(500).json({ success: false, error: 'Sipariş Google Sheets siparişler tablosundan silinemedi.' });
-        }
-    }
-    catch (err) {
-        console.error('[API /api/orders/delete Error]:', err);
-        res.status(500).json({ success: false, error: err.message || 'Sunucu hatası' });
-    }
-});
-// Ürün Stok Güncelleme API
-app.post('/api/products/update-stock', async (req, res) => {
-    try {
-        const { productCode, newStock } = req.body;
-        if (!productCode || newStock === undefined || newStock === null) {
-            return res.status(400).json({ success: false, error: 'productCode ve newStock parametreleri gereklidir' });
-        }
-        const success = await stock_service_1.StockService.updateStock(productCode, Number(newStock));
-        if (success) {
-            res.json({ success: true, message: `Ürün (${productCode}) stoğu ${newStock} olarak güncellendi.`, productCode, newStock: Number(newStock) });
-        }
-        else {
-            res.status(500).json({ success: false, error: 'Ürün stoğu Google Sheets üzerinde güncellenemedi.' });
-        }
-    }
-    catch (err) {
-        console.error('[API /api/products/update-stock Error]:', err);
-        res.status(500).json({ success: false, error: err.message || 'Sunucu hatası' });
-    }
-});
-// Google Gemini AI İle Akıllı Ürün Ekleme API (Çoklu Beden / Batch Destekli)
-app.post('/api/ai/create-product', async (req, res) => {
-    try {
+        const storeId = req.auth.storeId;
         const { prompt } = req.body;
         if (!prompt || typeof prompt !== 'string' || prompt.trim() === '') {
             return res.status(400).json({ success: false, error: 'Lütfen ürün komut metni giriniz.' });
         }
-        const result = await gemini_service_1.GeminiService.createProductFromPrompt(prompt.trim());
+        const result = await gemini_service_1.GeminiService.createProductFromPrompt(prompt.trim(), storeId);
         if (result.success && result.products && result.products.length > 0) {
+            auth_middleware_1.AuthMiddleware.logAudit(storeId, req.auth.userId, 'AI_CREATE_PRODUCT', 'products', result.products[0]?.productCode || '');
             res.json({
                 success: true,
                 message: result.aiMessage || 'Ürün(ler) Gemini AI tarafından başarıyla oluşturuldu ve kaydedildi.',
@@ -567,21 +539,61 @@ app.post('/api/ai/create-product', async (req, res) => {
         }
     }
     catch (err) {
-        console.error('[API /api/ai/create-product Error]:', err);
         res.status(500).json({ success: false, error: err.message || 'Yapay zeka sunucu hatası' });
     }
 });
-// Sunucuyu Başlat
+// --- API KEYS MANAGEMENT (OWNER ONLY) ---
+app.get('/api/api-keys', auth_middleware_1.AuthMiddleware.authenticate, auth_middleware_1.AuthMiddleware.requireRole(['OWNER']), (req, res) => {
+    try {
+        const storeId = req.auth.storeId;
+        const keys = db_1.db.prepare('SELECT id, name, permissions, created_at, last_used_at FROM api_keys WHERE store_id = ? ORDER BY id DESC').all(storeId);
+        res.json({ success: true, keys });
+    }
+    catch (e) {
+        res.status(500).json({ success: false, error: e.message });
+    }
+});
+app.post('/api/api-keys', auth_middleware_1.AuthMiddleware.authenticate, auth_middleware_1.AuthMiddleware.requireRole(['OWNER']), (req, res) => {
+    try {
+        const storeId = req.auth.storeId;
+        const { name, permissions } = req.body;
+        if (!name || !name.trim()) {
+            return res.status(400).json({ success: false, error: 'API key ismi zorunludur.' });
+        }
+        const rawKey = `isc_live_${crypto_1.default.randomBytes(24).toString('hex')}`;
+        const keyHash = crypto_1.default.createHash('sha256').update(rawKey).digest('hex');
+        db_1.db.prepare(`
+      INSERT INTO api_keys (store_id, name, key_hash, permissions, created_at)
+      VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+    `).run(storeId, name.trim(), keyHash, permissions || 'read_write');
+        auth_middleware_1.AuthMiddleware.logAudit(storeId, req.auth.userId, 'CREATE_API_KEY', 'api_keys', name);
+        res.json({ success: true, apiKey: rawKey, message: 'API Key oluşturuldu. Anahtarı güvenli yerde saklayın.' });
+    }
+    catch (e) {
+        res.status(500).json({ success: false, error: e.message });
+    }
+});
+app.delete('/api/api-keys/:id', auth_middleware_1.AuthMiddleware.authenticate, auth_middleware_1.AuthMiddleware.requireRole(['OWNER']), (req, res) => {
+    try {
+        const storeId = req.auth.storeId;
+        db_1.db.prepare('DELETE FROM api_keys WHERE store_id = ? AND id = ?').run(storeId, String(req.params.id));
+        auth_middleware_1.AuthMiddleware.logAudit(storeId, req.auth.userId, 'DELETE_API_KEY', 'api_keys', String(req.params.id));
+        res.json({ success: true, message: 'API Key silindi.' });
+    }
+    catch (e) {
+        res.status(500).json({ success: false, error: e.message });
+    }
+});
+// Start Express Application Server
 app.listen(env_1.env.port, () => {
     console.log(`
-  🚀 iscworks bot - Enterprise AI Backend Sunucusu Başlatıldı!
-  -------------------------------------------------------------
-  🤖 Sistem Adı: iscworks bot
+  🚀 iscworks bot - Enterprise Multi-Tenant RBAC Backend SUNUCUSU BAŞLATILDI!
+  -----------------------------------------------------------------------
+  🤖 Sistem Adı: iscworks bot (Stage 6 RBAC Secured)
   🌐 Port: ${env_1.env.port}
   🗄️ Database: SQLite (barons.db)
-  📩 n8n Cloud API: http://localhost:${env_1.env.port}/api/n8n/chat
+  🔐 Authentication: JWT HMAC-SHA256 & API Key DB Isolation
   📊 Admin API: http://localhost:${env_1.env.port}/api/orders
-  🎛️ Admin Panel: http://localhost:${env_1.env.port}/admin
-  -------------------------------------------------------------
+  -----------------------------------------------------------------------
   `);
 });

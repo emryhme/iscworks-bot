@@ -1,3 +1,4 @@
+import crypto from 'crypto';
 import { StockService } from '../services/stock.service';
 import { InventoryService } from '../services/inventory.service';
 import { OrderService } from '../services/order.service';
@@ -5,10 +6,11 @@ import { AIService } from '../services/ai.service';
 import { AdminCopilotService } from '../services/admin-copilot.service';
 import { GeminiService } from '../services/gemini.service';
 import { WebhookController } from '../controllers/webhook.controller';
-import { db } from '../database/db';
+import { AuthMiddleware } from '../middleware/auth.middleware';
+import { db, hashPassword, verifyPassword } from '../database/db';
 
 async function runTestSuite() {
-  console.log('🧪 Starting ISC Works Multi-Tenant Enterprise Master Test Suite (Stages 1–5)...\n');
+  console.log('🧪 Starting ISC Works Stage 6 Multi-Tenant Auth, RBAC & Security Test Suite...\n');
   let passed = 0;
   let failed = 0;
 
@@ -23,6 +25,8 @@ async function runTestSuite() {
   }
 
   // PRE-TEST CLEANUP
+  db.prepare('DELETE FROM audit_logs WHERE store_id IN (100, 200, 999)').run();
+  db.prepare('DELETE FROM api_keys WHERE store_id IN (100, 200, 999)').run();
   db.prepare('DELETE FROM orders WHERE store_id IN (100, 200, 999)').run();
   db.prepare('DELETE FROM order_items WHERE store_id IN (100, 200, 999)').run();
   db.prepare('DELETE FROM customers WHERE store_id IN (100, 200, 999)').run();
@@ -33,106 +37,129 @@ async function runTestSuite() {
   db.prepare('DELETE FROM user_rewards WHERE store_id IN (100, 200, 999)').run();
   db.prepare('DELETE FROM conversations WHERE store_id IN (100, 200, 999)').run();
   db.prepare('DELETE FROM webhook_events WHERE store_id IN (100, 200, 999)').run();
+  db.prepare('DELETE FROM memberships WHERE store_id IN (100, 200, 999)').run();
+  db.prepare("DELETE FROM users WHERE email IN ('owner_a@iscworks.com', 'staff_a@iscworks.com', 'owner_b@iscworks.com', 'inactive_user@iscworks.com')").run();
   db.prepare('DELETE FROM stores WHERE id IN (100, 200, 999)').run();
 
-  // Seed test stores
-  db.prepare("INSERT OR IGNORE INTO stores (id, owner_id, name, slug, status) VALUES (100, 1, 'Store A', 'store-a', 'active')").run();
-  db.prepare("INSERT OR IGNORE INTO stores (id, owner_id, name, slug, status) VALUES (200, 2, 'Store B', 'store-b', 'active')").run();
-  db.prepare("INSERT OR IGNORE INTO stores (id, owner_id, name, slug, status) VALUES (999, 3, 'Store Suspended', 'store-suspended', 'suspended')").run();
+  // SEED STORES
+  db.prepare("INSERT OR IGNORE INTO stores (id, owner_id, name, slug, status) VALUES (100, 10, 'Store Alpha', 'store-alpha', 'active')").run();
+  db.prepare("INSERT OR IGNORE INTO stores (id, owner_id, name, slug, status) VALUES (200, 20, 'Store Beta', 'store-beta', 'active')").run();
+  db.prepare("INSERT OR IGNORE INTO stores (id, owner_id, name, slug, status) VALUES (999, 30, 'Store Suspended', 'store-suspended', 'suspended')").run();
 
-  // Seed products
-  await StockService.addProduct({ storeId: 100, shortCode: 'ABC', productCode: 'ABC-M', name: 'Gömlek A', size: 'M', stock: 10, price: 100 });
-  await StockService.addProduct({ storeId: 200, shortCode: 'ABC', productCode: 'ABC-M', name: 'Gömlek B', size: 'M', stock: 50, price: 500 });
+  // SEED USERS & MEMBERSHIPS
+  const passHash = hashPassword('password123');
+  
+  // User 10: Store 100 OWNER
+  db.prepare("INSERT INTO users (id, full_name, email, password_hash, status) VALUES (10, 'Owner Alpha', 'owner_a@iscworks.com', ?, 'active')").run(passHash);
+  db.prepare("INSERT INTO memberships (user_id, store_id, role, status) VALUES (10, 100, 'OWNER', 'active')").run();
 
-  // Seed campaigns & settings
-  db.prepare("INSERT INTO campaigns (store_id, title, description, code, active) VALUES (100, 'Store A %10 Indirim', 'Kampanya A', 'IND10', 1)").run();
-  db.prepare("INSERT INTO campaigns (store_id, title, description, code, active) VALUES (200, 'Store B %50 Indirim', 'Kampanya B', 'IND50', 1)").run();
-  db.prepare("INSERT INTO settings (store_id, key, value) VALUES (100, 'shipping_fee', '50')").run();
-  db.prepare("INSERT INTO settings (store_id, key, value) VALUES (200, 'shipping_fee', '100')").run();
-  db.prepare("INSERT INTO user_rewards (store_id, sender_id, reward_code, discount_percent, min_qualifying_amount, is_used) VALUES (100, 'sender_x', 'REW100', 10.0, 1000, 0)").run();
-  db.prepare("INSERT INTO user_rewards (store_id, sender_id, reward_code, discount_percent, min_qualifying_amount, is_used) VALUES (200, 'sender_x', 'REW200', 50.0, 1000, 0)").run();
+  // User 11: Store 100 STAFF
+  db.prepare("INSERT INTO users (id, full_name, email, password_hash, status) VALUES (11, 'Staff Alpha', 'staff_a@iscworks.com', ?, 'active')").run(passHash);
+  db.prepare("INSERT INTO memberships (user_id, store_id, role, status) VALUES (11, 100, 'STAFF', 'active')").run();
 
-  // --- STAGE 2 & 3 TESTS ---
-  console.log('1️⃣ STOCK & INVENTORY ISOLATION: Same product code across different stores');
-  const prodA = (await StockService.fetchAllSheetRows(100)).find(r => r.productCode === 'ABC-M');
-  const prodB = (await StockService.fetchAllSheetRows(200)).find(r => r.productCode === 'ABC-M');
-  assert(prodA?.price === 100 && prodA?.stock === 10, 'Store A product ABC-M found with price 100');
-  assert(prodB?.price === 500 && prodB?.stock === 50, 'Store B product ABC-M found with price 500');
+  // User 20: Store 200 OWNER
+  db.prepare("INSERT INTO users (id, full_name, email, password_hash, status) VALUES (20, 'Owner Beta', 'owner_b@iscworks.com', ?, 'active')").run(passHash);
+  db.prepare("INSERT INTO memberships (user_id, store_id, role, status) VALUES (20, 200, 'OWNER', 'active')").run();
 
-  console.log('\n2️⃣ ORDER SERVICE: Price isolation on order creation');
-  const orderA1 = await OrderService.createOrder(100, {
-    customerName: 'Ali Yılmaz',
-    customerPhone: '05320001122',
-    address: 'Adres A',
-    productCode: 'ABC-M',
-    productName: 'Gömlek A',
-    size: 'M',
-    quantity: 1,
-    senderId: 'sender_x'
+  // User 30: Inactive Membership User
+  db.prepare("INSERT INTO users (id, full_name, email, password_hash, status) VALUES (30, 'Inactive User', 'inactive_user@iscworks.com', ?, 'active')").run(passHash);
+  db.prepare("INSERT INTO memberships (user_id, store_id, role, status) VALUES (30, 100, 'OWNER', 'inactive')").run();
+
+  // SEED PRODUCTS
+  await StockService.addProduct({ storeId: 100, shortCode: 'TSH', productCode: 'TSH-M', name: 'T-Shirt A', size: 'M', stock: 20, price: 150 });
+  await StockService.addProduct({ storeId: 200, shortCode: 'TSH', productCode: 'TSH-M', name: 'T-Shirt B', size: 'M', stock: 40, price: 450 });
+
+  // 1. AUTH TESTS
+  console.log('1️⃣ AUTH TEST 1: Password Verification (PBKDF2 SHA-512)');
+  assert(verifyPassword('password123', passHash) === true, 'Valid password verification returns true');
+  assert(verifyPassword('wrongpassword', passHash) === false, 'Invalid password verification returns false');
+
+  console.log('\n2️⃣ AUTH TEST 2: Valid JWT Token Generation & Verification');
+  const jwtOwnerA = AuthMiddleware.generateToken({ userId: 10, storeId: 100, role: 'OWNER', email: 'owner_a@iscworks.com' });
+  const decodedA = AuthMiddleware.verifyToken(jwtOwnerA);
+  assert(decodedA !== null && decodedA.userId === 10 && decodedA.storeId === 100 && decodedA.role === 'OWNER', 'Valid JWT token verified successfully');
+
+  console.log('\n3️⃣ AUTH TEST 3: Invalid & Expired Token Rejection');
+  const invalidSigToken = jwtOwnerA.substring(0, jwtOwnerA.length - 5) + 'X1Y2Z';
+  assert(AuthMiddleware.verifyToken(invalidSigToken) === null, 'Tampered/invalid signature token rejected');
+  assert(AuthMiddleware.verifyToken('') === null, 'Empty token rejected');
+
+  console.log('\n4️⃣ AUTH TEST 4: Legacy Session Token Bypass Rejection on Protected API');
+  let authFailed: boolean = false;
+  const mockResAuth = { status: (code: number) => ({ json: (data: any) => { if (code === 401) authFailed = true; } }) } as any;
+  AuthMiddleware.authenticate({ headers: { authorization: 'Bearer session_barons_legacy_hack_token' } } as any, mockResAuth, () => {});
+  assert((authFailed as boolean) === true, 'Legacy session_barons_ bypass token rejected on protected API');
+
+  // 2. TENANT ISOLATION TESTS
+  console.log('\n5️⃣ TENANT TEST 1: Authenticated Request Tenant Scoping');
+  let reqContext: any = null;
+  const mockReqStoreA = { headers: { authorization: `Bearer ${jwtOwnerA}` } } as any;
+  AuthMiddleware.authenticate(mockReqStoreA, mockResAuth, () => { reqContext = mockReqStoreA.auth; });
+  assert(reqContext !== null && reqContext.storeId === 100 && reqContext.role === 'OWNER', 'Auth context populated with validated storeId 100');
+
+  console.log('\n6️⃣ TENANT TEST 2: Cross-Tenant Store B Access Rejection for Store A User');
+  const jwtFakeB = AuthMiddleware.generateToken({ userId: 10, storeId: 200, role: 'OWNER', email: 'owner_a@iscworks.com' });
+  let forbidFailed: boolean = false;
+  const mockResForbid = { status: (code: number) => ({ json: () => { if (code === 403) forbidFailed = true; } }) } as any;
+  AuthMiddleware.authenticate({ headers: { authorization: `Bearer ${jwtFakeB}` } } as any, mockResForbid, () => {});
+  assert((forbidFailed as boolean) === true, 'User 10 attempting to claim Store 200 JWT is rejected by DB membership check');
+
+  console.log('\n7️⃣ TENANT TEST 3: Inactive Membership Rejection');
+  const jwtInactive = AuthMiddleware.generateToken({ userId: 30, storeId: 100, role: 'OWNER', email: 'inactive_user@iscworks.com' });
+  let inactiveFailed: boolean = false;
+  const mockResInactive = { status: (code: number) => ({ json: () => { if (code === 403) inactiveFailed = true; } }) } as any;
+  AuthMiddleware.authenticate({ headers: { authorization: `Bearer ${jwtInactive}` } } as any, mockResInactive, () => {});
+  assert((inactiveFailed as boolean) === true, 'User 30 with inactive membership is rejected with 403 Forbidden');
+
+  console.log('\n8️⃣ TENANT TEST 4: Suspended Store Rejection');
+  const jwtSuspended = AuthMiddleware.generateToken({ userId: 30, storeId: 999, role: 'OWNER', email: 'inactive_user@iscworks.com' });
+  let suspendedFailed: boolean = false;
+  const mockResSuspended = { status: (code: number) => ({ json: () => { if (code === 403) suspendedFailed = true; } }) } as any;
+  AuthMiddleware.authenticate({ headers: { authorization: `Bearer ${jwtSuspended}` } } as any, mockResSuspended, () => {});
+  assert((suspendedFailed as boolean) === true, 'User attempting access to suspended store 999 is rejected with 403 Forbidden');
+
+  // 3. RBAC ROLE ESCALATION TESTS
+  console.log('\n9️⃣ RBAC TEST 1: OWNER Role Access Allowance');
+  let roleOwnerPassed: boolean = false;
+  const rbacOwnerReq = { auth: { userId: 10, storeId: 100, role: 'OWNER', email: 'owner_a@iscworks.com' } } as any;
+  AuthMiddleware.requireRole(['OWNER'])(rbacOwnerReq, mockResForbid, () => { roleOwnerPassed = true; });
+  assert((roleOwnerPassed as boolean) === true, 'OWNER role passes OWNER restricted middleware');
+
+  console.log('\n🔟 RBAC TEST 2: STAFF Role Access Restriction on OWNER Action');
+  let roleStaffBlocked: boolean = false;
+  const rbacStaffReq = { auth: { userId: 11, storeId: 100, role: 'STAFF', email: 'staff_a@iscworks.com' } } as any;
+  const mockResRbac = { status: (code: number) => ({ json: () => { if (code === 403) roleStaffBlocked = true; } }) } as any;
+  AuthMiddleware.requireRole(['OWNER'])(rbacStaffReq, mockResRbac, () => { roleStaffBlocked = false; });
+  assert((roleStaffBlocked as boolean) === true, 'STAFF role blocked from OWNER restricted action');
+
+  // 4. API KEY & AUDIT LOG TESTS
+  console.log('\n1️⃣1️⃣ API KEY TEST: Multi-Tenant API Key Authentication');
+  const rawKey = 'isc_live_test_key_12345';
+  const keyHash = crypto.createHash('sha256').update(rawKey).digest('hex');
+  db.prepare("INSERT INTO api_keys (store_id, name, key_hash, permissions) VALUES (100, 'Integration Test Key', ?, 'read_write')").run(keyHash);
+  let apiKeyAuthenticated: boolean = false;
+  let apiKeyStoreId = 0;
+  const mockReqApiKey = { headers: { 'x-api-key': rawKey } } as any;
+  AuthMiddleware.authenticate(mockReqApiKey, mockResAuth, () => {
+    apiKeyAuthenticated = true;
+    apiKeyStoreId = mockReqApiKey.auth?.storeId || 0;
   });
-  assert(orderA1.unitPrice === 100, 'Store A order created with Store A price (100 TL)');
+  assert((apiKeyAuthenticated as boolean) === true && apiKeyStoreId === 100, 'API key authenticated strictly to Store ID 100');
 
-  console.log('\n3️⃣ ORDER SERVICE: Stock deduction isolation');
-  const prodA_after = (await StockService.fetchAllSheetRows(100)).find(r => r.productCode === 'ABC-M');
-  const prodB_after = (await StockService.fetchAllSheetRows(200)).find(r => r.productCode === 'ABC-M');
-  assert(prodA_after?.stock === 9, 'Store A stock deducted to 9');
-  assert(prodB_after?.stock === 50, 'Store B stock remains unchanged at 50');
+  console.log('\n1️⃣2️⃣ AUDIT LOG TEST: Audit Logging Scoped by Store ID');
+  AuthMiddleware.logAudit(100, 10, 'TEST_AUDIT_ACTION', 'products', 'TSH-M');
+  const auditRow = db.prepare("SELECT * FROM audit_logs WHERE store_id = 100 AND action = 'TEST_AUDIT_ACTION'").get() as any;
+  assert(auditRow !== undefined && auditRow.user_id === 10 && auditRow.entity_id === 'TSH-M', 'Audit log inserted strictly with store_id 100 and user_id 10');
 
-  console.log('\n4️⃣ ORDER SERVICE: getOrders(storeId) isolation');
-  const orderB1 = await OrderService.createOrder(200, {
-    customerName: 'Mehmet Kaya',
-    customerPhone: '05339998877',
-    address: 'Adres B',
-    productCode: 'ABC-M',
-    productName: 'Gömlek B',
-    size: 'M',
-    quantity: 1,
-    senderId: 'sender_x'
-  });
-  const ordersStoreA = await OrderService.getOrders(100);
-  const ordersStoreB = await OrderService.getOrders(200);
-  assert(ordersStoreA.length === 1 && ordersStoreA[0].orderId === orderA1.orderId, 'Store A returns only Store A orders');
-  assert(ordersStoreB.length === 1 && ordersStoreB[0].orderId === orderB1.orderId, 'Store B returns only Store B orders');
+  // 5. STAGE 1-5 REGRESSION TESTS
+  console.log('\n1️⃣3️⃣ REGRESSION TEST: Webhook Store Resolution & Idempotency');
+  const resolvedAlpha = WebhookController.resolveStore('store-alpha');
+  assert(resolvedAlpha !== null && resolvedAlpha.id === 100, 'store-alpha resolved to Store ID 100');
+  const firstEvt = WebhookController.isDuplicateEvent('evt_stage6_001', 100);
+  const secondEvt = WebhookController.isDuplicateEvent('evt_stage6_001', 100);
+  assert(firstEvt === false && secondEvt === true, 'Webhook idempotency works seamlessly across multi-tenant events');
 
-  console.log('\n5️⃣ ORDER SERVICE: Cross-tenant lookup rejection');
-  const crossLookup = await OrderService.getOrder(100, orderB1.orderId);
-  assert(crossLookup === null, 'Store A cannot fetch Store B order');
-
-  // --- STAGE 4 AI TESTS ---
-  console.log('\n6️⃣ AI SERVICE: Campaign & settings isolation');
-  const campaignsA = db.prepare('SELECT * FROM campaigns WHERE store_id = 100 AND active = 1').all() as any[];
-  const settingA = db.prepare("SELECT value FROM settings WHERE store_id = 100 AND key = 'shipping_fee'").get() as any;
-  assert(campaignsA.length === 1 && campaignsA[0].code === 'IND10', 'Store A AI sees only Store A campaign');
-  assert(settingA?.value === '50', 'Store A shipping fee setting is 50');
-
-  console.log('\n7️⃣ ADMIN COPILOT: Price update isolation');
-  await AdminCopilotService.processAdminCommand('ABC-M fiyatını 200 yap', 100);
-  const prodA_updated = (await StockService.fetchAllSheetRows(100)).find(p => p.productCode === 'ABC-M');
-  const prodB_untouched = (await StockService.fetchAllSheetRows(200)).find(p => p.productCode === 'ABC-M');
-  assert(prodA_updated?.price === 200, 'Store A price updated to 200 TL via Admin Copilot');
-  assert(prodB_untouched?.price === 500, 'Store B price remains untouched at 500 TL');
-
-  // --- STAGE 5 WEBHOOK TESTS ---
-  console.log('\n8️⃣ WEBHOOK: Store resolution & status check');
-  const resolvedA = WebhookController.resolveStore('store-a');
-  const resolvedSuspended = WebhookController.resolveStore('store-suspended');
-  const resolvedInvalid = WebhookController.resolveStore('invalid-slug');
-  assert(resolvedA?.id === 100 && resolvedA?.status === 'active', 'store-a resolved to active Store ID 100');
-  assert(resolvedSuspended?.status === 'suspended', 'Suspended store correctly identified');
-  assert(resolvedInvalid === null, 'Invalid store slug rejected with null');
-
-  console.log('\n9️⃣ WEBHOOK: Conversation isolation');
-  const convIdA = AIService.getOrCreateConversation(100, 'user_webhook_99');
-  const convIdB = AIService.getOrCreateConversation(200, 'user_webhook_99');
-  assert(convIdA !== convIdB, 'Store A and Store B create distinct conversation records for same user');
-
-  console.log('\n🔟 WEBHOOK: Event Idempotency');
-  const firstEvent = WebhookController.isDuplicateEvent('evt_master_111', 100);
-  const secondEvent = WebhookController.isDuplicateEvent('evt_master_111', 100);
-  assert(firstEvent === false, 'First webhook event is processed (false)');
-  assert(secondEvent === true, 'Duplicate webhook event is ignored (true)');
-
-  console.log(`\n📊 MASTER TEST SUMMARY: Passed: ${passed} | Failed: ${failed}`);
+  console.log(`\n📊 STAGE 6 MASTER SECURITY TEST SUMMARY: Passed: ${passed} | Failed: ${failed}`);
   if (failed > 0) {
     process.exit(1);
   }

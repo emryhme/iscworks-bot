@@ -1,6 +1,7 @@
 import Database from 'better-sqlite3';
 import path from 'path';
 import fs from 'fs';
+import crypto from 'crypto';
 
 /**
  * BARON'S SILLAGE SQLite Veritabanı Yöneticisi (barons.db)
@@ -285,10 +286,19 @@ export function initDatabase() {
     );
   `);
 
-  // Default Store Record Ensure (store_id = 1)
+  // Default Store & Admin User Records Ensure (store_id = 1)
   db.exec(`
     INSERT OR IGNORE INTO stores (id, owner_id, name, slug, status)
     VALUES (1, 1, 'BARON''S SILLAGE', 'default', 'active');
+  `);
+
+  const adminPassHash = hashPassword('cintonik!');
+  db.exec(`
+    INSERT OR IGNORE INTO users (id, full_name, email, password_hash, status)
+    VALUES (1, 'Tony Stark', 'tonystark@iscworks.com', '${adminPassHash}', 'active');
+
+    INSERT OR IGNORE INTO memberships (id, user_id, store_id, role, status)
+    VALUES (1, 1, 1, 'OWNER', 'active');
   `);
 
   // Auto Migrations: Kolonlar eksikse otomatik ekle
@@ -554,8 +564,6 @@ export function findMerchantApplicationByIdentifier(identifier: string) {
 /**
  * Şifre Güvenliği & Hashleme (PBKDF2 / SHA-512)
  */
-import crypto from 'crypto';
-
 export function hashPassword(password: string): string {
   if (!password) return '';
   const salt = 'iscworks_salt_2026';

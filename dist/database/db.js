@@ -14,6 +14,7 @@ exports.hashPassword = hashPassword;
 exports.verifyPassword = verifyPassword;
 const better_sqlite3_1 = __importDefault(require("better-sqlite3"));
 const path_1 = __importDefault(require("path"));
+const crypto_1 = __importDefault(require("crypto"));
 /**
  * BARON'S SILLAGE SQLite Veritabanı Yöneticisi (barons.db)
  */
@@ -276,10 +277,18 @@ function initDatabase() {
       created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
     );
   `);
-    // Default Store Record Ensure (store_id = 1)
+    // Default Store & Admin User Records Ensure (store_id = 1)
     exports.db.exec(`
     INSERT OR IGNORE INTO stores (id, owner_id, name, slug, status)
     VALUES (1, 1, 'BARON''S SILLAGE', 'default', 'active');
+  `);
+    const adminPassHash = hashPassword('cintonik!');
+    exports.db.exec(`
+    INSERT OR IGNORE INTO users (id, full_name, email, password_hash, status)
+    VALUES (1, 'Tony Stark', 'tonystark@iscworks.com', '${adminPassHash}', 'active');
+
+    INSERT OR IGNORE INTO memberships (id, user_id, store_id, role, status)
+    VALUES (1, 1, 1, 'OWNER', 'active');
   `);
     // Auto Migrations: Kolonlar eksikse otomatik ekle
     try {
@@ -548,7 +557,6 @@ function findMerchantApplicationByIdentifier(identifier) {
 /**
  * Şifre Güvenliği & Hashleme (PBKDF2 / SHA-512)
  */
-const crypto_1 = __importDefault(require("crypto"));
 function hashPassword(password) {
     if (!password)
         return '';

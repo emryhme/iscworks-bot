@@ -6,9 +6,10 @@ import { db } from '../database/db';
 export interface AuthContext {
   userId: number;
   storeId: number;
-  role: 'OWNER' | 'ADMIN' | 'MANAGER' | 'STAFF' | 'SUPPORT';
+  role: 'OWNER' | 'ADMIN' | 'MANAGER' | 'STAFF';
   email: string;
   storeSlug?: string;
+  tokenType?: 'jwt' | 'api_key';
 }
 
 export interface AuthenticatedRequest extends Request {
@@ -16,13 +17,14 @@ export interface AuthenticatedRequest extends Request {
 }
 
 /**
- * Enterprise HMAC-SHA256 JWT & Security Middleware
+ * Production-Grade HMAC-SHA256 JWT, RBAC & Tenant Isolation Middleware
  */
 export class AuthMiddleware {
   /**
    * Generates signed JWT Token
    */
   public static generateToken(payload: { userId: number; storeId: number; role: string; email: string }): string {
+    const secret = process.env.JWT_SECRET || env.jwtSecret || 'iscworks_prod_jwt_secret_2026';
     const header = Buffer.from(JSON.stringify({ alg: 'HS256', typ: 'JWT' })).toString('base64url');
     const body = Buffer.from(JSON.stringify({
       ...payload,
@@ -30,20 +32,21 @@ export class AuthMiddleware {
       exp: Math.floor(Date.now() / 1000) + (86400 * 30) // 30 Days
     })).toString('base64url');
 
-    const signature = crypto.createHmac('sha256', env.jwtSecret).update(`${header}.${body}`).digest('base64url');
+    const signature = crypto.createHmac('sha256', secret).update(`${header}.${body}`).digest('base64url');
     return `${header}.${body}.${signature}`;
   }
 
   /**
-   * Verifies JWT Token
+   * Verifies JWT Token Signature and Claims
    */
-  public static verifyToken(token: string): AuthContext | null {
+  public static verifyToken(token: string): { userId: number; storeId: number; role: string; email: string } | null {
     if (!token) return null;
     const parts = token.split('.');
     if (parts.length !== 3) return null;
 
     const [header, body, signature] = parts;
-    const expectedSig = crypto.createHmac('sha256', env.jwtSecret).update(`${header}.${body}`).digest('base64url');
+    const secret = process.env.JWT_SECRET || env.jwtSecret || 'iscworks_prod_jwt_secret_2026';
+    const expectedSig = crypto.createHmac('sha256', secret).update(`${header}.${body}`).digest('base64url');
 
     if (signature !== expectedSig) return null;
 
@@ -52,11 +55,12 @@ export class AuthMiddleware {
       if (payload.exp && payload.exp < Math.floor(Date.now() / 1000)) {
         return null; // Expired
       }
+      if (!payload.userId || !payload.storeId) return null;
       return {
-        userId: payload.userId || 1,
-        storeId: payload.storeId || 1,
-        role: payload.role || 'OWNER',
-        email: payload.email || 'admin@iscworks.com'
+        userId: Number(payload.userId),
+        storeId: Number(payload.storeId),
+        role: payload.role || 'STAFF',
+        email: payload.email || ''
       };
     } catch {
       return null;
@@ -64,7 +68,7 @@ export class AuthMiddleware {
   }
 
   /**
-   * Authentication Middleware - Enforces JWT validation
+   * Authentication & Authorization Middleware - Enforces DB Membership Verification
    */
   public static authenticate(req: AuthenticatedRequest, res: Response, next: NextFunction): void {
     const authHeader = req.headers.authorization;
@@ -76,14 +80,42 @@ export class AuthMiddleware {
       token = String(req.headers['x-access-token']).trim();
     }
 
-    // Support legacy admin session token in transition
-    if (token && token.startsWith('session_barons_')) {
-      req.auth = { userId: 1, storeId: 1, role: 'OWNER', email: 'tonystark@iscworks.com' };
+    // API Key Authentication Support
+    const apiKey = req.headers['x-api-key'] as string;
+    if (apiKey) {
+      const keyHash = crypto.createHash('sha256').update(apiKey.trim()).digest('hex');
+      const apiKeyRecord = db.prepare(`
+        SELECT k.id, k.store_id, k.name, k.permissions, s.status as store_status
+        FROM api_keys k
+        JOIN stores s ON s.id = k.store_id
+        WHERE k.key_hash = ? AND s.status = 'active'
+      `).get(keyHash) as any;
+
+      if (!apiKeyRecord) {
+        res.status(401).json({ success: false, error: { code: 'UNAUTHORIZED', message: 'Geçersiz veya pasif API key.' } });
+        return;
+      }
+
+      req.auth = {
+        userId: 0,
+        storeId: apiKeyRecord.store_id,
+        role: 'STAFF',
+        email: `api_key:${apiKeyRecord.name}`,
+        tokenType: 'api_key'
+      };
       return next();
     }
 
-    const authCtx = AuthMiddleware.verifyToken(token);
-    if (!authCtx) {
+    if (!token) {
+      res.status(401).json({
+        success: false,
+        error: { code: 'UNAUTHORIZED', message: 'Kimlik doğrulama tokenı eksik.' }
+      });
+      return;
+    }
+
+    const authPayload = AuthMiddleware.verifyToken(token);
+    if (!authPayload) {
       res.status(401).json({
         success: false,
         error: { code: 'UNAUTHORIZED', message: 'Geçersiz veya süresi dolmuş kimlik doğrulama tokenı.' }
@@ -91,12 +123,43 @@ export class AuthMiddleware {
       return;
     }
 
-    req.auth = authCtx;
+    // Database verification: Validate active Membership & active Store
+    const membershipRecord = db.prepare(`
+      SELECT m.role, m.status as membership_status, s.status as store_status, s.slug as store_slug
+      FROM memberships m
+      JOIN stores s ON s.id = m.store_id
+      WHERE m.user_id = ? AND m.store_id = ?
+    `).get(authPayload.userId, authPayload.storeId) as any;
+
+    if (!membershipRecord) {
+      res.status(403).json({
+        success: false,
+        error: { code: 'FORBIDDEN', message: 'Bu mağazaya erişim üyeliğiniz bulunmamaktadır.' }
+      });
+      return;
+    }
+
+    if (membershipRecord.membership_status !== 'active' || membershipRecord.store_status !== 'active') {
+      res.status(403).json({
+        success: false,
+        error: { code: 'FORBIDDEN', message: 'Mağaza üyeliğiniz veya mağaza pasif durumdadır.' }
+      });
+      return;
+    }
+
+    req.auth = {
+      userId: authPayload.userId,
+      storeId: authPayload.storeId,
+      role: (membershipRecord.role || authPayload.role) as any,
+      email: authPayload.email,
+      storeSlug: membershipRecord.store_slug,
+      tokenType: 'jwt'
+    };
     next();
   }
 
   /**
-   * RBAC Middleware - Enforces required roles
+   * RBAC Middleware - Enforces Required Role Matrix
    */
   public static requireRole(allowedRoles: string[]) {
     return (req: AuthenticatedRequest, res: Response, next: NextFunction): void => {
@@ -117,6 +180,20 @@ export class AuthMiddleware {
   }
 
   /**
+   * Audit Logging Helper Method
+   */
+  public static logAudit(storeId: number, userId: number, action: string, entityType: string, entityId: string = '', oldValue: string = '', newValue: string = ''): void {
+    try {
+      db.prepare(`
+        INSERT INTO audit_logs (store_id, user_id, action, entity_type, entity_id, old_value, new_value, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+      `).run(storeId, userId, action, entityType, entityId, oldValue, newValue);
+    } catch (e: any) {
+      console.warn('[Audit Log Warning]:', e.message);
+    }
+  }
+
+  /**
    * Production CORS Whitelist Middleware
    */
   public static cors(req: Request, res: Response, next: NextFunction): void {
@@ -128,7 +205,7 @@ export class AuthMiddleware {
     }
 
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Access-Token');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Access-Token, X-Api-Key');
 
     if (req.method === 'OPTIONS') {
       res.sendStatus(200);
