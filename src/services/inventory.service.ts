@@ -8,21 +8,40 @@ export interface StockCheckResult {
 }
 
 /**
- * Enterprise Inventory Management & Reservation Service
+ * Enterprise Multi-Tenant Inventory Management & Reservation Service
  */
 export class InventoryService {
+  private static validateStoreId(storeId: any): void {
+    if (typeof storeId !== 'number' || isNaN(storeId) || storeId <= 0) {
+      throw new Error('Store ID zorunludur ve geçerli bir pozitif sayı olmalıdır.');
+    }
+  }
+
   /**
-   * getStock - Fetches total, reserved, and net available stock for a product in a specific store
+   * getStock - Fetches total, reserved, and net available stock for a product in a specific store (Strict Store Isolation)
    */
-  public static getStock(storeId: number, productCode: string): StockCheckResult {
-    const pCode = (productCode || '').trim();
+  public static getStock(storeId: number, productCode: string): StockCheckResult;
+  public static getStock(productCode: string): StockCheckResult;
+  public static getStock(storeIdOrCode: any, productCode?: string): StockCheckResult {
+    let storeId: number;
+    let pCode: string;
+
+    if (typeof storeIdOrCode === 'number') {
+      storeId = storeIdOrCode;
+      pCode = (productCode || '').trim().toUpperCase();
+    } else {
+      this.validateStoreId(undefined); // Throws Error
+      return { available: false, stock: 0, reserved: 0, netAvailable: 0 };
+    }
+
+    this.validateStoreId(storeId);
     
-    // Check inventory table first
-    let inv = db.prepare('SELECT stock, reserved_stock FROM inventory WHERE store_id = ? AND product_code = ?').get(storeId, pCode) as any;
+    // Check inventory table first for this exact store
+    let inv = db.prepare('SELECT stock, reserved_stock FROM inventory WHERE store_id = ? AND UPPER(product_code) = ?').get(storeId, pCode) as any;
     
     if (!inv) {
-      // Fallback lookup in products table
-      const prod = db.prepare('SELECT stock FROM products WHERE (store_id = ? OR store_id = 1) AND (product_code = ? OR short_code = ?)').get(storeId, pCode, pCode) as any;
+      // Lookup in products table strictly scoped to storeId (No store_id = 1 fallback!)
+      const prod = db.prepare('SELECT stock FROM products WHERE store_id = ? AND (UPPER(product_code) = ? OR UPPER(short_code) = ?)').get(storeId, pCode, pCode) as any;
       const stock = prod ? Number(prod.stock) || 0 : 0;
       return { available: stock > 0, stock: stock, reserved: 0, netAvailable: stock };
     }
@@ -40,84 +59,171 @@ export class InventoryService {
   }
 
   /**
-   * checkAvailability - Checks if requested quantity is available
+   * checkAvailability - Checks if requested quantity is available for storeId
    */
-  public static checkAvailability(storeId: number, productCode: string, quantity: number): boolean {
-    const res = this.getStock(storeId, productCode);
-    return res.netAvailable >= Math.max(1, quantity);
+  public static checkAvailability(storeId: number, productCode: string, quantity: number): boolean;
+  public static checkAvailability(productCode: string, quantity: number): boolean;
+  public static checkAvailability(storeIdOrCode: any, quantityOrCode?: any, quantity?: number): boolean {
+    let storeId: number;
+    let pCode: string;
+    let q: number;
+
+    if (typeof storeIdOrCode === 'number') {
+      storeId = storeIdOrCode;
+      pCode = String(quantityOrCode || '');
+      q = Number(quantity) || 1;
+    } else {
+      this.validateStoreId(undefined); // Throws Error
+      return false;
+    }
+
+    this.validateStoreId(storeId);
+    const res = this.getStock(storeId, pCode);
+    return res.netAvailable >= Math.max(1, q);
   }
 
   /**
-   * reserveStock - Temporarily reserves stock for cart / checkout
+   * reserveStock - Temporarily reserves stock for cart / checkout (Strict Store Isolation)
    */
-  public static reserveStock(storeId: number, productCode: string, quantity: number): boolean {
-    const q = Math.max(1, quantity);
-    const pCode = (productCode || '').trim();
+  public static reserveStock(storeId: number, productCode: string, quantity: number): boolean;
+  public static reserveStock(productCode: string, quantity: number): boolean;
+  public static reserveStock(storeIdOrCode: any, quantityOrCode?: any, quantity?: number): boolean {
+    let storeId: number;
+    let pCode: string;
+    let q: number;
+
+    if (typeof storeIdOrCode === 'number') {
+      storeId = storeIdOrCode;
+      pCode = String(quantityOrCode || '').trim().toUpperCase();
+      q = Number(quantity) || 1;
+    } else {
+      this.validateStoreId(undefined); // Throws Error
+      return false;
+    }
+
+    this.validateStoreId(storeId);
 
     if (!this.checkAvailability(storeId, pCode, q)) {
       return false;
     }
 
-    const stmt = db.prepare(`
-      INSERT INTO inventory (store_id, product_code, stock, reserved_stock)
-      VALUES (?, ?, 0, ?)
-      ON CONFLICT(product_code) DO UPDATE SET
-        reserved_stock = reserved_stock + ?,
-        updated_at = CURRENT_TIMESTAMP
-    `);
+    let inv = db.prepare('SELECT id, reserved_stock FROM inventory WHERE store_id = ? AND UPPER(product_code) = ?').get(storeId, pCode) as any;
 
-    stmt.run(storeId, pCode, q, q);
+    if (inv) {
+      db.prepare(`
+        UPDATE inventory 
+        SET reserved_stock = reserved_stock + ?, updated_at = CURRENT_TIMESTAMP 
+        WHERE id = ?
+      `).run(q, inv.id);
+    } else {
+      // Pull stock from products table
+      const prod = db.prepare('SELECT stock FROM products WHERE store_id = ? AND (UPPER(product_code) = ? OR UPPER(short_code) = ?)').get(storeId, pCode, pCode) as any;
+      const prodStock = prod ? Number(prod.stock) || 0 : 0;
+
+      db.prepare(`
+        INSERT INTO inventory (store_id, product_code, stock, reserved_stock, updated_at)
+        VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+      `).run(storeId, pCode, prodStock, q);
+    }
     return true;
   }
 
   /**
-   * releaseStock - Releases temporary stock reservation (e.g. cancelled checkout / payment failure)
+   * releaseStock - Releases temporary stock reservation for storeId
    */
-  public static releaseStock(storeId: number, productCode: string, quantity: number): void {
-    const q = Math.max(1, quantity);
-    const pCode = (productCode || '').trim();
+  public static releaseStock(storeId: number, productCode: string, quantity: number): void;
+  public static releaseStock(productCode: string, quantity: number): void;
+  public static releaseStock(storeIdOrCode: any, quantityOrCode?: any, quantity?: number): void {
+    let storeId: number;
+    let pCode: string;
+    let q: number;
+
+    if (typeof storeIdOrCode === 'number') {
+      storeId = storeIdOrCode;
+      pCode = String(quantityOrCode || '').trim().toUpperCase();
+      q = Number(quantity) || 1;
+    } else {
+      this.validateStoreId(undefined); // Throws Error
+      return;
+    }
+
+    this.validateStoreId(storeId);
 
     db.prepare(`
       UPDATE inventory 
       SET reserved_stock = MAX(0, reserved_stock - ?), updated_at = CURRENT_TIMESTAMP 
-      WHERE store_id = ? AND product_code = ?
+      WHERE store_id = ? AND UPPER(product_code) = ?
     `).run(q, storeId, pCode);
   }
 
   /**
-   * deductStock - Permanently deducts stock upon order confirmation (Single Owner)
+   * deductStock - Permanently deducts stock upon order confirmation (Strict Store Isolation)
    */
-  public static deductStock(storeId: number, productCode: string, quantity: number): boolean {
-    const q = Math.max(1, quantity);
-    const pCode = (productCode || '').trim();
+  public static deductStock(storeId: number, productCode: string, quantity: number): boolean;
+  public static deductStock(productCode: string, quantity: number): boolean;
+  public static deductStock(storeIdOrCode: any, quantityOrCode?: any, quantity?: number): boolean {
+    let storeId: number;
+    let pCode: string;
+    let q: number;
+
+    if (typeof storeIdOrCode === 'number') {
+      storeId = storeIdOrCode;
+      pCode = String(quantityOrCode || '').trim().toUpperCase();
+      q = Number(quantity) || 1;
+    } else {
+      this.validateStoreId(undefined); // Throws Error
+      return false;
+    }
+
+    this.validateStoreId(storeId);
 
     const result = db.prepare(`
       UPDATE products 
       SET stock = MAX(0, stock - ?), updated_at = CURRENT_TIMESTAMP 
-      WHERE (store_id = ? OR store_id = 1) AND (product_code = ? OR short_code = ?)
+      WHERE store_id = ? AND (UPPER(product_code) = ? OR UPPER(short_code) = ?)
     `).run(q, storeId, pCode, pCode);
 
     // Synchronize inventory table
     db.prepare(`
       UPDATE inventory 
       SET stock = MAX(0, stock - ?), reserved_stock = MAX(0, reserved_stock - ?), updated_at = CURRENT_TIMESTAMP 
-      WHERE store_id = ? AND product_code = ?
+      WHERE store_id = ? AND UPPER(product_code) = ?
     `).run(q, q, storeId, pCode);
 
     return result.changes > 0;
   }
 
   /**
-   * restoreStock - Restores stock upon order cancellation or return
+   * restoreStock - Restores stock upon order cancellation or return (Strict Store Isolation)
    */
-  public static restoreStock(storeId: number, productCode: string, quantity: number): void {
-    const q = Math.max(1, quantity);
-    const pCode = (productCode || '').trim();
+  public static restoreStock(storeId: number, productCode: string, quantity: number): void;
+  public static restoreStock(productCode: string, quantity: number): void;
+  public static restoreStock(storeIdOrCode: any, quantityOrCode?: any, quantity?: number): void {
+    let storeId: number;
+    let pCode: string;
+    let q: number;
+
+    if (typeof storeIdOrCode === 'number') {
+      storeId = storeIdOrCode;
+      pCode = String(quantityOrCode || '').trim().toUpperCase();
+      q = Number(quantity) || 1;
+    } else {
+      this.validateStoreId(undefined); // Throws Error
+      return;
+    }
+
+    this.validateStoreId(storeId);
 
     db.prepare(`
       UPDATE products 
       SET stock = stock + ?, updated_at = CURRENT_TIMESTAMP 
-      WHERE (store_id = ? OR store_id = 1) AND (product_code = ? OR short_code = ?)
+      WHERE store_id = ? AND (UPPER(product_code) = ? OR UPPER(short_code) = ?)
     `).run(q, storeId, pCode, pCode);
+
+    db.prepare(`
+      UPDATE inventory 
+      SET stock = stock + ?, updated_at = CURRENT_TIMESTAMP 
+      WHERE store_id = ? AND UPPER(product_code) = ?
+    `).run(q, storeId, pCode);
   }
 }

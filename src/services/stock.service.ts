@@ -10,51 +10,77 @@ export interface ProductStockRow {
   price: number;       // FİYAT (Örn: 299)
   stock: number;       // STOK (Örn: 5)
   category: string;    // KATEGORİ (Örn: GÖMLEK)
+  storeId?: number;
 }
 
 /**
- * SQLite (barons.db) Destekli Ultra Hızlı Stok Yönetim Servisi
+ * SQLite (barons.db) Destekli Ultra Hızlı Multi-Tenant Stok Yönetim Servisi
  */
 export class StockService {
+  private static validateStoreId(storeId: any): void {
+    if (typeof storeId !== 'number' || isNaN(storeId) || storeId <= 0) {
+      throw new Error('Store ID zorunludur ve geçerli bir pozitif sayı olmalıdır.');
+    }
+  }
+
   /**
-   * SQLite veritabanındaki tüm ham ürün satırlarını getirir.
+   * SQLite veritabanındaki mağazaya özel ürün satırlarını getirir.
    */
-  public static async fetchAllSheetRows(): Promise<ProductStockRow[]> {
+  public static async fetchAllSheetRows(storeId: number): Promise<ProductStockRow[]>;
+  public static async fetchAllSheetRows(): Promise<ProductStockRow[]>;
+  public static async fetchAllSheetRows(storeId?: any): Promise<ProductStockRow[]> {
+    this.validateStoreId(storeId);
     try {
       const stmt = db.prepare(`
-        SELECT short_code as shortCode, product_code as productCode, name, color, size, price, stock, category
+        SELECT short_code as shortCode, product_code as productCode, name, color, size, price, stock, category, store_id as storeId
         FROM products
+        WHERE store_id = ?
         ORDER BY id ASC
       `);
-      return stmt.all() as ProductStockRow[];
+      return stmt.all(storeId) as ProductStockRow[];
     } catch (e: any) {
-      console.error('[StockService SQLite] ❌ Ürünler okunamadı:', e.message);
+      console.error(`[StockService SQLite] ❌ Ürünler okunamadı (Store: ${storeId}):`, e.message);
       return [];
     }
   }
 
   /**
-   * Tüm benzersiz ürünlerin güncel stok listesini getirir.
+   * Mağazaya özel benzersiz ürünlerin güncel stok listesini getirir.
    */
-  public static async getAllProducts(): Promise<ProductStockRow[]> {
-    return await this.fetchAllSheetRows();
+  public static async getAllProducts(storeId: number): Promise<ProductStockRow[]>;
+  public static async getAllProducts(): Promise<ProductStockRow[]>;
+  public static async getAllProducts(storeId?: any): Promise<ProductStockRow[]> {
+    return await this.fetchAllSheetRows(storeId);
   }
 
   /**
-   * Ürün Kodu (KGMLW-M), Kısa Kod (KGMLW), Beden veya Ürün İsmine göre akıllı stok sorgulama yapar.
+   * Mağaza bazında akıllı stok sorgulama yapar.
    */
-  public static async checkStock(queryInput: string): Promise<{ exists: boolean; inStock: boolean; product?: any }> {
-    const rawQuery = queryInput.trim().toUpperCase();
-    const rows = await this.fetchAllSheetRows();
+  public static async checkStock(storeId: number, queryInput: string): Promise<{ exists: boolean; inStock: boolean; product?: any }>;
+  public static async checkStock(queryInput: string): Promise<{ exists: boolean; inStock: boolean; product?: any }>;
+  public static async checkStock(storeIdOrQuery: any, queryInput?: string): Promise<{ exists: boolean; inStock: boolean; product?: any }> {
+    let storeId: number;
+    let rawQuery: string;
+
+    if (typeof storeIdOrQuery === 'number') {
+      storeId = storeIdOrQuery;
+      rawQuery = (queryInput || '').trim().toUpperCase();
+    } else {
+      this.validateStoreId(undefined); // Throws Error
+      return { exists: false, inStock: false };
+    }
+
+    this.validateStoreId(storeId);
+    const rows = await this.fetchAllSheetRows(storeId);
 
     if (rows.length === 0) {
       return { exists: false, inStock: false };
     }
 
-    // 1. Doğrudan ÜRÜN KODU Eşleşmesi (Örn: "KGMLW-M" veya "KGMLW-M var mı?")
+    // 1. Doğrudan ÜRÜN KODU Eşleşmesi
     let match = rows.find(r => r.productCode.toUpperCase() === rawQuery || rawQuery.includes(r.productCode.toUpperCase()));
 
-    // 2. Kısa Kod + Beden ayrıştırma (Örn: "KGMLW M" veya "KGMLW L")
+    // 2. Kısa Kod + Beden ayrıştırma
     if (!match) {
       match = rows.find(r => {
         const pattern1 = `${r.shortCode}-${r.size}`.toUpperCase();
@@ -63,7 +89,7 @@ export class StockService {
       });
     }
 
-    // 3. Kısa Kod Eşleşmesi (Örn: "KGMLW") -> Mevcut tüm bedenleri ve stok durumunu kontrol et
+    // 3. Kısa Kod Eşleşmesi
     if (!match) {
       const shortMatch = rows.find(r => rawQuery.includes(r.shortCode.toUpperCase()));
       if (shortMatch) {
@@ -84,7 +110,7 @@ export class StockService {
       }
     }
 
-    // 4. İsim İle Arama (Örn: "KUMAŞ GÖMLEK")
+    // 4. İsim İle Arama
     if (!match) {
       match = rows.find(r => r.name.toUpperCase().includes(rawQuery) || rawQuery.includes(r.name.toUpperCase()));
     }
@@ -106,12 +132,29 @@ export class StockService {
   }
 
   /**
-   * Stok Eksiltme (Sipariş Gerçekleştiğinde: -quantity)
+   * Stok Eksiltme (Mağazaya Özel)
    */
-  public static async deductStock(productCode: string, quantity: number, size?: string): Promise<boolean> {
+  public static async deductStock(storeId: number, productCode: string, quantity: number, size?: string): Promise<boolean>;
+  public static async deductStock(productCode: string, quantity: number, size?: string): Promise<boolean>;
+  public static async deductStock(storeIdOrCode: any, quantityOrCode?: any, sizeOrQty?: any, size?: string): Promise<boolean> {
+    let storeId: number;
+    let productCode: string;
+    let quantity: number;
+    let targetSize: string;
+
+    if (typeof storeIdOrCode === 'number') {
+      storeId = storeIdOrCode;
+      productCode = String(quantityOrCode || '');
+      quantity = Number(sizeOrQty) || 1;
+      targetSize = size ? size.trim().toUpperCase() : '';
+    } else {
+      this.validateStoreId(undefined); // Throws Error
+      return false;
+    }
+
+    this.validateStoreId(storeId);
     try {
       const targetCode = productCode.trim().toUpperCase();
-      const targetSize = size ? size.trim().toUpperCase() : '';
 
       let stmt;
       let result;
@@ -120,49 +163,76 @@ export class StockService {
         stmt = db.prepare(`
           UPDATE products
           SET stock = MAX(0, stock - ?), updated_at = CURRENT_TIMESTAMP
-          WHERE UPPER(product_code) = ? OR (UPPER(short_code) = ? AND UPPER(size) = ?)
+          WHERE store_id = ? AND (UPPER(product_code) = ? OR (UPPER(short_code) = ? AND UPPER(size) = ?))
         `);
         const parts = targetCode.split('-');
-        result = stmt.run(quantity, targetCode, parts[0], parts[1] || targetSize);
+        result = stmt.run(quantity, storeId, targetCode, parts[0], parts[1] || targetSize);
       } else if (targetSize) {
         const fullCode = `${targetCode}-${targetSize}`;
         stmt = db.prepare(`
           UPDATE products
           SET stock = MAX(0, stock - ?), updated_at = CURRENT_TIMESTAMP
-          WHERE UPPER(product_code) = ? OR (UPPER(short_code) = ? AND UPPER(size) = ?)
+          WHERE store_id = ? AND (UPPER(product_code) = ? OR (UPPER(short_code) = ? AND UPPER(size) = ?))
         `);
-        result = stmt.run(quantity, fullCode, targetCode, targetSize);
+        result = stmt.run(quantity, storeId, fullCode, targetCode, targetSize);
       } else {
         stmt = db.prepare(`
           UPDATE products
           SET stock = MAX(0, stock - ?), updated_at = CURRENT_TIMESTAMP
-          WHERE UPPER(product_code) = ? OR UPPER(short_code) = ?
+          WHERE store_id = ? AND (UPPER(product_code) = ? OR UPPER(short_code) = ?)
         `);
-        result = stmt.run(quantity, targetCode, targetCode);
+        result = stmt.run(quantity, storeId, targetCode, targetCode);
       }
 
-      console.log(`[StockService SQLite] 📦 Stok Düşüldü (${targetCode}): -${quantity} (Etkilenen Satır: ${result.changes})`);
+      // Synchronize inventory table
+      try {
+        db.prepare(`
+          UPDATE inventory 
+          SET stock = MAX(0, stock - ?), updated_at = CURRENT_TIMESTAMP 
+          WHERE store_id = ? AND UPPER(product_code) = ?
+        `).run(quantity, storeId, targetCode);
+      } catch (e) {}
 
-      // Google Sheets Senkronizasyonu
-      const updatedProd = db.prepare(`SELECT stock, product_code FROM products WHERE UPPER(product_code) = ? OR UPPER(short_code) = ?`).get(targetCode, targetCode) as any;
-      if (updatedProd && updatedProd.stock !== undefined) {
-        GoogleSheetsService.updateProductStock(updatedProd.product_code || targetCode, updatedProd.stock).catch(() => {});
+      console.log(`[StockService SQLite] 📦 Stok Düşüldü (Store: ${storeId}, ${targetCode}): -${quantity} (Etkilenen Satır: ${result.changes})`);
+
+      if (storeId === 1) {
+        const updatedProd = db.prepare(`SELECT stock, product_code FROM products WHERE store_id = 1 AND (UPPER(product_code) = ? OR UPPER(short_code) = ?)`).get(targetCode, targetCode) as any;
+        if (updatedProd && updatedProd.stock !== undefined) {
+          GoogleSheetsService.updateProductStock(updatedProd.product_code || targetCode, updatedProd.stock).catch(() => {});
+        }
       }
 
       return result.changes > 0;
     } catch (e: any) {
-      console.error('[StockService SQLite] ❌ Stok düşülemedi:', e.message);
+      console.error(`[StockService SQLite] ❌ Stok düşülemedi (Store: ${storeId}):`, e.message);
       return false;
     }
   }
 
   /**
-   * Stok İade Etme / Artırma (Sipariş Reddedildiğinde / İptal Edildiğinde: +quantity)
+   * Stok İade Etme / Artırma (Mağazaya Özel)
    */
-  public static async restoreStock(productCode: string, quantity: number, size?: string): Promise<boolean> {
+  public static async restoreStock(storeId: number, productCode: string, quantity: number, size?: string): Promise<boolean>;
+  public static async restoreStock(productCode: string, quantity: number, size?: string): Promise<boolean>;
+  public static async restoreStock(storeIdOrCode: any, quantityOrCode?: any, sizeOrQty?: any, size?: string): Promise<boolean> {
+    let storeId: number;
+    let productCode: string;
+    let quantity: number;
+    let targetSize: string;
+
+    if (typeof storeIdOrCode === 'number') {
+      storeId = storeIdOrCode;
+      productCode = String(quantityOrCode || '');
+      quantity = Number(sizeOrQty) || 1;
+      targetSize = size ? size.trim().toUpperCase() : '';
+    } else {
+      this.validateStoreId(undefined); // Throws Error
+      return false;
+    }
+
+    this.validateStoreId(storeId);
     try {
       const targetCode = productCode.trim().toUpperCase();
-      const targetSize = size ? size.trim().toUpperCase() : '';
 
       let stmt;
       let result;
@@ -171,46 +241,57 @@ export class StockService {
         stmt = db.prepare(`
           UPDATE products
           SET stock = stock + ?, updated_at = CURRENT_TIMESTAMP
-          WHERE UPPER(product_code) = ? OR (UPPER(short_code) = ? AND UPPER(size) = ?)
+          WHERE store_id = ? AND (UPPER(product_code) = ? OR (UPPER(short_code) = ? AND UPPER(size) = ?))
         `);
         const parts = targetCode.split('-');
-        result = stmt.run(quantity, targetCode, parts[0], parts[1] || targetSize);
+        result = stmt.run(quantity, storeId, targetCode, parts[0], parts[1] || targetSize);
       } else if (targetSize) {
         const fullCode = `${targetCode}-${targetSize}`;
         stmt = db.prepare(`
           UPDATE products
           SET stock = stock + ?, updated_at = CURRENT_TIMESTAMP
-          WHERE UPPER(product_code) = ? OR (UPPER(short_code) = ? AND UPPER(size) = ?)
+          WHERE store_id = ? AND (UPPER(product_code) = ? OR (UPPER(short_code) = ? AND UPPER(size) = ?))
         `);
-        result = stmt.run(quantity, fullCode, targetCode, targetSize);
+        result = stmt.run(quantity, storeId, fullCode, targetCode, targetSize);
       } else {
         stmt = db.prepare(`
           UPDATE products
           SET stock = stock + ?, updated_at = CURRENT_TIMESTAMP
-          WHERE UPPER(product_code) = ? OR UPPER(short_code) = ?
+          WHERE store_id = ? AND (UPPER(product_code) = ? OR UPPER(short_code) = ?)
         `);
-        result = stmt.run(quantity, targetCode, targetCode);
+        result = stmt.run(quantity, storeId, targetCode, targetCode);
       }
 
-      console.log(`[StockService SQLite] 🔄 Stok İade Edildi (${targetCode}): +${quantity} (Etkilenen Satır: ${result.changes})`);
+      // Synchronize inventory table
+      try {
+        db.prepare(`
+          UPDATE inventory 
+          SET stock = stock + ?, updated_at = CURRENT_TIMESTAMP 
+          WHERE store_id = ? AND UPPER(product_code) = ?
+        `).run(quantity, storeId, targetCode);
+      } catch (e) {}
 
-      // Google Sheets Senkronizasyonu
-      const updatedProd = db.prepare(`SELECT stock, product_code FROM products WHERE UPPER(product_code) = ? OR UPPER(short_code) = ?`).get(targetCode, targetCode) as any;
-      if (updatedProd && updatedProd.stock !== undefined) {
-        GoogleSheetsService.updateProductStock(updatedProd.product_code || targetCode, updatedProd.stock).catch(() => {});
+      console.log(`[StockService SQLite] 🔄 Stok İade Edildi (Store: ${storeId}, ${targetCode}): +${quantity}`);
+
+      if (storeId === 1) {
+        const updatedProd = db.prepare(`SELECT stock, product_code FROM products WHERE store_id = 1 AND (UPPER(product_code) = ? OR UPPER(short_code) = ?)`).get(targetCode, targetCode) as any;
+        if (updatedProd && updatedProd.stock !== undefined) {
+          GoogleSheetsService.updateProductStock(updatedProd.product_code || targetCode, updatedProd.stock).catch(() => {});
+        }
       }
 
       return result.changes > 0;
     } catch (e: any) {
-      console.error('[StockService SQLite] ❌ Stok iade edilemedi:', e.message);
+      console.error(`[StockService SQLite] ❌ Stok iade edilemedi (Store: ${storeId}):`, e.message);
       return false;
     }
   }
 
   /**
-   * SQLite Veritabanına Yeni Ürün Ekler veya Günceller
+   * SQLite Veritabanına Yeni Ürün Ekler veya Günceller (Store ID Zorunlu)
    */
   public static async addProduct(data: {
+    storeId?: number;
     shortCode: string;
     productCode?: string;
     name: string;
@@ -220,29 +301,30 @@ export class StockService {
     price?: number;
     category?: string;
     storeName?: string;
-    storeId?: number;
-  }): Promise<{ success: boolean; productCode: string }> {
+  }): Promise<{ success: boolean; productCode: string }>;
+  public static async addProduct(data: any): Promise<{ success: boolean; productCode: string }> {
+    this.validateStoreId(data?.storeId);
     try {
-      const shortCode = data.shortCode.trim().toUpperCase();
-      const size = data.size.trim().toUpperCase();
+      const storeId = data.storeId;
+      const shortCode = String(data.shortCode || '').trim().toUpperCase();
+      const size = String(data.size || '').trim().toUpperCase();
       const productCode = data.productCode && data.productCode.trim() !== '' 
         ? data.productCode.trim().toUpperCase() 
         : `${shortCode}-${size}`;
-      const name = data.name.trim();
+      const name = String(data.name || '').trim();
       const color = (data.color || 'Standart').trim();
       const stock = Math.max(0, Number(data.stock) || 0);
       const price = Number(data.price) || 299;
       const category = (data.category || 'Genel').trim();
       const storeName = (data.storeName || '').trim();
-      const storeId = data.storeId || 1;
 
-      const existing = db.prepare('SELECT id FROM products WHERE product_code = ? OR (short_code = ? AND size = ?)').get(productCode, shortCode, size) as any;
+      const existing = db.prepare('SELECT id FROM products WHERE store_id = ? AND (product_code = ? OR (short_code = ? AND size = ?))').get(storeId, productCode, shortCode, size) as any;
 
       if (existing) {
         db.prepare(`
           UPDATE products 
-          SET name = ?, color = ?, size = ?, stock = ?, price = ?, category = ?, store_name = ?, store_id = ?, updated_at = CURRENT_TIMESTAMP
-          WHERE id = ?
+          SET name = ?, color = ?, size = ?, stock = ?, price = ?, category = ?, store_name = ?, updated_at = CURRENT_TIMESTAMP
+          WHERE store_id = ? AND id = ?
         `).run(name, color, size, stock, price, category, storeName, storeId, existing.id);
       } else {
         db.prepare(`
@@ -251,52 +333,111 @@ export class StockService {
         `).run(shortCode, productCode, name, color, size, stock, price, category, storeName, storeId);
       }
 
-      console.log(`[StockService SQLite] ✅ Ürün eklendi/güncellendi: ${productCode} (Stok: ${stock}, Fiyat: ${price} TL)`);
+      // Synchronize inventory table
+      try {
+        let inv = db.prepare('SELECT id FROM inventory WHERE store_id = ? AND product_code = ?').get(storeId, productCode) as any;
+        if (inv) {
+          db.prepare('UPDATE inventory SET stock = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(stock, inv.id);
+        } else {
+          db.prepare('INSERT INTO inventory (store_id, product_code, stock, reserved_stock, updated_at) VALUES (?, ?, ?, 0, CURRENT_TIMESTAMP)').run(storeId, productCode, stock);
+        }
+      } catch (e) {}
+
+      console.log(`[StockService SQLite] ✅ Ürün eklendi/güncellendi (Store: ${storeId}): ${productCode} (Stok: ${stock}, Fiyat: ${price} TL)`);
       return { success: true, productCode };
     } catch (e: any) {
-      console.error('[StockService SQLite] ❌ Ürün eklenemedi:', e.message);
+      console.error(`[StockService SQLite] ❌ Ürün eklenemedi:`, e.message);
       return { success: false, productCode: data.productCode || data.shortCode };
     }
   }
 
   /**
-   * SQLite Veritabanından Ürün Siler
+   * SQLite Veritabanından Ürün Siler (Mağazaya Özel)
    */
-  public static async deleteProduct(productCode: string): Promise<boolean> {
-    try {
-      const stmt = db.prepare(`DELETE FROM products WHERE product_code = ? OR short_code = ?`);
-      const target = productCode.trim().toUpperCase();
-      const res = stmt.run(target, target);
-      console.log(`[StockService SQLite] 🗑️ Ürün silindi: ${target}`);
+  public static async deleteProduct(storeId: number, productCode: string): Promise<boolean>;
+  public static async deleteProduct(productCode: string): Promise<boolean>;
+  public static async deleteProduct(storeIdOrCode: any, productCode?: string): Promise<boolean> {
+    let storeId: number;
+    let targetCode: string;
 
-      // Google Sheets Senkronizasyonu
-      GoogleSheetsService.deleteProductRow(target).catch(() => {});
+    if (typeof storeIdOrCode === 'number') {
+      storeId = storeIdOrCode;
+      targetCode = String(productCode || '');
+    } else {
+      this.validateStoreId(undefined); // Throws Error
+      return false;
+    }
+
+    this.validateStoreId(storeId);
+    try {
+      const target = targetCode.trim().toUpperCase();
+      const stmt = db.prepare(`DELETE FROM products WHERE store_id = ? AND (product_code = ? OR short_code = ?)`);
+      const res = stmt.run(storeId, target, target);
+
+      // Synchronize inventory table
+      try {
+        db.prepare(`DELETE FROM inventory WHERE store_id = ? AND (product_code = ? OR product_code LIKE ?)`).run(storeId, target, `${target}-%`);
+      } catch (e) {}
+
+      console.log(`[StockService SQLite] 🗑️ Ürün silindi (Store: ${storeId}): ${target}`);
+
+      if (storeId === 1) {
+        GoogleSheetsService.deleteProductRow(target).catch(() => {});
+      }
       return res.changes > 0;
     } catch (e: any) {
-      console.error('[StockService SQLite] ❌ Ürün silinemedi:', e.message);
+      console.error(`[StockService SQLite] ❌ Ürün silinemedi (Store: ${storeId}):`, e.message);
       return false;
     }
   }
 
   /**
-   * SQLite Veritabanında Ürün Stok Miktarını Günceller
+   * SQLite Veritabanında Ürün Stok Miktarını Günceller (Mağazaya Özel)
    */
-  public static async updateStock(productCode: string, newStock: number): Promise<boolean> {
+  public static async updateStock(storeId: number, productCode: string, newStock: number): Promise<boolean>;
+  public static async updateStock(productCode: string, newStock: number): Promise<boolean>;
+  public static async updateStock(storeIdOrCode: any, productCodeOrStock?: any, newStock?: number): Promise<boolean> {
+    let storeId: number;
+    let targetCode: string;
+    let stockNum: number;
+
+    if (typeof storeIdOrCode === 'number') {
+      storeId = storeIdOrCode;
+      targetCode = String(productCodeOrStock || '');
+      stockNum = Number(newStock) || 0;
+    } else {
+      this.validateStoreId(undefined); // Throws Error
+      return false;
+    }
+
+    this.validateStoreId(storeId);
     try {
+      const target = targetCode.trim().toUpperCase();
       const stmt = db.prepare(`
         UPDATE products
         SET stock = ?, updated_at = CURRENT_TIMESTAMP
-        WHERE product_code = ? OR short_code = ?
+        WHERE store_id = ? AND (product_code = ? OR short_code = ?)
       `);
-      const target = productCode.trim().toUpperCase();
-      const res = stmt.run(Number(newStock), target, target);
-      console.log(`[StockService SQLite] 📦 Ürün (${target}) Stoğu Güncellendi: ${newStock}`);
+      const res = stmt.run(stockNum, storeId, target, target);
 
-      // Google Sheets Senkronizasyonu
-      GoogleSheetsService.updateProductStock(target, Number(newStock)).catch(() => {});
+      // Synchronize inventory table
+      try {
+        let inv = db.prepare('SELECT id FROM inventory WHERE store_id = ? AND product_code = ?').get(storeId, target) as any;
+        if (inv) {
+          db.prepare('UPDATE inventory SET stock = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(stockNum, inv.id);
+        } else {
+          db.prepare('INSERT INTO inventory (store_id, product_code, stock, reserved_stock, updated_at) VALUES (?, ?, ?, 0, CURRENT_TIMESTAMP)').run(storeId, target, stockNum);
+        }
+      } catch (e) {}
+
+      console.log(`[StockService SQLite] 📦 Ürün (${target}) Stoğu Güncellendi (Store: ${storeId}): ${stockNum}`);
+
+      if (storeId === 1) {
+        GoogleSheetsService.updateProductStock(target, stockNum).catch(() => {});
+      }
       return res.changes > 0;
     } catch (e: any) {
-      console.error('[StockService SQLite] ❌ Ürün stoğu güncellenemedi:', e.message);
+      console.error(`[StockService SQLite] ❌ Ürün stoğu güncellenemedi (Store: ${storeId}):`, e.message);
       return false;
     }
   }
