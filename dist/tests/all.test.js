@@ -10,7 +10,7 @@ const webhook_controller_1 = require("../controllers/webhook.controller");
 const auth_middleware_1 = require("../middleware/auth.middleware");
 const db_1 = require("../database/db");
 async function runTestSuite() {
-    console.log('🧪 Starting ISC Works Master Admin & Master Security Test Suite...\n');
+    console.log('🧪 Starting ISC Works Master Admin & Master Security & Stock Test Suite...\n');
     let passed = 0;
     let failed = 0;
     function assert(condition, testName) {
@@ -207,7 +207,39 @@ async function runTestSuite() {
     const evtStoreB = webhook_controller_1.WebhookController.isDuplicateEvent('evt_attack_001', 200);
     const evtStoreARepeat = webhook_controller_1.WebhookController.isDuplicateEvent('evt_attack_001', 100);
     assert(evtStoreA === false && evtStoreB === false && evtStoreARepeat === true, 'Event idempotency tracks event_id scoped strictly by tenant store_id');
-    console.log(`\n📊 MASTER SECURITY & WEBHOOK ISOLATION TEST SUMMARY: Passed: ${passed} | Failed: ${failed}`);
+    // 7. STOCK BUG FIX TESTS (ADD, SET, ISOLATION, COLLISION & SANITATION)
+    console.log('\n2️⃣7️⃣ STOCK BUG FIX TEST 1: Stock Add (+5 from 10 -> 15)');
+    await stock_service_1.StockService.addProduct({ storeId: 100, shortCode: 'TST', productCode: 'TEST-STOCK', name: 'Test Product', size: 'M', stock: 10, price: 200 });
+    const updateSuccess1 = await stock_service_1.StockService.updateStock(100, 'TEST-STOCK', 15);
+    const prodRow1 = db_1.db.prepare("SELECT stock FROM products WHERE store_id = 100 AND product_code = 'TEST-STOCK'").get();
+    const invRow1 = db_1.db.prepare("SELECT stock FROM inventory WHERE store_id = 100 AND product_code = 'TEST-STOCK'").get();
+    assert(updateSuccess1 === true && prodRow1?.stock === 15 && invRow1?.stock === 15, 'Stock updated to 15 in both products and inventory tables');
+    console.log('\n2️⃣8️⃣ STOCK BUG FIX TEST 2: Stock Set (10 -> 25) & Read After Write');
+    const updateSuccess2 = await stock_service_1.StockService.updateStock(100, 'TEST-STOCK', 25);
+    const stockCheck2 = await stock_service_1.StockService.checkStock(100, 'TEST-STOCK');
+    assert(updateSuccess2 === true && stockCheck2.exists && stockCheck2.product?.stock === 25, 'Read After Write retrieves updated stock=25');
+    console.log('\n2️⃣9️⃣ STOCK BUG FIX TEST 3: Store A / Store B Stock Update Isolation');
+    await stock_service_1.StockService.addProduct({ storeId: 200, shortCode: 'TST', productCode: 'TEST-STOCK', name: 'Test Product B', size: 'M', stock: 50, price: 200 });
+    await stock_service_1.StockService.updateStock(100, 'TEST-STOCK', 30);
+    const storeAStock = db_1.db.prepare("SELECT stock FROM products WHERE store_id = 100 AND product_code = 'TEST-STOCK'").get().stock;
+    const storeBStock = db_1.db.prepare("SELECT stock FROM products WHERE store_id = 200 AND product_code = 'TEST-STOCK'").get().stock;
+    assert(storeAStock === 30 && storeBStock === 50, 'Store A stock updated to 30 while Store B stock remains strictly isolated at 50');
+    console.log('\n3️⃣0️⃣ STOCK BUG FIX TEST 4: Product Code Collision Test (ABC-M)');
+    await stock_service_1.StockService.addProduct({ storeId: 100, shortCode: 'ABC', productCode: 'ABC-M', name: 'Shirt A', size: 'M', stock: 10, price: 300 });
+    await stock_service_1.StockService.addProduct({ storeId: 200, shortCode: 'ABC', productCode: 'ABC-M', name: 'Shirt B', size: 'M', stock: 100, price: 300 });
+    await stock_service_1.StockService.updateStock(100, 'ABC-M', 20);
+    const abcStoreA = db_1.db.prepare("SELECT stock FROM products WHERE store_id = 100 AND product_code = 'ABC-M'").get().stock;
+    const abcStoreB = db_1.db.prepare("SELECT stock FROM products WHERE store_id = 200 AND product_code = 'ABC-M'").get().stock;
+    assert(abcStoreA === 20 && abcStoreB === 100, 'Updating ABC-M for Store 100 changes Store 100 to 20 while Store 200 remains 100');
+    console.log('\n3️⃣1️⃣ STOCK BUG FIX TEST 5: Invalid Quantity Sanitation & Handling');
+    const invalidNeg = await stock_service_1.StockService.updateStock(100, 'TEST-STOCK', -10);
+    const invalidNaN = await stock_service_1.StockService.updateStock(100, 'TEST-STOCK', NaN);
+    const currentStockAfterInvalid = db_1.db.prepare("SELECT stock FROM products WHERE store_id = 100 AND product_code = 'TEST-STOCK'").get().stock;
+    assert(currentStockAfterInvalid === 30, 'Invalid quantity inputs (-10, NaN) do not pollute or corrupt database stock');
+    console.log('\n3️⃣2️⃣ STOCK BUG FIX TEST 6: False Success Prevention on Non-Existent Product');
+    const nonExistentResult = await stock_service_1.StockService.updateStock(100, 'NON-EXISTENT-CODE-999', 50);
+    assert(nonExistentResult === false, 'Updating non-existent product returns false (HTTP 404), preventing false-success bug');
+    console.log(`\n📊 MASTER SECURITY & STOCK BUG FIX TEST SUMMARY: Passed: ${passed} | Failed: ${failed}`);
     if (failed > 0) {
         process.exit(1);
     }

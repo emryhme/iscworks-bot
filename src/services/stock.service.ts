@@ -404,14 +404,20 @@ export class StockService {
 
     if (typeof storeIdOrCode === 'number') {
       storeId = storeIdOrCode;
-      targetCode = String(productCodeOrStock || '');
-      stockNum = Number(newStock) || 0;
+      targetCode = String(productCodeOrStock || '').trim().toUpperCase();
+      stockNum = Number(newStock);
     } else {
       this.validateStoreId(undefined); // Throws Error
       return false;
     }
 
     this.validateStoreId(storeId);
+
+    if (isNaN(stockNum) || stockNum < 0) {
+      console.warn(`[StockService SQLite] ❌ Geçersiz stok miktarı (Store: ${storeId}): ${newStock}`);
+      return false;
+    }
+
     try {
       const target = targetCode.trim().toUpperCase();
       const stmt = db.prepare(`
@@ -421,9 +427,13 @@ export class StockService {
       `);
       const res = stmt.run(stockNum, storeId, target, target);
 
+      if (res.changes === 0) {
+        return false;
+      }
+
       // Synchronize inventory table
       try {
-        let inv = db.prepare('SELECT id FROM inventory WHERE store_id = ? AND product_code = ?').get(storeId, target) as any;
+        let inv = db.prepare('SELECT id FROM inventory WHERE store_id = ? AND UPPER(product_code) = ?').get(storeId, target) as any;
         if (inv) {
           db.prepare('UPDATE inventory SET stock = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(stockNum, inv.id);
         } else {

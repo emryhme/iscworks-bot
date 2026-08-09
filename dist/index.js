@@ -650,29 +650,47 @@ app.post('/api/products/bulk-update', auth_middleware_1.AuthMiddleware.authentic
         if (!Array.isArray(updates) || updates.length === 0) {
             return res.status(400).json({ success: false, error: 'Güncellenecek veri listesi boş veya geçersiz.' });
         }
-        const updatePriceStmt = db_1.db.prepare('UPDATE products SET price = ?, updated_at = CURRENT_TIMESTAMP WHERE store_id = ? AND (product_code = ? OR short_code = ?)');
-        const updateStockStmt = db_1.db.prepare('UPDATE products SET stock = ?, updated_at = CURRENT_TIMESTAMP WHERE store_id = ? AND (product_code = ? OR short_code = ?)');
+        const updatePriceStmt = db_1.db.prepare('UPDATE products SET price = ?, updated_at = CURRENT_TIMESTAMP WHERE store_id = ? AND product_code = ?');
+        const updateStockStmt = db_1.db.prepare('UPDATE products SET stock = ?, updated_at = CURRENT_TIMESTAMP WHERE store_id = ? AND product_code = ?');
         let updatedCount = 0;
         const bulkTransaction = db_1.db.transaction((items) => {
             for (const item of items) {
                 if (item.productCode) {
-                    if (item.price !== undefined && !isNaN(Number(item.price))) {
-                        updatePriceStmt.run(Number(item.price), storeId, item.productCode, item.productCode);
-                        updatedCount++;
+                    const cleanCode = String(item.productCode).trim().toUpperCase();
+                    if (item.price !== undefined && !isNaN(Number(item.price)) && Number(item.price) >= 0) {
+                        const resPrice = updatePriceStmt.run(Number(item.price), storeId, cleanCode);
+                        if (resPrice.changes > 0)
+                            updatedCount++;
                     }
-                    if (item.stock !== undefined && !isNaN(Number(item.stock))) {
-                        updateStockStmt.run(Number(item.stock), storeId, item.productCode, item.productCode);
-                        updatedCount++;
+                    if (item.stock !== undefined && !isNaN(Number(item.stock)) && Number(item.stock) >= 0) {
+                        const stockNum = Number(item.stock);
+                        const resStock = updateStockStmt.run(stockNum, storeId, cleanCode);
+                        if (resStock.changes > 0) {
+                            updatedCount++;
+                            try {
+                                let inv = db_1.db.prepare('SELECT id FROM inventory WHERE store_id = ? AND UPPER(product_code) = ?').get(storeId, cleanCode);
+                                if (inv) {
+                                    db_1.db.prepare('UPDATE inventory SET stock = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(stockNum, inv.id);
+                                }
+                                else {
+                                    db_1.db.prepare('INSERT INTO inventory (store_id, product_code, stock, reserved_stock, updated_at) VALUES (?, ?, ?, 0, CURRENT_TIMESTAMP)').run(storeId, cleanCode, stockNum);
+                                }
+                            }
+                            catch (e) { }
+                        }
                     }
                 }
             }
         });
         bulkTransaction(updates);
         auth_middleware_1.AuthMiddleware.logAudit(storeId, req.auth.userId, 'BULK_UPDATE_PRODUCTS', 'products', `${updates.length} items`);
-        res.json({ success: true, message: `${updates.length} adet ürünün fiyat ve stok verileri başarıyla kaydedildi!`, updatedCount });
+        if (updatedCount === 0) {
+            return res.status(404).json({ success: false, error: 'Belirtilen ürünler bu mağazada bulunamadı veya güncelleme yapılamadı.' });
+        }
+        return res.json({ success: true, message: `${updatedCount} adet güncelleme başarıyla kaydedildi!`, updatedCount });
     }
     catch (e) {
-        res.status(500).json({ success: false, error: e.message });
+        return res.status(500).json({ success: false, error: e.message });
     }
 });
 app.post('/api/products/delete', auth_middleware_1.AuthMiddleware.authenticate, auth_middleware_1.AuthMiddleware.requireRole(['OWNER', 'ADMIN']), async (req, res) => {
@@ -685,14 +703,14 @@ app.post('/api/products/delete', auth_middleware_1.AuthMiddleware.authenticate, 
         const success = await stock_service_1.StockService.deleteProduct(storeId, productCode);
         if (success) {
             auth_middleware_1.AuthMiddleware.logAudit(storeId, req.auth.userId, 'DELETE_PRODUCT', 'products', productCode);
-            res.json({ success: true, message: `Ürün (${productCode}) silindi.` });
+            return res.json({ success: true, message: `Ürün (${productCode}) silindi.` });
         }
         else {
-            res.status(500).json({ success: false, error: 'Ürün silinemedi veya bulunamadı.' });
+            return res.status(404).json({ success: false, error: 'Ürün bu mağazada bulunamadı veya silinemedi.' });
         }
     }
     catch (err) {
-        res.status(500).json({ success: false, error: err.message || 'Sunucu hatası' });
+        return res.status(500).json({ success: false, error: err.message || 'Sunucu hatası' });
     }
 });
 app.post('/api/products/update-stock', auth_middleware_1.AuthMiddleware.authenticate, auth_middleware_1.AuthMiddleware.requireRole(['OWNER', 'ADMIN', 'MANAGER']), async (req, res) => {
@@ -702,17 +720,21 @@ app.post('/api/products/update-stock', auth_middleware_1.AuthMiddleware.authenti
         if (!productCode || newStock === undefined || newStock === null) {
             return res.status(400).json({ success: false, error: 'productCode ve newStock parametreleri gereklidir' });
         }
-        const success = await stock_service_1.StockService.updateStock(storeId, productCode, Number(newStock));
+        const numStock = Number(newStock);
+        if (isNaN(numStock) || numStock < 0) {
+            return res.status(400).json({ success: false, error: 'Geçersiz stok miktarı. Stok 0 veya pozitif bir sayı olmalıdır.' });
+        }
+        const success = await stock_service_1.StockService.updateStock(storeId, String(productCode), numStock);
         if (success) {
-            auth_middleware_1.AuthMiddleware.logAudit(storeId, req.auth.userId, 'UPDATE_STOCK', 'products', productCode, '', String(newStock));
-            res.json({ success: true, message: `Ürün (${productCode}) stoğu ${newStock} olarak güncellendi.`, productCode, newStock: Number(newStock) });
+            auth_middleware_1.AuthMiddleware.logAudit(storeId, req.auth.userId, 'UPDATE_STOCK', 'products', String(productCode), '', String(numStock));
+            return res.json({ success: true, message: `Ürün (${productCode}) stoğu ${numStock} olarak güncellendi.`, productCode, stock: numStock });
         }
         else {
-            res.status(500).json({ success: false, error: 'Ürün stoğu güncellenemedi.' });
+            return res.status(404).json({ success: false, error: 'Ürün bu mağazada bulunamadı veya stok güncellenemedi.' });
         }
     }
     catch (err) {
-        res.status(500).json({ success: false, error: err.message || 'Sunucu hatası' });
+        return res.status(500).json({ success: false, error: err.message || 'Sunucu hatası' });
     }
 });
 // --- ORDERS ---

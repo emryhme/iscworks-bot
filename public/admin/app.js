@@ -813,20 +813,20 @@ function renderProductsTable() {
         <td><span class="size-pill">${escapeHtml(p.size || '-')}</span></td>
         <td>
           <div style="display:flex; align-items:center; gap:4px;">
-            <input type="number" id="stock_${escapeHtml(p.productCode)}" value="${stock}" style="width:65px; padding:4px 6px; border-radius:6px; border:1px solid #475569; background:#0f172a; color:#f8fafc; font-weight:600;" />
+            <input type="number" id="stock_${escapeHtml(p.productCode)}" value="${stock}" min="0" onkeydown="if(event.key==='Enter') saveProductRow('${escapeHtml(p.productCode)}')" style="width:65px; padding:4px 6px; border-radius:6px; border:1px solid #475569; background:#0f172a; color:#f8fafc; font-weight:600;" />
             ${stockBadge}
           </div>
         </td>
         <td>
           <div style="display:flex; align-items:center; gap:4px;">
-            <input type="number" id="price_${escapeHtml(p.productCode)}" value="${p.price || 299}" style="width:75px; padding:4px 6px; border-radius:6px; border:1px solid #475569; background:#0f172a; color:#4ade80; font-weight:700;" />
+            <input type="number" id="price_${escapeHtml(p.productCode)}" value="${p.price || 299}" min="0" onkeydown="if(event.key==='Enter') saveProductRow('${escapeHtml(p.productCode)}')" style="width:75px; padding:4px 6px; border-radius:6px; border:1px solid #475569; background:#0f172a; color:#4ade80; font-weight:700;" />
           </div>
         </td>
         <td><small class="text-muted">${escapeHtml(p.category || '-')}</small></td>
         <td>
           <div class="action-btn-group">
-            <button class="btn btn-sm btn-stock" onclick="updateProductPrice('${escapeHtml(p.productCode)}')">
-              <i class="fa-solid fa-floppy-disk"></i> Fiyat Kaydet
+            <button class="btn btn-sm btn-stock" onclick="saveProductRow('${escapeHtml(p.productCode)}')">
+              <i class="fa-solid fa-floppy-disk"></i> Kaydet
             </button>
             <button class="btn btn-sm btn-delete" onclick="deleteProduct('${escapeHtml(p.productCode)}')">
               <i class="fa-solid fa-trash-can"></i> Sil
@@ -838,7 +838,73 @@ function renderProductsTable() {
   }).join('');
 }
 
-// Tüm Ürün Fiyat ve Stoklarını Toplu Kaydet (Bulk Save)
+// Ürün Satırını (Stok & Fiyat) Birlikte Kaydet (API via apiFetch)
+async function saveProductRow(productCode) {
+  const priceInput = document.getElementById(`price_${productCode}`);
+  const stockInput = document.getElementById(`stock_${productCode}`);
+
+  const priceVal = priceInput ? Number(priceInput.value) : undefined;
+  const stockVal = stockInput ? Number(stockInput.value) : undefined;
+
+  if (priceVal !== undefined && (isNaN(priceVal) || priceVal < 0)) {
+    showToast('Geçersiz fiyat girdiniz.', 'error');
+    return;
+  }
+  if (stockVal !== undefined && (isNaN(stockVal) || stockVal < 0)) {
+    showToast('Geçersiz stok girdiniz. Stok 0 veya daha büyük bir sayı olmalıdır.', 'error');
+    return;
+  }
+
+  try {
+    const updates = [{
+      productCode,
+      ...(priceVal !== undefined ? { price: priceVal } : {}),
+      ...(stockVal !== undefined ? { stock: stockVal } : {})
+    }];
+
+    const data = await apiFetch('/api/products/bulk-update', {
+      method: 'POST',
+      body: JSON.stringify({ updates })
+    });
+
+    if (data && data.success) {
+      showToast(`✅ ${productCode} stok ve fiyat verileri kaydedildi!`, 'success');
+      fetchData();
+    } else {
+      showToast(data?.error || 'Güncelleme kaydedilemedi.', 'error');
+    }
+  } catch (e) {
+    showToast(e.message || 'Güncelleme kaydedilirken sunucu hatası oluştu.', 'error');
+  }
+}
+
+// Ürün Stoğu Güncelleme (API via apiFetch)
+async function updateProductStock(productCode) {
+  const stockInput = document.getElementById(`stock_${productCode}`);
+  if (!stockInput) return;
+  const newStock = Number(stockInput.value);
+  if (isNaN(newStock) || newStock < 0) {
+    showToast('Geçersiz stok miktarı girdiniz. Stok 0 veya pozitif olmalıdır.', 'error');
+    return;
+  }
+
+  try {
+    const data = await apiFetch('/api/products/update-stock', {
+      method: 'POST',
+      body: JSON.stringify({ productCode, newStock })
+    });
+    if (data && data.success) {
+      showToast(`✅ ${productCode} stoğu ${data.stock !== undefined ? data.stock : newStock} olarak güncellendi.`, 'success');
+      fetchData();
+    } else {
+      showToast(data?.error || 'Stok güncellenemedi.', 'error');
+    }
+  } catch (e) {
+    showToast(e.message || 'Stok güncellenirken sunucu hatası oluştu.', 'error');
+  }
+}
+
+// Tüm Ürün Fiyat ve Stoklarını Toplu Kaydet (Bulk Save via apiFetch)
 async function saveAllPricesAndStocks() {
   const updates = [];
 
@@ -876,24 +942,22 @@ async function saveAllPricesAndStocks() {
   }
 
   try {
-    const res = await fetch(`${API_BASE}/api/products/bulk-update`, {
+    const data = await apiFetch('/api/products/bulk-update', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ updates })
     });
-    const data = await res.json();
-    if (res.ok && data.success) {
-      showToast(`💾 TOPLU KAYIT BAŞARILI!\n${updates.length} adet ürünün fiyat ve stok değişiklikleri kaydedildi!`, 'success');
+    if (data && data.success) {
+      showToast(`💾 TOPLU KAYIT BAŞARILI!\n${data.updatedCount || updates.length} adet ürünün fiyat ve stok değişiklikleri kaydedildi!`, 'success');
       fetchData();
     } else {
-      showToast(`❌ Hata (${res.status}): ${data.error || 'Toplu kayıt gerçekleştirilemedi.'}`, 'error');
+      showToast(`❌ Hata: ${data?.error || 'Toplu kayıt gerçekleştirilemedi.'}`, 'error');
     }
   } catch (e) {
-    showToast(`❌ Bağlantı Hatası: ${e.message}`, 'error');
+    showToast(`❌ Hata: ${e.message}`, 'error');
   }
 }
 
-// Ürün Fiyatı Güncelleme (API)
+// Ürün Fiyatı Güncelleme (API via apiFetch)
 async function updateProductPrice(productCode) {
   const priceInput = document.getElementById(`price_${productCode}`);
   if (!priceInput) return;
@@ -904,20 +968,18 @@ async function updateProductPrice(productCode) {
   }
 
   try {
-    const res = await fetch(`${API_BASE}/api/products/price`, {
+    const data = await apiFetch('/api/products/price', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ productCode, price: newPrice })
     });
-    const data = await res.json();
-    if (data.success) {
+    if (data && data.success) {
       showToast(`✅ ${productCode} fiyatı ${newPrice} TL olarak kaydedildi.`, 'success');
       fetchData();
     } else {
-      showToast(data.error || 'Fiyat güncellenemedi.', 'error');
+      showToast(data?.error || 'Fiyat güncellenemedi.', 'error');
     }
   } catch (e) {
-    showToast('Fiyat güncellenirken sunucu hatası oluştu.', 'error');
+    showToast(e.message || 'Fiyat güncellenirken sunucu hatası oluştu.', 'error');
   }
 }
 
@@ -1035,23 +1097,21 @@ async function handleNewProductSubmit(e) {
   if (submitBtn) submitBtn.disabled = true;
 
   try {
-    const res = await fetch(`${API_BASE}/api/products`, {
+    const data = await apiFetch('/api/products', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
     });
-    const data = await res.json();
 
-    if (data.success) {
+    if (data && data.success) {
       showToast(`✅ ${payload.name} (${payload.productCode}) kaydedildi!`, 'success');
       const form = document.getElementById('newProductForm');
       if (form) form.reset();
       fetchData();
     } else {
-      showToast(`❌ Hata: ${data.error || 'Kaydedilemedi'}`, 'error');
+      showToast(`❌ Hata: ${data?.error || 'Kaydedilemedi'}`, 'error');
     }
   } catch (err) {
-    showToast('Sunucu hatası oluştu.', 'error');
+    showToast(err.message || 'Sunucu hatası oluştu.', 'error');
   } finally {
     if (submitBtn) submitBtn.disabled = false;
   }
@@ -1438,21 +1498,23 @@ function openRejectionModal(orderId) {
   }
 }
 
-// Ürün Silme
+// Ürün Silme (API via apiFetch)
 async function deleteProduct(productCode) {
   if (!confirm(`${productCode} kodlu ürünü silmek istediğinize emin misiniz?`)) return;
 
   try {
-    const res = await fetch(`${API_BASE}/api/products/${productCode}`, { method: 'DELETE' });
-    const data = await res.json();
-    if (data.success) {
+    const data = await apiFetch('/api/products/delete', {
+      method: 'POST',
+      body: JSON.stringify({ productCode })
+    });
+    if (data && data.success) {
       showToast(`✅ ${productCode} silindi.`, 'success');
       fetchData();
     } else {
-      showToast(`❌ Hata: ${data.error || 'Silinemedi'}`, 'error');
+      showToast(`❌ Hata: ${data?.error || 'Silinemedi'}`, 'error');
     }
   } catch (err) {
-    showToast('Silme işlemi başarısız oldu.', 'error');
+    showToast(err.message || 'Silme işlemi başarısız oldu.', 'error');
   }
 }
 

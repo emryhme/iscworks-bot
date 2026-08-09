@@ -10,7 +10,7 @@ import { AuthMiddleware } from '../middleware/auth.middleware';
 import { db, hashPassword, verifyPassword } from '../database/db';
 
 async function runTestSuite() {
-  console.log('🧪 Starting ISC Works Master Admin & Master Security Test Suite...\n');
+  console.log('🧪 Starting ISC Works Master Admin & Master Security & Stock Test Suite...\n');
   let passed = 0;
   let failed = 0;
 
@@ -237,7 +237,45 @@ async function runTestSuite() {
   const evtStoreARepeat = WebhookController.isDuplicateEvent('evt_attack_001', 100);
   assert(evtStoreA === false && evtStoreB === false && evtStoreARepeat === true, 'Event idempotency tracks event_id scoped strictly by tenant store_id');
 
-  console.log(`\n📊 MASTER SECURITY & WEBHOOK ISOLATION TEST SUMMARY: Passed: ${passed} | Failed: ${failed}`);
+  // 7. STOCK BUG FIX TESTS (ADD, SET, ISOLATION, COLLISION & SANITATION)
+  console.log('\n2️⃣7️⃣ STOCK BUG FIX TEST 1: Stock Add (+5 from 10 -> 15)');
+  await StockService.addProduct({ storeId: 100, shortCode: 'TST', productCode: 'TEST-STOCK', name: 'Test Product', size: 'M', stock: 10, price: 200 });
+  const updateSuccess1 = await StockService.updateStock(100, 'TEST-STOCK', 15);
+  const prodRow1 = db.prepare("SELECT stock FROM products WHERE store_id = 100 AND product_code = 'TEST-STOCK'").get() as any;
+  const invRow1 = db.prepare("SELECT stock FROM inventory WHERE store_id = 100 AND product_code = 'TEST-STOCK'").get() as any;
+  assert(updateSuccess1 === true && prodRow1?.stock === 15 && invRow1?.stock === 15, 'Stock updated to 15 in both products and inventory tables');
+
+  console.log('\n2️⃣8️⃣ STOCK BUG FIX TEST 2: Stock Set (10 -> 25) & Read After Write');
+  const updateSuccess2 = await StockService.updateStock(100, 'TEST-STOCK', 25);
+  const stockCheck2 = await StockService.checkStock(100, 'TEST-STOCK');
+  assert(updateSuccess2 === true && stockCheck2.exists && stockCheck2.product?.stock === 25, 'Read After Write retrieves updated stock=25');
+
+  console.log('\n2️⃣9️⃣ STOCK BUG FIX TEST 3: Store A / Store B Stock Update Isolation');
+  await StockService.addProduct({ storeId: 200, shortCode: 'TST', productCode: 'TEST-STOCK', name: 'Test Product B', size: 'M', stock: 50, price: 200 });
+  await StockService.updateStock(100, 'TEST-STOCK', 30);
+  const storeAStock = (db.prepare("SELECT stock FROM products WHERE store_id = 100 AND product_code = 'TEST-STOCK'").get() as any).stock;
+  const storeBStock = (db.prepare("SELECT stock FROM products WHERE store_id = 200 AND product_code = 'TEST-STOCK'").get() as any).stock;
+  assert(storeAStock === 30 && storeBStock === 50, 'Store A stock updated to 30 while Store B stock remains strictly isolated at 50');
+
+  console.log('\n3️⃣0️⃣ STOCK BUG FIX TEST 4: Product Code Collision Test (ABC-M)');
+  await StockService.addProduct({ storeId: 100, shortCode: 'ABC', productCode: 'ABC-M', name: 'Shirt A', size: 'M', stock: 10, price: 300 });
+  await StockService.addProduct({ storeId: 200, shortCode: 'ABC', productCode: 'ABC-M', name: 'Shirt B', size: 'M', stock: 100, price: 300 });
+  await StockService.updateStock(100, 'ABC-M', 20);
+  const abcStoreA = (db.prepare("SELECT stock FROM products WHERE store_id = 100 AND product_code = 'ABC-M'").get() as any).stock;
+  const abcStoreB = (db.prepare("SELECT stock FROM products WHERE store_id = 200 AND product_code = 'ABC-M'").get() as any).stock;
+  assert(abcStoreA === 20 && abcStoreB === 100, 'Updating ABC-M for Store 100 changes Store 100 to 20 while Store 200 remains 100');
+
+  console.log('\n3️⃣1️⃣ STOCK BUG FIX TEST 5: Invalid Quantity Sanitation & Handling');
+  const invalidNeg = await StockService.updateStock(100, 'TEST-STOCK', -10);
+  const invalidNaN = await StockService.updateStock(100, 'TEST-STOCK', NaN);
+  const currentStockAfterInvalid = (db.prepare("SELECT stock FROM products WHERE store_id = 100 AND product_code = 'TEST-STOCK'").get() as any).stock;
+  assert(currentStockAfterInvalid === 30, 'Invalid quantity inputs (-10, NaN) do not pollute or corrupt database stock');
+
+  console.log('\n3️⃣2️⃣ STOCK BUG FIX TEST 6: False Success Prevention on Non-Existent Product');
+  const nonExistentResult = await StockService.updateStock(100, 'NON-EXISTENT-CODE-999', 50);
+  assert(nonExistentResult === false, 'Updating non-existent product returns false (HTTP 404), preventing false-success bug');
+
+  console.log(`\n📊 MASTER SECURITY & STOCK BUG FIX TEST SUMMARY: Passed: ${passed} | Failed: ${failed}`);
   if (failed > 0) {
     process.exit(1);
   }
