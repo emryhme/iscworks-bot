@@ -66,30 +66,30 @@ app.post('/api/auth/register', (req, res) => {
     let resultStore: any = null;
 
     db.transaction(() => {
-      // 1. Create User
+      // 1. Create User (status: 'pending')
       const userRes = db.prepare(`
         INSERT INTO users (full_name, email, phone, tc_no, password_hash, status)
-        VALUES (?, ?, ?, ?, ?, 'active')
+        VALUES (?, ?, ?, ?, ?, 'pending')
       `).run(fullName, cleanEmail, phone, cleanTcNo, hashedPassword);
       const userId = Number(userRes.lastInsertRowid);
 
-      // 2. Create Store
+      // 2. Create Store (status: 'pending')
       const storeRes = db.prepare(`
         INSERT INTO stores (owner_id, name, slug, status)
-        VALUES (?, ?, ?, 'active')
+        VALUES (?, ?, ?, 'pending')
       `).run(userId, cleanStoreName, storeSlug);
       const storeId = Number(storeRes.lastInsertRowid);
 
-      // 3. Create Membership (OWNER / active)
+      // 3. Create Membership (OWNER / pending)
       db.prepare(`
         INSERT INTO memberships (user_id, store_id, role, status)
-        VALUES (?, ?, 'OWNER', 'active')
+        VALUES (?, ?, 'OWNER', 'pending')
       `).run(userId, storeId);
 
-      // 4. Create Merchant Application History (Password field receives hashedPassword ONLY)
+      // 4. Create Merchant Application History (status: 'pending')
       db.prepare(`
         INSERT INTO merchant_applications (full_name, tc_no, phone, email, store_name, plan, password, status)
-        VALUES (?, ?, ?, ?, ?, ?, ?, 'approved')
+        VALUES (?, ?, ?, ?, ?, ?, ?, 'pending')
       `).run(fullName, cleanTcNo, phone, cleanEmail, cleanStoreName, plan || 'Pro Store', hashedPassword);
 
       // 5. Create Audit Log
@@ -99,24 +99,16 @@ app.post('/api/auth/register', (req, res) => {
       resultStore = { id: storeId, name: cleanStoreName, slug: storeSlug };
     })();
 
-    const token = AuthMiddleware.generateToken({
-      userId: resultUser.id,
-      storeId: resultStore.id,
-      role: 'OWNER',
-      email: resultUser.email
-    });
-
     return res.json({
       success: true,
-      message: 'Kayıt ve mağaza kurulumu başarıyla tamamlandı.',
-      token,
+      message: 'Mağaza başvurunuz başarıyla alındı. Süper Admin onayından sonra giriş yapabilirsiniz.',
       user: {
         id: resultUser.id,
         email: resultUser.email,
         name: resultUser.name,
         storeId: resultStore.id,
         storeSlug: resultStore.slug,
-        role: 'OWNER'
+        status: 'pending'
       }
     });
   } catch (err: any) {
@@ -145,6 +137,10 @@ app.post('/api/auth/login', (req, res) => {
     return res.status(401).json({ success: false, error: 'Geçersiz kullanıcı adı veya şifre.' });
   }
 
+  if (user.status === 'pending') {
+    return res.status(403).json({ success: false, error: 'Hesabınız henüz onay aşamasındadır. Süper Admin onayından sonra giriş yapabilirsiniz.' });
+  }
+
   if (user.status !== 'active') {
     return res.status(403).json({ success: false, error: 'Hesabınız pasif durumdadır.' });
   }
@@ -159,7 +155,7 @@ app.post('/api/auth/login', (req, res) => {
   `).all(user.id) as any[];
 
   if (!memberships || memberships.length === 0) {
-    return res.status(403).json({ success: false, error: 'Aktif bir mağaza üyeliğiniz bulunmamaktadır.' });
+    return res.status(403).json({ success: false, error: 'Aktif veya onaylanmış bir mağaza üyeliğiniz bulunmamaktadır.' });
   }
 
   // Pick target store (or requested storeId if valid)
@@ -197,6 +193,88 @@ app.post('/api/auth/login', (req, res) => {
 // Verify Auth Token Endpoint
 app.get('/api/auth/verify', AuthMiddleware.authenticate, (req: AuthenticatedRequest, res) => {
   return res.json({ success: true, valid: true, user: req.auth });
+});
+
+// ==========================================
+// MASTER ADMIN MERCHANT APPLICATION ROUTES
+// ==========================================
+
+// GET /api/admin/applications (Master Admin only - Store ID 1)
+app.get('/api/admin/applications', AuthMiddleware.authenticate, AuthMiddleware.requireRole(['OWNER']), (req: AuthenticatedRequest, res) => {
+  try {
+    if (req.auth!.storeId !== 1) {
+      return res.status(403).json({ success: false, error: 'Mağaza başvurularını yalnızca Süper Admin yönetebilir.' });
+    }
+
+    const apps = db.prepare('SELECT id, full_name, tc_no, phone, email, store_name, plan, status, created_at FROM merchant_applications ORDER BY id DESC').all();
+    return res.json({ success: true, applications: apps });
+  } catch (e: any) {
+    return res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+// POST /api/admin/applications/:id/approve (Master Admin approve application)
+app.post('/api/admin/applications/:id/approve', AuthMiddleware.authenticate, AuthMiddleware.requireRole(['OWNER']), (req: AuthenticatedRequest, res) => {
+  try {
+    if (req.auth!.storeId !== 1) {
+      return res.status(403).json({ success: false, error: 'Başvuru onaylama yetkisi sadece Süper Admin hesabına aittir.' });
+    }
+
+    const appId = Number(req.params.id);
+    const appRow = db.prepare('SELECT * FROM merchant_applications WHERE id = ?').get(appId) as any;
+    if (!appRow) {
+      return res.status(404).json({ success: false, error: 'Mağaza başvurusu bulunamadı.' });
+    }
+
+    db.transaction(() => {
+      db.prepare('UPDATE merchant_applications SET status = \'approved\', updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(appId);
+      db.prepare('UPDATE users SET status = \'active\' WHERE LOWER(email) = ?').run(appRow.email.toLowerCase());
+      
+      const userRow = db.prepare('SELECT id FROM users WHERE LOWER(email) = ?').get(appRow.email.toLowerCase()) as any;
+      if (userRow) {
+        db.prepare('UPDATE stores SET status = \'active\', updated_at = CURRENT_TIMESTAMP WHERE owner_id = ?').run(userRow.id);
+        db.prepare('UPDATE memberships SET status = \'active\' WHERE user_id = ?').run(userRow.id);
+      }
+
+      AuthMiddleware.logAudit(1, req.auth!.userId, 'APPROVE_APPLICATION', 'merchant_applications', String(appId), '', appRow.email);
+    })();
+
+    return res.json({ success: true, message: `${appRow.store_name} mağaza başvurusu başarıyla onaylandı ve aktifleşti!` });
+  } catch (e: any) {
+    return res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+// POST /api/admin/applications/:id/reject (Master Admin reject application)
+app.post('/api/admin/applications/:id/reject', AuthMiddleware.authenticate, AuthMiddleware.requireRole(['OWNER']), (req: AuthenticatedRequest, res) => {
+  try {
+    if (req.auth!.storeId !== 1) {
+      return res.status(403).json({ success: false, error: 'Başvuru reddetme yetkisi sadece Süper Admin hesabına aittir.' });
+    }
+
+    const appId = Number(req.params.id);
+    const appRow = db.prepare('SELECT * FROM merchant_applications WHERE id = ?').get(appId) as any;
+    if (!appRow) {
+      return res.status(404).json({ success: false, error: 'Mağaza başvurusu bulunamadı.' });
+    }
+
+    db.transaction(() => {
+      db.prepare('UPDATE merchant_applications SET status = \'rejected\', updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(appId);
+      db.prepare('UPDATE users SET status = \'rejected\' WHERE LOWER(email) = ?').run(appRow.email.toLowerCase());
+      
+      const userRow = db.prepare('SELECT id FROM users WHERE LOWER(email) = ?').get(appRow.email.toLowerCase()) as any;
+      if (userRow) {
+        db.prepare('UPDATE stores SET status = \'rejected\', updated_at = CURRENT_TIMESTAMP WHERE owner_id = ?').run(userRow.id);
+        db.prepare('UPDATE memberships SET status = \'rejected\' WHERE user_id = ?').run(userRow.id);
+      }
+
+      AuthMiddleware.logAudit(1, req.auth!.userId, 'REJECT_APPLICATION', 'merchant_applications', String(appId), '', appRow.email);
+    })();
+
+    return res.json({ success: true, message: `${appRow.store_name} mağaza başvurusu reddedildi.` });
+  } catch (e: any) {
+    return res.status(500).json({ success: false, error: e.message });
+  }
 });
 
 // ==========================================

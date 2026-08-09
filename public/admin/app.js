@@ -168,6 +168,7 @@ function initApp() {
   fetchData();
   fetchCampaigns();
   fetchSettings();
+  fetchMerchantApplications();
   setInterval(pollOrdersInBackground, POLL_INTERVAL_MS);
 }
 
@@ -2250,3 +2251,67 @@ document.addEventListener('DOMContentLoaded', () => {
     npForm.addEventListener('submit', handleNewProductSubmit);
   }
 });
+
+// Master Admin Merchant Application Approval Tools
+async function fetchMerchantApplications() {
+  const tableBody = document.getElementById('merchantApplicationsTableBody');
+  if (!tableBody) return;
+
+  try {
+    const data = await apiFetch('/api/admin/applications');
+    if (data && data.success && Array.isArray(data.applications)) {
+      if (data.applications.length === 0) {
+        tableBody.innerHTML = `<tr><td colspan="8" style="text-align:center; padding: 1.5rem; color: #94a3b8;">Henüz mağaza başvurusu bulunmuyor.</td></tr>`;
+        return;
+      }
+      tableBody.innerHTML = data.applications.map(app => {
+        let statusBadge = '<span class="status-badge low-stock">⏳ Beklemede</span>';
+        if (app.status === 'approved' || app.status === 'active') {
+          statusBadge = '<span class="status-badge in-stock">✅ Onaylandı</span>';
+        } else if (app.status === 'rejected') {
+          statusBadge = '<span class="status-badge out-stock">❌ Reddedildi</span>';
+        }
+
+        const actions = (app.status === 'pending') ? `
+          <button class="btn btn-sm btn-primary" onclick="approveMerchantApplication(${app.id})"><i class="fa-solid fa-check"></i> Onayla</button>
+          <button class="btn btn-sm btn-delete" style="margin-left:4px;" onclick="rejectMerchantApplication(${app.id})"><i class="fa-solid fa-xmark"></i> Reddet</button>
+        ` : `<span style="font-size:11px; color:#6b7280;">İşlem Yapıldı</span>`;
+
+        return `
+          <tr>
+            <td>#${app.id}</td>
+            <td><strong>${escapeHtml(app.store_name)}</strong></td>
+            <td>${escapeHtml(app.full_name)}</td>
+            <td>${escapeHtml(app.email)}<br><small style="color:#6b7280;">${escapeHtml(app.phone)}</small></td>
+            <td>${escapeHtml(app.tc_no)}</td>
+            <td><span class="code-tag">${escapeHtml(app.plan || 'Pro')}</span></td>
+            <td>${statusBadge}</td>
+            <td>${actions}</td>
+          </tr>
+        `;
+      }).join('');
+    }
+  } catch (e) {
+    if (e.message !== 'FORBIDDEN') {
+      tableBody.innerHTML = `<tr><td colspan="8" style="text-align:center; padding: 1.5rem; color: #ef4444;">Başvurular yüklenirken hata oluştu.</td></tr>`;
+    }
+  }
+}
+
+async function approveMerchantApplication(id) {
+  if (!confirm('Bu mağaza başvurusunu onaylamak ve mağazayı aktifleştirmek istiyor musunuz?')) return;
+  try {
+    const data = await apiFetch(`/api/admin/applications/${id}/approve`, { method: 'POST' });
+    showToast(data.message || 'Mağaza başvurusu başarıyla onaylandı!', 'success');
+    fetchMerchantApplications();
+  } catch (e) {}
+}
+
+async function rejectMerchantApplication(id) {
+  if (!confirm('Bu mağaza başvurusunu reddetmek istediğinizden emin misiniz?')) return;
+  try {
+    const data = await apiFetch(`/api/admin/applications/${id}/reject`, { method: 'POST' });
+    showToast(data.message || 'Mağaza başvurusu reddedildi.', 'info');
+    fetchMerchantApplications();
+  } catch (e) {}
+}
