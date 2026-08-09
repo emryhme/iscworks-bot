@@ -51,12 +51,15 @@ async function apiFetch(url, options = {}) {
     if (response.status === 401) {
       localStorage.removeItem('barons_admin_token');
       localStorage.removeItem('barons_admin_user');
-      window.location.href = '/admin/login.html';
+      window.location.href = '/master-admin/login.html';
       throw new Error('UNAUTHORIZED');
     }
 
     if (response.status === 403) {
-      showToast('⛔ Bu alana erişim için Master Admin (Platform Yöneticisi) yetkisi gereklidir.', 'error');
+      showToast('⛔ Master Admin yetkiniz bulunmamaktadır.', 'error');
+      setTimeout(() => {
+        window.location.href = '/admin/login.html';
+      }, 1200);
       throw new Error('FORBIDDEN');
     }
 
@@ -75,22 +78,26 @@ async function apiFetch(url, options = {}) {
 }
 
 function checkMasterAuth() {
+  if (window.location.pathname.includes('login.html')) {
+    return;
+  }
+
   const token = localStorage.getItem('barons_admin_token');
   const rawUser = localStorage.getItem('barons_admin_user');
 
   if (!token || !rawUser) {
-    window.location.href = '/admin/login.html';
+    window.location.href = '/master-admin/login.html';
     return;
   }
 
   try {
     const u = JSON.parse(rawUser);
     if (u.storeId !== 1 || (u.role !== 'OWNER' && u.role !== 'Super Admin')) {
-      alert('⛔ Yetkisiz Erişim! /master-admin paneli yalnızca Platform Yöneticisine (Master Admin) özeldir.');
-      window.location.href = '/admin/index.html';
+      alert('⛔ Master Admin yetkiniz bulunmamaktadır.');
+      window.location.href = '/admin/login.html';
     }
   } catch (e) {
-    window.location.href = '/admin/login.html';
+    window.location.href = '/master-admin/login.html';
   }
 }
 
@@ -99,7 +106,7 @@ function logoutMasterAdmin() {
   localStorage.removeItem('barons_admin_user');
   showToast('👋 Master Admin oturumu kapatıldı.', 'info');
   setTimeout(() => {
-    window.location.href = '/admin/login.html';
+    window.location.href = '/master-admin/login.html';
   }, 600);
 }
 
