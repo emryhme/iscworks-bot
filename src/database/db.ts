@@ -285,6 +285,12 @@ export function initDatabase() {
     );
   `);
 
+  // Default Store Record Ensure (store_id = 1)
+  db.exec(`
+    INSERT OR IGNORE INTO stores (id, owner_id, name, slug, status)
+    VALUES (1, 1, 'BARON''S SILLAGE', 'default', 'active');
+  `);
+
   // Auto Migrations: Kolonlar eksikse otomatik ekle
   try { db.exec(`ALTER TABLE products ADD COLUMN price REAL NOT NULL DEFAULT 299.00;`); } catch (e) {}
   try { db.exec(`ALTER TABLE products ADD COLUMN store_name TEXT DEFAULT '';`); } catch (e) {}
@@ -303,22 +309,95 @@ export function initDatabase() {
   try { db.exec(`ALTER TABLE user_rewards ADD COLUMN store_name TEXT DEFAULT '';`); } catch (e) {}
   try { db.exec(`ALTER TABLE user_rewards ADD COLUMN store_id INTEGER NOT NULL DEFAULT 1;`); } catch (e) {}
 
-  // İndeksler (Sorgu Hızlandırma)
+  // Multi-Tenant Migration 1: products tablosunu UNIQUE(store_id, product_code) yapısına geçir
+  const productsSchema = db.prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'products'").get() as { sql: string } | undefined;
+  if (productsSchema && (productsSchema.sql.includes('product_code TEXT UNIQUE') || !productsSchema.sql.includes('UNIQUE(store_id, product_code)'))) {
+    console.log('[Database Migration] 🔄 products tablosu UNIQUE(store_id, product_code) yapısına aktarılıyor...');
+    const migrateProducts = db.transaction(() => {
+      db.exec(`
+        CREATE TABLE products_new (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          short_code TEXT NOT NULL,
+          product_code TEXT NOT NULL,
+          name TEXT NOT NULL,
+          color TEXT DEFAULT '',
+          size TEXT NOT NULL,
+          price REAL NOT NULL DEFAULT 299.00,
+          stock INTEGER NOT NULL DEFAULT 0,
+          category TEXT DEFAULT '',
+          wp_link TEXT DEFAULT '',
+          media_link TEXT DEFAULT '',
+          created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          store_name TEXT DEFAULT '',
+          store_id INTEGER NOT NULL DEFAULT 1,
+          UNIQUE(store_id, product_code),
+          FOREIGN KEY (store_id) REFERENCES stores(id) ON DELETE CASCADE
+        );
+      `);
+      db.exec(`
+        INSERT INTO products_new (id, short_code, product_code, name, color, size, price, stock, category, wp_link, media_link, created_at, updated_at, store_name, store_id)
+        SELECT id, short_code, product_code, name, color, size, COALESCE(price, 299.00), stock, category, wp_link, media_link, created_at, updated_at, COALESCE(store_name, ''), COALESCE(store_id, 1)
+        FROM products;
+      `);
+      db.exec(`DROP TABLE products;`);
+      db.exec(`ALTER TABLE products_new RENAME TO products;`);
+    });
+    migrateProducts();
+    console.log('[Database Migration] ✅ products tablosu başarıyla dönüştürüldü.');
+  }
+
+  // Multi-Tenant Migration 2: settings tablosunu PRIMARY KEY(store_id, key) yapısına aktar
+  const settingsSchema = db.prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'settings'").get() as { sql: string } | undefined;
+  if (settingsSchema && !settingsSchema.sql.includes('store_id')) {
+    console.log('[Database Migration] 🔄 settings tablosu PRIMARY KEY(store_id, key) yapısına aktarılıyor...');
+    const migrateSettings = db.transaction(() => {
+      db.exec(`
+        CREATE TABLE settings_new (
+          store_id INTEGER NOT NULL DEFAULT 1,
+          key TEXT NOT NULL,
+          value TEXT NOT NULL,
+          PRIMARY KEY (store_id, key),
+          FOREIGN KEY (store_id) REFERENCES stores(id) ON DELETE CASCADE
+        );
+      `);
+      db.exec(`
+        INSERT OR IGNORE INTO settings_new (store_id, key, value)
+        SELECT 1, key, value FROM settings;
+      `);
+      db.exec(`DROP TABLE settings;`);
+      db.exec(`ALTER TABLE settings_new RENAME TO settings;`);
+    });
+    migrateSettings();
+    console.log('[Database Migration] ✅ settings tablosu başarıyla dönüştürüldü.');
+  }
+
+  // Multi-Tenant Performans İndeksleri
   db.exec(`
     CREATE INDEX IF NOT EXISTS idx_products_code ON products(product_code);
     CREATE INDEX IF NOT EXISTS idx_products_short ON products(short_code);
     CREATE INDEX IF NOT EXISTS idx_products_store ON products(store_name);
     CREATE INDEX IF NOT EXISTS idx_products_store_id ON products(store_id);
+    CREATE INDEX IF NOT EXISTS idx_products_store_code ON products(store_id, product_code);
+    CREATE INDEX IF NOT EXISTS idx_products_store_short ON products(store_id, short_code);
     CREATE INDEX IF NOT EXISTS idx_orders_id ON orders(order_id);
     CREATE INDEX IF NOT EXISTS idx_orders_phone ON orders(customer_phone);
     CREATE INDEX IF NOT EXISTS idx_orders_sender ON orders(sender_id);
     CREATE INDEX IF NOT EXISTS idx_orders_store ON orders(store_name);
     CREATE INDEX IF NOT EXISTS idx_orders_store_id ON orders(store_id);
+    CREATE INDEX IF NOT EXISTS idx_orders_store_created ON orders(store_id, created_at);
+    CREATE INDEX IF NOT EXISTS idx_orders_store_status ON orders(store_id, status);
+    CREATE INDEX IF NOT EXISTS idx_orders_store_sender ON orders(store_id, sender_id);
     CREATE INDEX IF NOT EXISTS idx_campaigns_active ON campaigns(active);
+    CREATE INDEX IF NOT EXISTS idx_campaigns_store_id ON campaigns(store_id);
     CREATE INDEX IF NOT EXISTS idx_rewards_sender ON user_rewards(sender_id);
+    CREATE INDEX IF NOT EXISTS idx_rewards_store_id ON user_rewards(store_id);
     CREATE INDEX IF NOT EXISTS idx_webhook_events_id ON webhook_events(event_id);
     CREATE INDEX IF NOT EXISTS idx_stores_slug ON stores(slug);
     CREATE INDEX IF NOT EXISTS idx_inventory_store ON inventory(store_id);
+    CREATE INDEX IF NOT EXISTS idx_inventory_store_code ON inventory(store_id, product_code);
+    CREATE INDEX IF NOT EXISTS idx_customers_store_sender ON customers(store_id, sender_id);
+    CREATE INDEX IF NOT EXISTS idx_conversations_store_customer ON conversations(store_id, customer_id);
     CREATE INDEX IF NOT EXISTS idx_ai_usage_store ON ai_usage(store_id);
   `);
 
