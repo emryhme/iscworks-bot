@@ -244,12 +244,12 @@ app.get('/api/webhook/:storeSlug', webhook_controller_1.WebhookController.verify
 app.post('/api/webhook/:storeSlug', webhook_controller_1.WebhookController.handleStoreWebhook);
 // Static Admin UI Server (Merchant Panel)
 app.use('/admin', express_1.default.static(path_1.default.join(__dirname, '../public/admin')));
-app.get('/admin', (req, res) => {
+app.get(['/admin', '/admin/'], (req, res) => {
     res.sendFile(path_1.default.join(__dirname, '../public/admin/index.html'));
 });
 // Static Master Admin UI Server (Platform Owner Panel)
 app.use('/master-admin', express_1.default.static(path_1.default.join(__dirname, '../public/master-admin')));
-app.get('/master-admin', (req, res) => {
+app.get(['/master-admin', '/master-admin/'], (req, res) => {
     res.sendFile(path_1.default.join(__dirname, '../public/master-admin/index.html'));
 });
 // ==========================================
