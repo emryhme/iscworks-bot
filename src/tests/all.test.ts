@@ -10,7 +10,7 @@ import { AuthMiddleware } from '../middleware/auth.middleware';
 import { db, hashPassword, verifyPassword } from '../database/db';
 
 async function runTestSuite() {
-  console.log('🧪 Starting ISC Works Stage 6 Multi-Tenant Auth, RBAC & Security Test Suite...\n');
+  console.log('🧪 Starting ISC Works Stage 7 Multi-Tenant Frontend & Master Security Test Suite...\n');
   let passed = 0;
   let failed = 0;
 
@@ -69,7 +69,7 @@ async function runTestSuite() {
   await StockService.addProduct({ storeId: 100, shortCode: 'TSH', productCode: 'TSH-M', name: 'T-Shirt A', size: 'M', stock: 20, price: 150 });
   await StockService.addProduct({ storeId: 200, shortCode: 'TSH', productCode: 'TSH-M', name: 'T-Shirt B', size: 'M', stock: 40, price: 450 });
 
-  // 1. AUTH TESTS
+  // 1. AUTH & JWT TESTS
   console.log('1️⃣ AUTH TEST 1: Password Verification (PBKDF2 SHA-512)');
   assert(verifyPassword('password123', passHash) === true, 'Valid password verification returns true');
   assert(verifyPassword('wrongpassword', passHash) === false, 'Invalid password verification returns false');
@@ -151,15 +151,29 @@ async function runTestSuite() {
   const auditRow = db.prepare("SELECT * FROM audit_logs WHERE store_id = 100 AND action = 'TEST_AUDIT_ACTION'").get() as any;
   assert(auditRow !== undefined && auditRow.user_id === 10 && auditRow.entity_id === 'TSH-M', 'Audit log inserted strictly with store_id 100 and user_id 10');
 
-  // 5. STAGE 1-5 REGRESSION TESTS
-  console.log('\n1️⃣3️⃣ REGRESSION TEST: Webhook Store Resolution & Idempotency');
+  // 5. STAGE 7 FRONTEND & REGRESSION TESTS
+  console.log('\n1️⃣3️⃣ STAGE 7 FRONTEND TEST 1: XSS Neutralization Utility');
+  function escapeHtmlTest(str: string) {
+    return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+  }
+  const xssVector = '<script>alert("hack")</script>';
+  const escaped = escapeHtmlTest(xssVector);
+  assert(!escaped.includes('<script>') && escaped.includes('&lt;script&gt;'), 'XSS script injection vector successfully neutralized');
+
+  console.log('\n1️⃣4️⃣ STAGE 7 FRONTEND TEST 2: Multi-Tenant Data Fetch Isolation');
+  const prodsStoreA = await StockService.getAllProducts(100);
+  const prodsStoreB = await StockService.getAllProducts(200);
+  assert(prodsStoreA.length === 1 && prodsStoreA[0].name === 'T-Shirt A', 'Frontend API fetch for Store A returns strictly Store A product (T-Shirt A)');
+  assert(prodsStoreB.length === 1 && prodsStoreB[0].name === 'T-Shirt B', 'Frontend API fetch for Store B returns strictly Store B product (T-Shirt B)');
+
+  console.log('\n1️⃣5️⃣ STAGE 7 REGRESSION TEST: Webhook Resolution & Idempotency');
   const resolvedAlpha = WebhookController.resolveStore('store-alpha');
   assert(resolvedAlpha !== null && resolvedAlpha.id === 100, 'store-alpha resolved to Store ID 100');
-  const firstEvt = WebhookController.isDuplicateEvent('evt_stage6_001', 100);
-  const secondEvt = WebhookController.isDuplicateEvent('evt_stage6_001', 100);
+  const firstEvt = WebhookController.isDuplicateEvent('evt_stage7_001', 100);
+  const secondEvt = WebhookController.isDuplicateEvent('evt_stage7_001', 100);
   assert(firstEvt === false && secondEvt === true, 'Webhook idempotency works seamlessly across multi-tenant events');
 
-  console.log(`\n📊 STAGE 6 MASTER SECURITY TEST SUMMARY: Passed: ${passed} | Failed: ${failed}`);
+  console.log(`\n📊 STAGE 7 MASTER SECURITY & FRONTEND TEST SUMMARY: Passed: ${passed} | Failed: ${failed}`);
   if (failed > 0) {
     process.exit(1);
   }

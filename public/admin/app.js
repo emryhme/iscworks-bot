@@ -3,6 +3,61 @@
 const API_BASE = '';
 const POLL_INTERVAL_MS = 10000; // 10 Saniyede Bir Arka Plan Kontrolü (Ultra Hafif)
 
+// HTML Escaping Utility for XSS Prevention
+function escapeHtml(str) {
+  if (str === null || str === undefined) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+// Central Safe API Wrapper with JWT Authentication Interceptor
+async function apiFetch(url, options = {}) {
+  const token = localStorage.getItem('barons_admin_token');
+  const headers = {
+    'Content-Type': 'application/json',
+    ...(options.headers || {})
+  };
+
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
+  try {
+    const response = await fetch(url, { ...options, headers });
+
+    if (response.status === 401) {
+      localStorage.removeItem('barons_admin_token');
+      localStorage.removeItem('barons_admin_user');
+      if (!window.location.pathname.endsWith('login.html')) {
+        showToast('🔑 Oturumunuzun süresi doldu. Giriş sayfasına yönlendiriliyorsunuz...', 'warning');
+        setTimeout(() => { window.location.href = 'login.html'; }, 800);
+      }
+      throw new Error('UNAUTHORIZED');
+    }
+
+    if (response.status === 403) {
+      showToast('⛔ Bu işlem için yetkiniz bulunmamaktadır.', 'error');
+      throw new Error('FORBIDDEN');
+    }
+
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      const errMsg = typeof data.error === 'string' ? data.error : (data.error?.message || 'İşlem başarısız.');
+      throw new Error(errMsg);
+    }
+    return data;
+  } catch (err) {
+    if (err.message !== 'UNAUTHORIZED' && err.message !== 'FORBIDDEN') {
+      console.warn('[apiFetch Notice]:', err.message);
+    }
+    throw err;
+  }
+}
+
 // Global App State
 const state = {
   products: [],
@@ -16,8 +71,19 @@ const state = {
 };
 
 function applyDynamicStoreBranding() {
-  // Sabit master admin branding
-  document.title = 'ISCWORKS — CommerceOS Admin';
+  const rawUser = localStorage.getItem('barons_admin_user');
+  let storeName = 'CommerceOS';
+  if (rawUser) {
+    try {
+      const u = JSON.parse(rawUser);
+      storeName = u.storeName || u.title || 'Mağazam';
+    } catch (e) {}
+  }
+  document.title = `${storeName} — Admin Panel`;
+  const logoSpan = document.querySelector('.logo span');
+  if (logoSpan) {
+    logoSpan.textContent = storeName;
+  }
 }
 
 function checkAuthStatus() {
@@ -33,6 +99,10 @@ function checkAuthStatus() {
 function logoutUser() {
   localStorage.removeItem('barons_admin_token');
   localStorage.removeItem('barons_admin_user');
+  state.products = [];
+  state.orders = [];
+  state.rewards = [];
+  state.knownOrderIds.clear();
   showToast('👋 Çıkış yapıldı. Giriş sayfasına yönlendiriliyorsunuz...', 'info');
   setTimeout(() => {
     window.location.href = 'login.html';
@@ -46,20 +116,31 @@ function setupUserDropdown() {
   userElem.style.cursor = 'pointer';
   userElem.style.position = 'relative';
 
+  const rawUser = localStorage.getItem('barons_admin_user');
+  let displayName = 'Kullanıcı';
+  let roleTitle = 'OWNER';
+  if (rawUser) {
+    try {
+      const u = JSON.parse(rawUser);
+      displayName = u.name || u.email || 'Kullanıcı';
+      roleTitle = u.role || u.title || 'OWNER';
+    } catch (e) {}
+  }
+
   let dropdown = document.getElementById('userProfileDropdown');
   if (!dropdown) {
     dropdown = document.createElement('div');
     dropdown.id = 'userProfileDropdown';
     dropdown.style.cssText = `
-      position: absolute; top: 50px; right: 0; width: 200px;
+      position: absolute; top: 50px; right: 0; width: 220px;
       background: #ffffff; border: 1px solid #e5e7eb; border-radius: 10px;
       box-shadow: 0 10px 25px rgba(0,0,0,0.1); display: none; flex-direction: column;
       padding: 8px 0; z-index: 9999; animation: modalFadeIn 0.2s ease;
     `;
     dropdown.innerHTML = `
       <div style="padding: 10px 16px; border-bottom: 1px solid #f0f0f0;">
-        <strong style="font-size: 12px; display: block; color: #111827;">Tony Stark</strong>
-        <span style="font-size: 10px; color: #6b7280;">Super Admin (Patron)</span>
+        <strong style="font-size: 12px; display: block; color: #111827;">${escapeHtml(displayName)}</strong>
+        <span style="font-size: 10px; color: #6b7280; font-weight: 600;">Rol: ${escapeHtml(roleTitle)}</span>
       </div>
       <div onclick="logoutUser()" style="padding: 10px 16px; font-size: 11px; color: #ef4444; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 8px;" onmouseover="this.style.background='#fef2f2'" onmouseout="this.style.background='transparent'">
         <i class="fa-solid fa-right-from-bracket"></i> Çıkış Yap
@@ -81,6 +162,7 @@ function setupUserDropdown() {
 // Initialize Application Robustly (Supports readyState interactive & complete)
 function initApp() {
   checkAuthStatus();
+  applyDynamicStoreBranding();
   setupEventListeners();
   setupUserDropdown();
   fetchData();
@@ -246,9 +328,9 @@ async function fetchData() {
 
   try {
     const [stocksRes, ordersRes, rewardsRes] = await Promise.all([
-      fetch(`${API_BASE}/api/stocks`).then(r => r.ok ? r.json() : null).catch(() => null),
-      fetch(`${API_BASE}/api/orders`).then(r => r.ok ? r.json() : null).catch(() => null),
-      fetch(`${API_BASE}/api/rewards`).then(r => r.ok ? r.json() : null).catch(() => null)
+      apiFetch('/api/stocks').catch(() => null),
+      apiFetch('/api/orders').catch(() => null),
+      apiFetch('/api/rewards').catch(() => null)
     ]);
 
     if (stocksRes && Array.isArray(stocksRes.stocks)) {
@@ -265,7 +347,7 @@ async function fetchData() {
     updateMetrics();
     renderTables();
     loadAutoRewardSetting();
-    setSyncStatus('success', 'Live SQLite & Sheet Sync');
+    setSyncStatus('success', 'Live Multi-Tenant Sync');
 
   } catch (error) {
     console.error('Fetch error:', error);
@@ -279,10 +361,7 @@ async function fetchData() {
 // Arka Planda Sessiz ve Ultra Hızlı Canlı Sipariş Kontrolü (Polling)
 async function pollOrdersInBackground() {
   try {
-    const res = await fetch(`${API_BASE}/api/orders`);
-    if (!res.ok) return;
-    const data = await res.json();
-
+    const data = await apiFetch('/api/orders');
     if (data && data.success && Array.isArray(data.orders)) {
       const newOrdersDetected = processIncomingOrders(data.orders);
       if (newOrdersDetected) {
