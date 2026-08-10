@@ -23,9 +23,9 @@ class AIService {
     static getApiKey() {
         return (process.env.OPENAI_API_KEY || env_1.env.openaiApiKey || '').trim().replace(/^["']|["']$/g, '');
     }
-    static getSessionContext(senderId, storeSlug = 'default', storeId = 1) {
+    static getSessionContext(senderId, storeSlug = 'default', storeId = 1, channel = 'instagram') {
         this.validateStoreId(storeId);
-        const key = `${storeId}:${storeSlug}:${senderId}`;
+        const key = `${storeId}:${storeSlug}:${channel}:${senderId}`;
         if (!this.sessions.has(key)) {
             this.sessions.set(key, { storeId, history: [], cart: [] });
         }
@@ -475,17 +475,20 @@ Yalnızca aşağıdaki JSON yapısını döndür (bilinmeyen alanlar için null 
     /**
      * Mesaj İşleme Ana Metodu (Strict Store Isolation & Security)
      */
-    static async processMessage(senderId, userMessage, storeSlug = 'default', storeId = 1) {
+    static async processMessage(senderId, userMessage, storeSlug = 'default', storeId = 1, channel = 'instagram') {
         this.validateStoreId(storeId);
         const apiKey = this.getApiKey();
         if (!apiKey) {
             return {
                 reply: "Merhaba! Lütfen geçerli bir OPENAI_API_KEY tanımlayınız.",
-                tokens: { promptTokens: 0, completionTokens: 0, totalTokens: 0, costUsd: 0 }
+                tokens: { promptTokens: 0, completionTokens: 0, totalTokens: 0, costUsd: 0 },
+                toolTraces: [],
+                cart: []
             };
         }
         let promptTokens = 0;
         let completionTokens = 0;
+        const toolTraces = [];
         const trackUsage = (res, currentMessagesCount) => {
             if (res?.usage_metadata) {
                 promptTokens += res.usage_metadata.input_tokens || 0;
@@ -498,7 +501,7 @@ Yalnızca aşağıdaki JSON yapısını döndür (bilinmeyen alanlar için null 
         };
         try {
             await this.extractSessionDataWithAI(senderId, userMessage, apiKey, storeSlug, storeId);
-            const ctx = this.getSessionContext(senderId, storeSlug, storeId);
+            const ctx = this.getSessionContext(senderId, storeSlug, storeId, channel);
             // Veritabanından Aktif Kampanyaları Çek (Store Isolated)
             const activeCampaigns = db_1.db.prepare(`
         SELECT title, description, code, start_date, end_date 
@@ -577,13 +580,33 @@ ${campaignsText}
             while (response.tool_calls && response.tool_calls.length > 0 && count < 4) {
                 count++;
                 for (const tc of response.tool_calls) {
+                    const startTime = Date.now();
                     let toolResult = "";
-                    if (tc.name === 'SIPARIS') {
-                        toolResult = await siparisAgentTool.invoke(JSON.stringify(tc.args));
+                    let status = 'SUCCESS';
+                    try {
+                        if (tc.name === 'SIPARIS') {
+                            toolResult = await siparisAgentTool.invoke(JSON.stringify(tc.args));
+                        }
+                        else if (tc.name === 'STOK_MAN') {
+                            toolResult = await stokManAgentTool.invoke(JSON.stringify(tc.args));
+                        }
+                        else {
+                            toolResult = "Bilinmeyen araç";
+                        }
                     }
-                    else if (tc.name === 'STOK_MAN') {
-                        toolResult = await stokManAgentTool.invoke(JSON.stringify(tc.args));
+                    catch (err) {
+                        status = 'FAILED';
+                        toolResult = `Araç hatası: ${err.message}`;
                     }
+                    const durationMs = Date.now() - startTime;
+                    toolTraces.push({
+                        toolName: tc.name,
+                        args: tc.args,
+                        storeId: storeId,
+                        result: toolResult,
+                        durationMs: durationMs,
+                        status: status
+                    });
                     messages.push(new messages_1.ToolMessage({ content: toolResult, tool_call_id: tc.id }));
                 }
                 response = await boundRootModel.invoke(messages);
@@ -596,16 +619,43 @@ ${campaignsText}
             const costUsd = (promptTokens * 0.0000025) + (completionTokens * 0.00001);
             return {
                 reply: finalOutput,
-                tokens: { promptTokens, completionTokens, totalTokens, costUsd }
+                tokens: { promptTokens, completionTokens, totalTokens, costUsd },
+                toolTraces,
+                cart: ctx.cart
             };
         }
         catch (error) {
             console.error('[AIService] ❌ İşlem Hatası:', error);
             return {
                 reply: "Üzgünüm, şu an bağlantıda geçici bir yoğunluk var. Lütfen biraz sonra tekrar deneyiniz.",
-                tokens: { promptTokens: 0, completionTokens: 0, totalTokens: 0, costUsd: 0 }
+                tokens: { promptTokens: 0, completionTokens: 0, totalTokens: 0, costUsd: 0 },
+                toolTraces: [],
+                cart: []
             };
         }
+    }
+    static resetTestSession(storeId, storeSlug, senderId, channel = 'TEST', action = 'all') {
+        const key = `${storeId}:${storeSlug}:${channel}:${senderId}`;
+        if (this.sessions.has(key)) {
+            const ctx = this.sessions.get(key);
+            if (action === 'cart' || action === 'all') {
+                ctx.cart = [];
+            }
+            if (action === 'conversation' || action === 'all') {
+                ctx.history = [];
+            }
+            if (action === 'all') {
+                this.sessions.delete(key);
+            }
+        }
+    }
+    static getSessionInfo(storeId, storeSlug, senderId, channel = 'TEST') {
+        const key = `${storeId}:${storeSlug}:${channel}:${senderId}`;
+        const ctx = this.sessions.get(key) || { storeId, history: [], cart: [] };
+        return {
+            cart: ctx.cart || [],
+            historyCount: ctx.history ? ctx.history.length : 0
+        };
     }
 }
 exports.AIService = AIService;

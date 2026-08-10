@@ -17,6 +17,15 @@ export interface CartItem {
   unitPrice: number;
 }
 
+export interface ToolTraceItem {
+  toolName: string;
+  args: any;
+  storeId: number;
+  result: any;
+  durationMs: number;
+  status: 'SUCCESS' | 'FAILED';
+}
+
 interface SessionContext {
   storeId: number;
   history: BaseMessage[];
@@ -45,9 +54,9 @@ export class AIService {
     return (process.env.OPENAI_API_KEY || env.openaiApiKey || '').trim().replace(/^["']|["']$/g, '');
   }
 
-  private static getSessionContext(senderId: string, storeSlug: string = 'default', storeId: number = 1): SessionContext {
+  public static getSessionContext(senderId: string, storeSlug: string = 'default', storeId: number = 1, channel: string = 'instagram'): SessionContext {
     this.validateStoreId(storeId);
-    const key = `${storeId}:${storeSlug}:${senderId}`;
+    const key = `${storeId}:${storeSlug}:${channel}:${senderId}`;
     if (!this.sessions.has(key)) {
       this.sessions.set(key, { storeId, history: [], cart: [] });
     }
@@ -520,20 +529,29 @@ Yalnızca aşağıdaki JSON yapısını döndür (bilinmeyen alanlar için null 
     senderId: string, 
     userMessage: string, 
     storeSlug: string = 'default', 
-    storeId: number = 1
-  ): Promise<{ reply: string; tokens: { promptTokens: number; completionTokens: number; totalTokens: number; costUsd: number } }> {
+    storeId: number = 1,
+    channel: string = 'instagram'
+  ): Promise<{
+    reply: string;
+    tokens: { promptTokens: number; completionTokens: number; totalTokens: number; costUsd: number };
+    toolTraces: ToolTraceItem[];
+    cart: CartItem[];
+  }> {
     this.validateStoreId(storeId);
     const apiKey = this.getApiKey();
 
     if (!apiKey) {
       return {
         reply: "Merhaba! Lütfen geçerli bir OPENAI_API_KEY tanımlayınız.",
-        tokens: { promptTokens: 0, completionTokens: 0, totalTokens: 0, costUsd: 0 }
+        tokens: { promptTokens: 0, completionTokens: 0, totalTokens: 0, costUsd: 0 },
+        toolTraces: [],
+        cart: []
       };
     }
 
     let promptTokens = 0;
     let completionTokens = 0;
+    const toolTraces: ToolTraceItem[] = [];
 
     const trackUsage = (res: any, currentMessagesCount: number) => {
       if (res?.usage_metadata) {
@@ -547,7 +565,7 @@ Yalnızca aşağıdaki JSON yapısını döndür (bilinmeyen alanlar için null 
 
     try {
       await this.extractSessionDataWithAI(senderId, userMessage, apiKey, storeSlug, storeId);
-      const ctx = this.getSessionContext(senderId, storeSlug, storeId);
+      const ctx = this.getSessionContext(senderId, storeSlug, storeId, channel);
 
       // Veritabanından Aktif Kampanyaları Çek (Store Isolated)
       const activeCampaigns = db.prepare(`
@@ -639,12 +657,30 @@ ${campaignsText}
       while (response.tool_calls && response.tool_calls.length > 0 && count < 4) {
         count++;
         for (const tc of response.tool_calls) {
+          const startTime = Date.now();
           let toolResult = "";
-          if (tc.name === 'SIPARIS') {
-            toolResult = await siparisAgentTool.invoke(JSON.stringify(tc.args));
-          } else if (tc.name === 'STOK_MAN') {
-            toolResult = await stokManAgentTool.invoke(JSON.stringify(tc.args));
+          let status: 'SUCCESS' | 'FAILED' = 'SUCCESS';
+          try {
+            if (tc.name === 'SIPARIS') {
+              toolResult = await siparisAgentTool.invoke(JSON.stringify(tc.args));
+            } else if (tc.name === 'STOK_MAN') {
+              toolResult = await stokManAgentTool.invoke(JSON.stringify(tc.args));
+            } else {
+              toolResult = "Bilinmeyen araç";
+            }
+          } catch (err: any) {
+            status = 'FAILED';
+            toolResult = `Araç hatası: ${err.message}`;
           }
+          const durationMs = Date.now() - startTime;
+          toolTraces.push({
+            toolName: tc.name,
+            args: tc.args,
+            storeId: storeId,
+            result: toolResult,
+            durationMs: durationMs,
+            status: status
+          });
           messages.push(new ToolMessage({ content: toolResult, tool_call_id: tc.id! }));
         }
         response = await boundRootModel.invoke(messages);
@@ -660,15 +696,44 @@ ${campaignsText}
 
       return {
         reply: finalOutput,
-        tokens: { promptTokens, completionTokens, totalTokens, costUsd }
+        tokens: { promptTokens, completionTokens, totalTokens, costUsd },
+        toolTraces,
+        cart: ctx.cart
       };
 
     } catch (error: any) {
       console.error('[AIService] ❌ İşlem Hatası:', error);
       return {
         reply: "Üzgünüm, şu an bağlantıda geçici bir yoğunluk var. Lütfen biraz sonra tekrar deneyiniz.",
-        tokens: { promptTokens: 0, completionTokens: 0, totalTokens: 0, costUsd: 0 }
+        tokens: { promptTokens: 0, completionTokens: 0, totalTokens: 0, costUsd: 0 },
+        toolTraces: [],
+        cart: []
       };
     }
+  }
+
+  public static resetTestSession(storeId: number, storeSlug: string, senderId: string, channel: string = 'TEST', action: 'cart' | 'conversation' | 'all' = 'all') {
+    const key = `${storeId}:${storeSlug}:${channel}:${senderId}`;
+    if (this.sessions.has(key)) {
+      const ctx = this.sessions.get(key)!;
+      if (action === 'cart' || action === 'all') {
+        ctx.cart = [];
+      }
+      if (action === 'conversation' || action === 'all') {
+        ctx.history = [];
+      }
+      if (action === 'all') {
+        this.sessions.delete(key);
+      }
+    }
+  }
+
+  public static getSessionInfo(storeId: number, storeSlug: string, senderId: string, channel: string = 'TEST') {
+    const key = `${storeId}:${storeSlug}:${channel}:${senderId}`;
+    const ctx = this.sessions.get(key) || { storeId, history: [], cart: [] };
+    return {
+      cart: ctx.cart || [],
+      historyCount: ctx.history ? ctx.history.length : 0
+    };
   }
 }
