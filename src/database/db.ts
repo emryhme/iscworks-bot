@@ -392,6 +392,25 @@ export function initDatabase() {
     console.log('[Database Migration] ✅ settings tablosu başarıyla dönüştürüldü.');
   }
 
+  // Multi-Tenant Migration 3: inventory tablosunu eksik ürünler için otomatik backfill et (Store & Product Code Scoped)
+  try {
+    const backfillInventory = db.transaction(() => {
+      db.exec(`
+        INSERT INTO inventory (store_id, product_code, stock, reserved_stock, updated_at)
+        SELECT p.store_id, p.product_code, p.stock, 0, CURRENT_TIMESTAMP
+        FROM products p
+        WHERE NOT EXISTS (
+          SELECT 1 FROM inventory i 
+          WHERE i.store_id = p.store_id AND UPPER(i.product_code) = UPPER(p.product_code)
+        );
+      `);
+    });
+    backfillInventory();
+    console.log('[Database Migration] ✅ inventory tablosu eksik ürünler için otomatik senkronize (backfill) edildi.');
+  } catch (e: any) {
+    console.error('[Database Migration] ⚠️ inventory backfill uyarısı:', e.message);
+  }
+
   // Multi-Tenant Performans İndeksleri
   db.exec(`
     CREATE INDEX IF NOT EXISTS idx_products_code ON products(product_code);
@@ -416,6 +435,7 @@ export function initDatabase() {
     CREATE INDEX IF NOT EXISTS idx_stores_slug ON stores(slug);
     CREATE INDEX IF NOT EXISTS idx_inventory_store ON inventory(store_id);
     CREATE INDEX IF NOT EXISTS idx_inventory_store_code ON inventory(store_id, product_code);
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_inventory_store_code_unique ON inventory(store_id, product_code);
     CREATE INDEX IF NOT EXISTS idx_customers_store_sender ON customers(store_id, sender_id);
     CREATE INDEX IF NOT EXISTS idx_conversations_store_customer ON conversations(store_id, customer_id);
     CREATE INDEX IF NOT EXISTS idx_ai_usage_store ON ai_usage(store_id);

@@ -37,7 +37,7 @@ async function runTestSuite() {
     db_1.db.prepare('DELETE FROM conversations WHERE store_id IN (100, 200, 999)').run();
     db_1.db.prepare('DELETE FROM webhook_events WHERE store_id IN (100, 200, 999)').run();
     db_1.db.prepare('DELETE FROM memberships WHERE store_id IN (100, 200, 999)').run();
-    db_1.db.prepare("DELETE FROM users WHERE email IN ('owner_a@iscworks.com', 'staff_a@iscworks.com', 'owner_b@iscworks.com', 'inactive_user@iscworks.com')").run();
+    db_1.db.prepare("DELETE FROM users WHERE id IN (10, 11, 20, 30) OR email IN ('owner_a@iscworks.com', 'staff_a@iscworks.com', 'owner_b@iscworks.com', 'inactive_user@iscworks.com')").run();
     db_1.db.prepare('DELETE FROM stores WHERE id IN (100, 200, 999)').run();
     // SEED STORES
     db_1.db.prepare("INSERT OR IGNORE INTO stores (id, owner_id, name, slug, status) VALUES (100, 10, 'Store Alpha', 'store-alpha', 'active')").run();
