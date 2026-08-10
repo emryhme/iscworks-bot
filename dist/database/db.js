@@ -363,23 +363,20 @@ function initDatabase() {
     catch (e) { }
     exports.db.exec(`CREATE INDEX IF NOT EXISTS idx_webhook_events_store_event ON webhook_events(store_id, event_id);`);
     try {
-        exports.db.exec(`ALTER TABLE stores ADD COLUMN meta_page_id TEXT DEFAULT '';`);
-    }
-    catch (e) { }
-    try {
-        exports.db.exec(`ALTER TABLE stores ADD COLUMN instagram_account_id TEXT DEFAULT '';`);
-    }
-    catch (e) { }
-    try {
-        exports.db.exec(`ALTER TABLE stores ADD COLUMN instagram_username TEXT DEFAULT '';`);
-    }
-    catch (e) { }
-    try {
-        exports.db.exec(`ALTER TABLE stores ADD COLUMN last_webhook_at TEXT DEFAULT NULL;`);
+        exports.db.exec(`ALTER TABLE stores ADD COLUMN webhook_verify_token TEXT DEFAULT '';`);
     }
     catch (e) { }
     exports.db.exec(`CREATE INDEX IF NOT EXISTS idx_stores_meta_page ON stores(meta_page_id);`);
     exports.db.exec(`CREATE INDEX IF NOT EXISTS idx_stores_ig_account ON stores(instagram_account_id);`);
+    // Auto-generate webhook_verify_token for any store missing a token
+    try {
+        const storesWithoutToken = exports.db.prepare("SELECT id, slug FROM stores WHERE webhook_verify_token IS NULL OR webhook_verify_token = ''").all();
+        for (const st of storesWithoutToken) {
+            const newToken = `whsec_${st.slug}_` + crypto_1.default.randomBytes(12).toString('hex');
+            exports.db.prepare('UPDATE stores SET webhook_verify_token = ? WHERE id = ?').run(newToken, st.id);
+        }
+    }
+    catch (e) { }
     // Multi-Tenant Migration 1: products tablosunu UNIQUE(store_id, product_code) yapısına geçir
     const productsSchema = exports.db.prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'products'").get();
     if (productsSchema && (productsSchema.sql.includes('product_code TEXT UNIQUE') || !productsSchema.sql.includes('UNIQUE(store_id, product_code)'))) {

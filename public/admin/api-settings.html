@@ -249,6 +249,18 @@
                         </div>
                     </div>
                     <div class="form-group full-width">
+                        <label>Mağazanıza Özel Webhook Verify Token</label>
+                        <div style="display:flex; gap:8px; align-items:center;">
+                            <input type="password" id="storeVerifyTokenInput" readonly style="background:#0f172a; color:#34d399; font-family:monospace; font-weight:700; width:100%;" value="••••••••••••••••••••••••">
+                            <button type="button" class="btn btn-secondary" id="btnToggleTokenVisibility" onclick="toggleVerifyTokenVisibility()" style="white-space:nowrap;">
+                                <i class="fa-solid fa-eye" id="eyeIconToken"></i> Göster
+                            </button>
+                            <button type="button" class="btn btn-secondary" onclick="regenerateStoreVerifyToken()" style="white-space:nowrap; background: rgba(239,68,68,0.15); color: #f87171; border-color: rgba(239,68,68,0.3);">
+                                <i class="fa-solid fa-rotate"></i> Yeni Token Oluştur
+                            </button>
+                        </div>
+                    </div>
+                    <div class="form-group full-width">
                         <label>Genel Meta Entegrasyon Webhook URL (Global Endpoint)</label>
                         <input type="text" id="globalWebhookUrl" readonly style="background:#0f172a; color:#a78bfa; font-family:monospace; font-weight:700;" value="http://localhost:3000/webhook/instagram">
                     </div>

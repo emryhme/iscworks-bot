@@ -1032,6 +1032,88 @@ app.post('/api/settings', AuthMiddleware.authenticate, AuthMiddleware.requireRol
   }
 });
 
+app.get('/api/stores/webhook-info', AuthMiddleware.authenticate, AuthMiddleware.requireRole(['OWNER', 'ADMIN', 'MANAGER', 'STAFF']), (req: AuthenticatedRequest, res) => {
+  try {
+    const storeId = req.auth!.storeId;
+    let store = db.prepare('SELECT id, name, slug, status, meta_page_id, instagram_account_id, instagram_username, last_webhook_at, webhook_verify_token FROM stores WHERE id = ?').get(storeId) as any;
+
+    if (!store) {
+      return res.status(404).json({ success: false, error: 'Mağaza bulunamadı.' });
+    }
+
+    if (!store.webhook_verify_token) {
+      const newToken = `whsec_${store.slug}_` + crypto.randomBytes(12).toString('hex');
+      db.prepare('UPDATE stores SET webhook_verify_token = ? WHERE id = ?').run(newToken, storeId);
+      store.webhook_verify_token = newToken;
+    }
+
+    const host = req.get('host') || '136.92.8.201:3000';
+    const protocol = req.protocol === 'https' || req.get('x-forwarded-proto') === 'https' ? 'https' : 'http';
+    const webhookUrl = `${protocol}://${host}/api/webhook/${store.slug}`;
+
+    return res.json({
+      success: true,
+      storeId: store.id,
+      storeName: store.name,
+      slug: store.slug,
+      webhookUrl: webhookUrl,
+      verifyToken: store.webhook_verify_token,
+      metaPageId: store.meta_page_id || '',
+      instagramAccountId: store.instagram_account_id || '',
+      instagramUsername: store.instagram_username || '',
+      lastWebhookAt: store.last_webhook_at || null
+    });
+  } catch (e: any) {
+    return res.status(500).json({ success: false, error: e.message || 'Sunucu hatası' });
+  }
+});
+
+app.post('/api/stores/webhook-token/regenerate', AuthMiddleware.authenticate, AuthMiddleware.requireRole(['OWNER', 'ADMIN']), (req: AuthenticatedRequest, res) => {
+  try {
+    const storeId = req.auth!.storeId;
+    const store = db.prepare('SELECT id, slug FROM stores WHERE id = ?').get(storeId) as any;
+
+    if (!store) {
+      return res.status(404).json({ success: false, error: 'Mağaza bulunamadı.' });
+    }
+
+    const newToken = `whsec_${store.slug}_` + crypto.randomBytes(12).toString('hex');
+    db.prepare('UPDATE stores SET webhook_verify_token = ? WHERE id = ?').run(newToken, storeId);
+    AuthMiddleware.logAudit(storeId, req.auth!.userId, 'REGENERATE_WEBHOOK_TOKEN', 'stores', String(storeId));
+
+    return res.json({
+      success: true,
+      message: 'Webhook verify token başarıyla yenilendi.',
+      verifyToken: newToken
+    });
+  } catch (e: any) {
+    return res.status(500).json({ success: false, error: e.message || 'Token yenilenirken sunucu hatası oluştu.' });
+  }
+});
+
+app.post('/api/integration/meta', AuthMiddleware.authenticate, AuthMiddleware.requireRole(['OWNER', 'ADMIN', 'MANAGER']), (req: AuthenticatedRequest, res) => {
+  try {
+    const storeId = req.auth!.storeId;
+    const { metaPageId, instagramAccountId, instagramUsername } = req.body || {};
+
+    db.prepare(`
+      UPDATE stores 
+      SET meta_page_id = ?, instagram_account_id = ?, instagram_username = ?, updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `).run(
+      metaPageId ? String(metaPageId).trim() : '',
+      instagramAccountId ? String(instagramAccountId).trim() : '',
+      instagramUsername ? String(instagramUsername).trim() : '',
+      storeId
+    );
+
+    AuthMiddleware.logAudit(storeId, req.auth!.userId, 'UPDATE_META_INTEGRATION', 'stores', String(storeId));
+    return res.json({ success: true, message: 'Meta & Instagram entegrasyon ayarları kaydedildi!' });
+  } catch (e: any) {
+    return res.status(500).json({ success: false, error: e.message || 'Meta ayarları kaydedilemedi.' });
+  }
+});
+
 // --- VIP REWARDS ---
 app.get('/api/rewards', AuthMiddleware.authenticate, AuthMiddleware.requireRole(['OWNER', 'ADMIN', 'MANAGER', 'STAFF']), (req: AuthenticatedRequest, res) => {
   try {

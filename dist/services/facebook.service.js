@@ -6,32 +6,43 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.FacebookService = void 0;
 const axios_1 = __importDefault(require("axios"));
 const env_1 = require("../config/env");
+const db_1 = require("../database/db");
 /**
- * Facebook Graph API (Instagram DM / Messenger) Yanıt Gönderme Servisi
+ * Facebook Graph API (Instagram DM / Messenger) Yanıt Gönderme Servisi (Store Scoped)
  */
 class FacebookService {
     /**
-     * Müşteriye yanıt mesajı gönderir.
+     * Müşteriye yanıt mesajı gönderir (Per-Store Credential Support).
      */
-    static async sendMessage(recipientId, text) {
-        if (!env_1.env.fbPageAccessToken) {
-            console.warn('[FacebookService] ⚠️ FB Page Access Token eksik, mesaj konsola yazdırılıyor:');
+    static async sendMessage(recipientId, text, storeId) {
+        let accessToken = env_1.env.fbPageAccessToken;
+        if (storeId) {
+            try {
+                const setting = db_1.db.prepare("SELECT value FROM settings WHERE store_id = ? AND key = 'facebook_page_access_token'").get(storeId);
+                if (setting && setting.value && setting.value.trim()) {
+                    accessToken = setting.value.trim();
+                }
+            }
+            catch { }
+        }
+        if (!accessToken) {
+            console.warn(`[FacebookService] ⚠️ FB Page Access Token eksik (Store: ${storeId || 'default'}), mesaj konsola yazdırılıyor:`);
             console.log(`[FB Mock -> ${recipientId}]: ${text}`);
             return false;
         }
         const sanitizedText = text ? text.trim() : '';
         try {
-            const url = `https://graph.facebook.com/v21.0/me/messages?access_token=${encodeURIComponent(env_1.env.fbPageAccessToken)}`;
+            const url = `https://graph.facebook.com/v21.0/me/messages?access_token=${encodeURIComponent(accessToken)}`;
             const res = await axios_1.default.post(url, {
                 recipient: { id: recipientId },
                 message: { text: sanitizedText }
             }, {
                 headers: {
-                    Authorization: `Bearer ${env_1.env.fbPageAccessToken}`,
+                    Authorization: `Bearer ${accessToken}`,
                     'Content-Type': 'application/json'
                 }
             });
-            console.log(`[FacebookService] 📤 Mesaj başarıyla gönderildi -> ${recipientId} (Status: ${res.status})`);
+            console.log(`[FacebookService] 📤 Mesaj başarıyla gönderildi -> ${recipientId} (Store: ${storeId || 'default'}, Status: ${res.status})`);
             return true;
         }
         catch (error) {

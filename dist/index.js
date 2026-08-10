@@ -920,6 +920,74 @@ app.post('/api/settings', auth_middleware_1.AuthMiddleware.authenticate, auth_mi
         res.status(500).json({ success: false, error: e.message });
     }
 });
+app.get('/api/stores/webhook-info', auth_middleware_1.AuthMiddleware.authenticate, auth_middleware_1.AuthMiddleware.requireRole(['OWNER', 'ADMIN', 'MANAGER', 'STAFF']), (req, res) => {
+    try {
+        const storeId = req.auth.storeId;
+        let store = db_1.db.prepare('SELECT id, name, slug, status, meta_page_id, instagram_account_id, instagram_username, last_webhook_at, webhook_verify_token FROM stores WHERE id = ?').get(storeId);
+        if (!store) {
+            return res.status(404).json({ success: false, error: 'Mağaza bulunamadı.' });
+        }
+        if (!store.webhook_verify_token) {
+            const newToken = `whsec_${store.slug}_` + crypto_1.default.randomBytes(12).toString('hex');
+            db_1.db.prepare('UPDATE stores SET webhook_verify_token = ? WHERE id = ?').run(newToken, storeId);
+            store.webhook_verify_token = newToken;
+        }
+        const host = req.get('host') || '136.92.8.201:3000';
+        const protocol = req.protocol === 'https' || req.get('x-forwarded-proto') === 'https' ? 'https' : 'http';
+        const webhookUrl = `${protocol}://${host}/api/webhook/${store.slug}`;
+        return res.json({
+            success: true,
+            storeId: store.id,
+            storeName: store.name,
+            slug: store.slug,
+            webhookUrl: webhookUrl,
+            verifyToken: store.webhook_verify_token,
+            metaPageId: store.meta_page_id || '',
+            instagramAccountId: store.instagram_account_id || '',
+            instagramUsername: store.instagram_username || '',
+            lastWebhookAt: store.last_webhook_at || null
+        });
+    }
+    catch (e) {
+        return res.status(500).json({ success: false, error: e.message || 'Sunucu hatası' });
+    }
+});
+app.post('/api/stores/webhook-token/regenerate', auth_middleware_1.AuthMiddleware.authenticate, auth_middleware_1.AuthMiddleware.requireRole(['OWNER', 'ADMIN']), (req, res) => {
+    try {
+        const storeId = req.auth.storeId;
+        const store = db_1.db.prepare('SELECT id, slug FROM stores WHERE id = ?').get(storeId);
+        if (!store) {
+            return res.status(404).json({ success: false, error: 'Mağaza bulunamadı.' });
+        }
+        const newToken = `whsec_${store.slug}_` + crypto_1.default.randomBytes(12).toString('hex');
+        db_1.db.prepare('UPDATE stores SET webhook_verify_token = ? WHERE id = ?').run(newToken, storeId);
+        auth_middleware_1.AuthMiddleware.logAudit(storeId, req.auth.userId, 'REGENERATE_WEBHOOK_TOKEN', 'stores', String(storeId));
+        return res.json({
+            success: true,
+            message: 'Webhook verify token başarıyla yenilendi.',
+            verifyToken: newToken
+        });
+    }
+    catch (e) {
+        return res.status(500).json({ success: false, error: e.message || 'Token yenilenirken sunucu hatası oluştu.' });
+    }
+});
+app.post('/api/integration/meta', auth_middleware_1.AuthMiddleware.authenticate, auth_middleware_1.AuthMiddleware.requireRole(['OWNER', 'ADMIN', 'MANAGER']), (req, res) => {
+    try {
+        const storeId = req.auth.storeId;
+        const { metaPageId, instagramAccountId, instagramUsername } = req.body || {};
+        db_1.db.prepare(`
+      UPDATE stores 
+      SET meta_page_id = ?, instagram_account_id = ?, instagram_username = ?, updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `).run(metaPageId ? String(metaPageId).trim() : '', instagramAccountId ? String(instagramAccountId).trim() : '', instagramUsername ? String(instagramUsername).trim() : '', storeId);
+        auth_middleware_1.AuthMiddleware.logAudit(storeId, req.auth.userId, 'UPDATE_META_INTEGRATION', 'stores', String(storeId));
+        return res.json({ success: true, message: 'Meta & Instagram entegrasyon ayarları kaydedildi!' });
+    }
+    catch (e) {
+        return res.status(500).json({ success: false, error: e.message || 'Meta ayarları kaydedilemedi.' });
+    }
+});
 // --- VIP REWARDS ---
 app.get('/api/rewards', auth_middleware_1.AuthMiddleware.authenticate, auth_middleware_1.AuthMiddleware.requireRole(['OWNER', 'ADMIN', 'MANAGER', 'STAFF']), (req, res) => {
     try {

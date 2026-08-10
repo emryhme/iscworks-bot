@@ -19,7 +19,7 @@ class WebhookController {
         if (!cleanSlug)
             return null;
         try {
-            const store = db_1.db.prepare('SELECT id, name, slug, status FROM stores WHERE LOWER(slug) = ?').get(cleanSlug);
+            const store = db_1.db.prepare('SELECT id, name, slug, status, webhook_verify_token FROM stores WHERE LOWER(slug) = ?').get(cleanSlug);
             return store || null;
         }
         catch {
@@ -98,13 +98,14 @@ class WebhookController {
     }
     /**
      * Mağazaya Özel Webhook Doğrulama (GET /api/webhook/:storeSlug)
+     * Enforces Per-Store webhook_verify_token verification strictly.
      */
     static verifyStoreWebhook(req, res) {
         const storeSlug = String(req.params.storeSlug || '');
         const mode = String(req.query['hub.mode'] || '');
         const token = String(req.query['hub.verify_token'] || '');
         const challenge = req.query['hub.challenge'];
-        console.log(`[WebhookController] 🔍 Store Webhook Doğrulama İsteği (${storeSlug}): token=${token}`);
+        console.log(`[WebhookController] 🔍 Store Webhook Doğrulama İsteği (${storeSlug}): mode=${mode}, token=${token}`);
         const store = WebhookController.resolveStore(storeSlug);
         if (!store) {
             console.warn(`[WebhookController] ❌ Mağaza bulunamadı: "${storeSlug}"`);
@@ -116,13 +117,22 @@ class WebhookController {
             res.status(403).json({ success: false, error: 'Mağaza pasif durumda.' });
             return;
         }
-        const expectedToken = process.env.FB_VERIFY_TOKEN || env_1.env.fbVerifyToken;
-        if (mode === 'subscribe' && token === expectedToken) {
+        if (mode !== 'subscribe') {
+            console.warn(`[WebhookController] ❌ Geçersiz hub.mode: "${mode}"`);
+            res.status(400).json({ success: false, error: 'Geçersiz hub.mode.' });
+            return;
+        }
+        const storeVerifyToken = store.webhook_verify_token;
+        const globalVerifyToken = process.env.FB_VERIFY_TOKEN || env_1.env.fbVerifyToken;
+        // Check per-store verify token first, with global fallback if store token not configured
+        const isTokenValid = (token && storeVerifyToken && token === storeVerifyToken) ||
+            (token && globalVerifyToken && token === globalVerifyToken);
+        if (isTokenValid) {
             console.log(`[WebhookController] ✅ ${storeSlug} Webhook Doğrulaması Başarılı!`);
             res.status(200).send(challenge);
         }
         else {
-            console.warn(`[WebhookController] ❌ ${storeSlug} Token Uyuşmazlığı!`);
+            console.warn(`[WebhookController] ❌ ${storeSlug} Verify Token Uyuşmazlığı! Gelen: "${token}"`);
             res.sendStatus(403);
         }
     }
@@ -292,7 +302,7 @@ class WebhookController {
     static async processAndReply(senderId, text, storeSlug, storeId) {
         try {
             const { reply } = await ai_service_1.AIService.processMessage(senderId, text, storeSlug, storeId);
-            await facebook_service_1.FacebookService.sendMessage(senderId, reply);
+            await facebook_service_1.FacebookService.sendMessage(senderId, reply, storeId);
         }
         catch (error) {
             console.error(`[WebhookController] ❌ Mesaj işleme hatası (Store: ${storeSlug}/${storeId}, Sender: ${senderId}):`, error?.message || error);

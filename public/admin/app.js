@@ -2172,32 +2172,41 @@ function exportStoreDataToCSV() {
 }
 
 // MAĞAZAYA ÖZEL WEBHOOK VE META ENTEGRASYON SÜRÜCÜSÜ
+let realVerifyToken = '';
+
 async function loadStoreWebhookDetails() {
   const input = document.getElementById('storeWebhookUrl');
-  if (!input) return;
+  const tokenInput = document.getElementById('storeVerifyTokenInput');
+  const pageIdInput = document.getElementById('metaPageIdInput');
+  const igAccountInput = document.getElementById('igAccountIdInput');
+  const igUserInput = document.getElementById('igUsernameInput');
+  const lastEvtElem = document.getElementById('lastWebhookEventTime');
+  const statusBadge = document.getElementById('metaStatusBadge');
 
+  if (!input && !tokenInput) return;
   const origin = window.location.origin || 'http://localhost:3000';
 
   try {
-    const data = await apiFetch('/api/integration/status');
+    const data = await apiFetch('/api/stores/webhook-info');
     if (data && data.success) {
-      if (input) input.value = `${origin}/api/webhook/${data.storeSlug}`;
-      
+      if (input) input.value = data.webhookUrl || `${origin}/api/webhook/${data.slug}`;
+      realVerifyToken = data.verifyToken || '';
+
+      if (tokenInput && tokenInput.type === 'password') {
+        tokenInput.value = '••••••••••••••••••••••••';
+      } else if (tokenInput && tokenInput.type === 'text') {
+        tokenInput.value = realVerifyToken;
+      }
+
       const globalInput = document.getElementById('globalWebhookUrl');
       if (globalInput) globalInput.value = `${origin}/webhook/instagram`;
 
-      const pageIdInput = document.getElementById('metaPageIdInput');
       if (pageIdInput) pageIdInput.value = data.metaPageId || '';
-
-      const igAccountInput = document.getElementById('igAccountIdInput');
       if (igAccountInput) igAccountInput.value = data.instagramAccountId || '';
-
-      const igUserInput = document.getElementById('igUsernameInput');
       if (igUserInput) igUserInput.value = data.instagramUsername || '';
 
-      const statusBadge = document.getElementById('metaStatusBadge');
       if (statusBadge) {
-        if (data.connected) {
+        if (data.metaPageId || data.instagramAccountId) {
           statusBadge.className = 'status-badge in-stock';
           statusBadge.innerHTML = '🟢 Bağlı (Connected)';
         } else {
@@ -2206,15 +2215,52 @@ async function loadStoreWebhookDetails() {
         }
       }
 
-      const lastEvtElem = document.getElementById('lastWebhookEventTime');
       if (lastEvtElem) {
         lastEvtElem.textContent = data.lastWebhookAt || 'Henüz event gelmedi';
       }
     }
   } catch (e) {
-    const storeName = getActiveStoreName();
-    const slug = storeName.toLowerCase().replace(/[^a-z0-9]/g, '');
-    if (input) input.value = `${origin}/api/webhook/${slug || 'magaza'}`;
+    console.warn('[loadStoreWebhookDetails Notice]:', e.message);
+  }
+}
+
+function toggleVerifyTokenVisibility() {
+  const tokenInput = document.getElementById('storeVerifyTokenInput');
+  const btn = document.getElementById('btnToggleTokenVisibility');
+  if (!tokenInput) return;
+
+  if (tokenInput.type === 'password') {
+    tokenInput.type = 'text';
+    tokenInput.value = realVerifyToken;
+    if (btn) btn.innerHTML = '<i class="fa-solid fa-eye-slash"></i> Gizle';
+  } else {
+    tokenInput.type = 'password';
+    tokenInput.value = '••••••••••••••••••••••••';
+    if (btn) btn.innerHTML = '<i class="fa-solid fa-eye"></i> Göster';
+  }
+}
+
+async function regenerateStoreVerifyToken() {
+  if (!confirm('Mağazanıza özel Webhook Verify Token\'ı yenilemek istediğinizden emin misiniz?\n\nYeni token oluşturulduğunda Meta Developer portalında da güncellemeniz gerekecektir.')) return;
+
+  try {
+    const data = await apiFetch('/api/stores/webhook-token/regenerate', { method: 'POST' });
+    if (data && data.success && data.verifyToken) {
+      realVerifyToken = data.verifyToken;
+      const tokenInput = document.getElementById('storeVerifyTokenInput');
+      if (tokenInput) {
+        if (tokenInput.type === 'text') {
+          tokenInput.value = realVerifyToken;
+        } else {
+          tokenInput.value = '••••••••••••••••••••••••';
+        }
+      }
+      showToast('🎉 Webhook Verify Token başarıyla yenilendi!', 'success');
+    } else {
+      showToast(`❌ Hata: ${data?.error || 'Token yenilenemedi.'}`, 'error');
+    }
+  } catch (e) {
+    showToast(`❌ Hata: ${e.message || 'Token yenilenirken hata oluştu.'}`, 'error');
   }
 }
 

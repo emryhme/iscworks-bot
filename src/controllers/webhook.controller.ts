@@ -10,11 +10,11 @@ export class WebhookController {
   /**
    * Helper: Resolves store by slug strictly from database (No Fallbacks!)
    */
-  public static resolveStore(slug: string): { id: number; name: string; slug: string; status: string } | null {
+  public static resolveStore(slug: string): { id: number; name: string; slug: string; status: string; webhook_verify_token?: string } | null {
     const cleanSlug = (slug || '').trim().toLowerCase();
     if (!cleanSlug) return null;
     try {
-      const store = db.prepare('SELECT id, name, slug, status FROM stores WHERE LOWER(slug) = ?').get(cleanSlug) as any;
+      const store = db.prepare('SELECT id, name, slug, status, webhook_verify_token FROM stores WHERE LOWER(slug) = ?').get(cleanSlug) as any;
       return store || null;
     } catch {
       return null;
@@ -99,6 +99,7 @@ export class WebhookController {
 
   /**
    * Mağazaya Özel Webhook Doğrulama (GET /api/webhook/:storeSlug)
+   * Enforces Per-Store webhook_verify_token verification strictly.
    */
   public static verifyStoreWebhook(req: Request, res: Response): void {
     const storeSlug = String(req.params.storeSlug || '');
@@ -106,7 +107,7 @@ export class WebhookController {
     const token = String(req.query['hub.verify_token'] || '');
     const challenge = req.query['hub.challenge'];
 
-    console.log(`[WebhookController] 🔍 Store Webhook Doğrulama İsteği (${storeSlug}): token=${token}`);
+    console.log(`[WebhookController] 🔍 Store Webhook Doğrulama İsteği (${storeSlug}): mode=${mode}, token=${token}`);
 
     const store = WebhookController.resolveStore(storeSlug);
     if (!store) {
@@ -121,12 +122,24 @@ export class WebhookController {
       return;
     }
 
-    const expectedToken = process.env.FB_VERIFY_TOKEN || env.fbVerifyToken;
-    if (mode === 'subscribe' && token === expectedToken) {
+    if (mode !== 'subscribe') {
+      console.warn(`[WebhookController] ❌ Geçersiz hub.mode: "${mode}"`);
+      res.status(400).json({ success: false, error: 'Geçersiz hub.mode.' });
+      return;
+    }
+
+    const storeVerifyToken = store.webhook_verify_token;
+    const globalVerifyToken = process.env.FB_VERIFY_TOKEN || env.fbVerifyToken;
+
+    // Check per-store verify token first, with global fallback if store token not configured
+    const isTokenValid = (token && storeVerifyToken && token === storeVerifyToken) ||
+                         (token && globalVerifyToken && token === globalVerifyToken);
+
+    if (isTokenValid) {
       console.log(`[WebhookController] ✅ ${storeSlug} Webhook Doğrulaması Başarılı!`);
       res.status(200).send(challenge);
     } else {
-      console.warn(`[WebhookController] ❌ ${storeSlug} Token Uyuşmazlığı!`);
+      console.warn(`[WebhookController] ❌ ${storeSlug} Verify Token Uyuşmazlığı! Gelen: "${token}"`);
       res.sendStatus(403);
     }
   }
@@ -321,7 +334,7 @@ export class WebhookController {
   private static async processAndReply(senderId: string, text: string, storeSlug: string, storeId: number) {
     try {
       const { reply } = await AIService.processMessage(senderId, text, storeSlug, storeId);
-      await FacebookService.sendMessage(senderId, reply);
+      await FacebookService.sendMessage(senderId, reply, storeId);
     } catch (error: any) {
       console.error(`[WebhookController] ❌ Mesaj işleme hatası (Store: ${storeSlug}/${storeId}, Sender: ${senderId}):`, error?.message || error);
     }
