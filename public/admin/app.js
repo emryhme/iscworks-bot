@@ -1467,16 +1467,15 @@ async function deleteProduct(productCode) {
 }
 
 // Fetch and Handle Settings
+// Fetch and Handle Settings (API via apiFetch)
 async function fetchSettings() {
   const settingShippingFee = document.getElementById('settingShippingFee');
   const settingFreeThreshold = document.getElementById('settingFreeThreshold');
   if (!settingShippingFee && !settingFreeThreshold) return;
 
   try {
-    const res = await fetch(`${API_BASE}/api/settings`);
-    if (!res.ok) return;
-    const data = await res.json();
-    if (data.success && data.settings) {
+    const data = await apiFetch('/api/settings');
+    if (data && data.success && data.settings) {
       if (settingShippingFee) settingShippingFee.value = data.settings.shipping_fee || '49';
       if (settingFreeThreshold) settingFreeThreshold.value = data.settings.free_shipping_threshold || '1500';
     }
@@ -1492,34 +1491,28 @@ async function handleSettingsSubmit(e) {
   const freeThreshold = settingFreeThreshold ? settingFreeThreshold.value : '1500';
 
   try {
-    const res = await fetch(`${API_BASE}/api/settings`, {
+    const data = await apiFetch('/api/settings', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ settings: { shipping_fee: shippingFee, free_shipping_threshold: freeThreshold } })
     });
-    const data = await res.json();
-    if (data.success) {
+    if (data && data.success) {
       showToast('✅ Kargo fiyat ayarları kaydedildi!', 'success');
     } else {
-      showToast('❌ Ayarlar kaydedilemedi.', 'error');
+      const errMsg = typeof data?.error === 'string' ? data.error : (data?.error?.message || 'Ayarlar kaydedilemedi.');
+      showToast(`❌ Hata: ${errMsg}`, 'error');
     }
   } catch (e) {
-    showToast('Ayarlar kaydedilirken hata oluştu.', 'error');
+    showToast(`❌ Hata: ${e.message || 'Ayarlar kaydedilirken hata oluştu.'}`, 'error');
   }
 }
 
-// Fetch and Handle Campaigns
+// Fetch and Handle Campaigns (API via apiFetch)
 async function fetchCampaigns() {
   const tableBody = document.getElementById('campaignsTableBody');
   if (!tableBody) return;
 
   try {
-    const res = await fetch(`${API_BASE}/api/campaigns`);
-    if (!res.ok) {
-      tableBody.innerHTML = `<tr><td colspan="7" style="text-align:center; padding: 1.5rem; color: #ef4444;">Kampanyalar alınamadı (${res.status}).</td></tr>`;
-      return;
-    }
-    const data = await res.json();
+    const data = await apiFetch('/api/campaigns');
     if (data && data.success && Array.isArray(data.campaigns)) {
       if (data.campaigns.length === 0) {
         tableBody.innerHTML = `<tr><td colspan="7" style="text-align:center; padding: 1.5rem; color: #94a3b8;">Henüz aktif bir kampanya eklenmemiş. Yeni kampanya ekleyebilirsiniz.</td></tr>`;
@@ -1550,6 +1543,9 @@ async function fetchCampaigns() {
           </tr>
         `;
       }).join('');
+    } else {
+      const errMsg = typeof data?.error === 'string' ? data.error : (data?.error?.message || 'Kampanyalar yüklenemedi.');
+      tableBody.innerHTML = `<tr><td colspan="7" style="text-align:center; padding: 1.5rem; color: #ef4444;">${escapeHtml(errMsg)}</td></tr>`;
     }
   } catch (e) {
     tableBody.innerHTML = `<tr><td colspan="7" style="text-align:center; padding: 1.5rem; color: #ef4444;">Bağlantı hatası: ${escapeHtml(e.message)}</td></tr>`;
@@ -1586,19 +1582,18 @@ async function handleCampaignSubmit(e) {
   }
 
   try {
-    const res = await fetch(`${API_BASE}/api/campaigns`, {
+    const data = await apiFetch('/api/campaigns', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
     });
-    const data = await res.json();
-    if (res.ok && data.success) {
+    if (data && data.success) {
       showToast('🎉 Yeni kampanya başarıyla başlatıldı ve kaydedildi!', 'success');
       const form = document.getElementById('campaignForm');
       if (form) form.reset();
       fetchCampaigns();
     } else {
-      showToast(`❌ Kampanya kaydedilemedi: ${data.error || 'Bilinmeyen sunucu hatası'}`, 'error');
+      const errMsg = typeof data?.error === 'string' ? data.error : (data?.error?.message || data?.message || 'Bilinmeyen sunucu hatası');
+      showToast(`❌ Kampanya kaydedilemedi: ${errMsg}`, 'error');
     }
   } catch (e) {
     showToast(`❌ Sunucu Bağlantı Hatası: ${e.message}`, 'error');
@@ -1608,18 +1603,20 @@ async function handleCampaignSubmit(e) {
 async function deleteCampaign(id) {
   if (!confirm('Kampanyayı silmek istediğinize emin misiniz?')) return;
   try {
-    const res = await fetch(`${API_BASE}/api/campaigns/${id}`, { method: 'DELETE' });
-    const data = await res.json();
-    if (data.success) {
+    const data = await apiFetch(`/api/campaigns/${id}`, { method: 'DELETE' });
+    if (data && data.success) {
       showToast('✅ Kampanya silindi.', 'success');
       fetchCampaigns();
+    } else {
+      const errMsg = typeof data?.error === 'string' ? data.error : (data?.error?.message || 'Kampanya silinemedi.');
+      showToast(`❌ Hata: ${errMsg}`, 'error');
     }
   } catch (e) {
-    showToast('Kampanya silinirken hata oluştu.', 'error');
+    showToast(`❌ Hata: ${e.message || 'Kampanya silinirken hata oluştu.'}`, 'error');
   }
 }
 
-// Handle Custom VIP Reward Submit
+// Handle Custom VIP Reward Submit (API via apiFetch)
 async function handleRewardSubmit(e) {
   e.preventDefault();
 
@@ -1638,36 +1635,37 @@ async function handleRewardSubmit(e) {
   };
 
   try {
-    const res = await fetch(`${API_BASE}/api/rewards`, {
+    const data = await apiFetch('/api/rewards', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
     });
-    const data = await res.json();
-    if (res.ok && data.success) {
+    if (data && data.success) {
       showToast('💎 VIP Sadakat Ödülü başarıyla eklendi!', 'success');
       const form = document.getElementById('rewardForm');
       if (form) form.reset();
       fetchData();
     } else {
-      showToast(`❌ Hata: ${data.error || 'Eklenemedi'}`, 'error');
+      const errMsg = typeof data?.error === 'string' ? data.error : (data?.error?.message || 'Eklenemedi');
+      showToast(`❌ Hata: ${errMsg}`, 'error');
     }
   } catch (e) {
-    showToast('Ödül eklenirken sunucu hatası oluştu.', 'error');
+    showToast(`❌ Hata: ${e.message || 'Ödül eklenirken sunucu hatası oluştu.'}`, 'error');
   }
 }
 
 async function deleteReward(id) {
   if (!confirm('Bu VIP ödülünü silmek istediğinize emin misiniz?')) return;
   try {
-    const res = await fetch(`${API_BASE}/api/rewards/${id}`, { method: 'DELETE' });
-    const data = await res.json();
-    if (data.success) {
+    const data = await apiFetch(`/api/rewards/${id}`, { method: 'DELETE' });
+    if (data && data.success) {
       showToast('✅ VIP Ödülü silindi.', 'success');
       fetchData();
+    } else {
+      const errMsg = typeof data?.error === 'string' ? data.error : (data?.error?.message || 'Silinemedi.');
+      showToast(`❌ Hata: ${errMsg}`, 'error');
     }
   } catch (e) {
-    showToast('Silme hatası oluştu.', 'error');
+    showToast(`❌ Hata: ${e.message || 'Silme hatası oluştu.'}`, 'error');
   }
 }
 

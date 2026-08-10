@@ -793,37 +793,89 @@ app.get('/api/campaigns', auth_middleware_1.AuthMiddleware.authenticate, auth_mi
     try {
         const storeId = req.auth.storeId;
         const campaigns = db_1.db.prepare('SELECT * FROM campaigns WHERE store_id = ? ORDER BY id DESC').all(storeId);
-        res.json({ success: true, campaigns });
+        return res.json({ success: true, campaigns });
     }
     catch (e) {
-        res.status(500).json({ success: false, error: e.message });
+        return res.status(500).json({ success: false, error: e.message || 'Kampanyalar alınırken sunucu hatası oluştu.' });
     }
 });
 app.post('/api/campaigns', auth_middleware_1.AuthMiddleware.authenticate, auth_middleware_1.AuthMiddleware.requireRole(['OWNER', 'ADMIN', 'MANAGER']), (req, res) => {
     try {
         const storeId = req.auth.storeId;
-        const { title, description, code, discountPercent, discountAmount, minOrderAmount, startDate, endDate } = req.body;
+        const { title, description, code, discountPercent, discountAmount, minOrderAmount, startDate, endDate } = req.body || {};
+        if (!title || !String(title).trim() || !description || !String(description).trim()) {
+            return res.status(400).json({ success: false, error: 'Kampanya başlığı ve açıklaması zorunludur.' });
+        }
+        const cleanTitle = String(title).trim();
+        const cleanDesc = String(description).trim();
+        const cleanCode = code ? String(code).trim().toUpperCase() : '';
+        const numPercent = discountPercent !== undefined ? Number(discountPercent) : 0;
+        const numAmount = discountAmount !== undefined ? Number(discountAmount) : 0;
+        const numMinOrder = minOrderAmount !== undefined ? Number(minOrderAmount) : 0;
+        if (isNaN(numPercent) || numPercent < 0) {
+            return res.status(400).json({ success: false, error: 'Geçersiz indirim yüzdesi.' });
+        }
         const stmt = db_1.db.prepare(`
       INSERT INTO campaigns (store_id, title, description, code, discount_percent, discount_amount, min_order_amount, start_date, end_date, active)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
     `);
-        stmt.run(storeId, title, description, code || '', discountPercent || 0, discountAmount || 0, minOrderAmount || 0, startDate || null, endDate || null);
-        auth_middleware_1.AuthMiddleware.logAudit(storeId, req.auth.userId, 'CREATE_CAMPAIGN', 'campaigns', code || title);
-        res.json({ success: true, message: 'Kampanya başarıyla oluşturuldu.' });
+        const result = stmt.run(storeId, cleanTitle, cleanDesc, cleanCode, numPercent, numAmount, numMinOrder, startDate || null, endDate || null);
+        auth_middleware_1.AuthMiddleware.logAudit(storeId, req.auth.userId, 'CREATE_CAMPAIGN', 'campaigns', cleanCode || cleanTitle);
+        return res.status(201).json({
+            success: true,
+            message: 'Kampanya başarıyla oluşturuldu.',
+            id: Number(result.lastInsertRowid),
+            campaign: {
+                id: Number(result.lastInsertRowid),
+                store_id: storeId,
+                title: cleanTitle,
+                description: cleanDesc,
+                code: cleanCode,
+                discount_percent: numPercent,
+                active: 1
+            }
+        });
     }
     catch (e) {
-        res.status(500).json({ success: false, error: e.message });
+        return res.status(500).json({ success: false, error: e.message || 'Kampanya oluşturulurken veritabanı hatası oluştu.' });
+    }
+});
+app.post('/api/campaigns/toggle', auth_middleware_1.AuthMiddleware.authenticate, auth_middleware_1.AuthMiddleware.requireRole(['OWNER', 'ADMIN', 'MANAGER']), (req, res) => {
+    try {
+        const storeId = req.auth.storeId;
+        const { id, active } = req.body || {};
+        if (!id) {
+            return res.status(400).json({ success: false, error: 'Kampanya id zorunludur.' });
+        }
+        const newActive = active ? 1 : 0;
+        const result = db_1.db.prepare('UPDATE campaigns SET active = ? WHERE store_id = ? AND id = ?').run(newActive, storeId, String(id));
+        if (result.changes > 0) {
+            auth_middleware_1.AuthMiddleware.logAudit(storeId, req.auth.userId, 'TOGGLE_CAMPAIGN', 'campaigns', String(id), '', String(newActive));
+            return res.json({ success: true, message: 'Kampanya durumu güncellendi.', active: newActive });
+        }
+        else {
+            return res.status(404).json({ success: false, error: 'Kampanya bulunamadı veya bu mağazaya ait değil.' });
+        }
+    }
+    catch (e) {
+        return res.status(500).json({ success: false, error: e.message || 'Kampanya güncellenemedi.' });
     }
 });
 app.delete('/api/campaigns/:id', auth_middleware_1.AuthMiddleware.authenticate, auth_middleware_1.AuthMiddleware.requireRole(['OWNER', 'ADMIN', 'MANAGER']), (req, res) => {
     try {
         const storeId = req.auth.storeId;
-        db_1.db.prepare('DELETE FROM campaigns WHERE store_id = ? AND id = ?').run(storeId, String(req.params.id));
-        auth_middleware_1.AuthMiddleware.logAudit(storeId, req.auth.userId, 'DELETE_CAMPAIGN', 'campaigns', String(req.params.id));
-        res.json({ success: true, message: 'Kampanya silindi.' });
+        const campaignId = String(req.params.id);
+        const result = db_1.db.prepare('DELETE FROM campaigns WHERE store_id = ? AND id = ?').run(storeId, campaignId);
+        if (result.changes > 0) {
+            auth_middleware_1.AuthMiddleware.logAudit(storeId, req.auth.userId, 'DELETE_CAMPAIGN', 'campaigns', campaignId);
+            return res.json({ success: true, message: 'Kampanya silindi.' });
+        }
+        else {
+            return res.status(404).json({ success: false, error: 'Kampanya bulunamadı veya bu mağazaya ait değil.' });
+        }
     }
     catch (e) {
-        res.status(500).json({ error: e.message });
+        return res.status(500).json({ success: false, error: e.message || 'Kampanya silinirken hata oluştu.' });
     }
 });
 // --- SETTINGS ---
