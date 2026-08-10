@@ -1063,59 +1063,7 @@ function renderOrdersTable() {
   }).join('');
 }
 
-// Handle New Product Submit
-async function handleNewProductSubmit(e) {
-  e.preventDefault();
 
-  const shortCode = document.getElementById('shortCode');
-  const sizeInput = document.getElementById('sizeInput');
-  const productCode = document.getElementById('productCode');
-  const productName = document.getElementById('productName');
-  const colorInput = document.getElementById('colorInput');
-  const stockInput = document.getElementById('stockInput');
-  const categoryInput = document.getElementById('categoryInput');
-
-  const shortCodeVal = (shortCode?.value || '').toUpperCase().trim();
-  const sizeVal = (sizeInput?.value || '').toUpperCase().trim();
-  let computedProductCode = (productCode?.value || '').toUpperCase().trim();
-
-  if (!computedProductCode && shortCodeVal && sizeVal) {
-    computedProductCode = `${shortCodeVal}-${sizeVal}`;
-  }
-
-  const payload = {
-    shortCode: shortCodeVal,
-    productCode: computedProductCode,
-    name: productName?.value.trim() || '',
-    color: colorInput?.value.trim() || '',
-    size: sizeVal,
-    stock: Number(stockInput?.value) || 0,
-    category: categoryInput?.value.trim() || ''
-  };
-
-  const submitBtn = document.getElementById('btnSubmitProduct');
-  if (submitBtn) submitBtn.disabled = true;
-
-  try {
-    const data = await apiFetch('/api/products', {
-      method: 'POST',
-      body: JSON.stringify(payload)
-    });
-
-    if (data && data.success) {
-      showToast(`✅ ${payload.name} (${payload.productCode}) kaydedildi!`, 'success');
-      const form = document.getElementById('newProductForm');
-      if (form) form.reset();
-      fetchData();
-    } else {
-      showToast(`❌ Hata: ${data?.error || 'Kaydedilemedi'}`, 'error');
-    }
-  } catch (err) {
-    showToast(err.message || 'Sunucu hatası oluştu.', 'error');
-  } finally {
-    if (submitBtn) submitBtn.disabled = false;
-  }
-}
 
 // Handle Gemini AI Product Submit
 async function handleAiProductSubmit() {
@@ -2298,7 +2246,25 @@ function copyStoreWebhookUrl() {
   showToast('📋 Mağazanıza özel bağımsız Webhook URL kopyalandı!', 'success');
 }
 
-// YENİ ÜRÜN VE STOK GİRİŞİ FORMU SÜRÜCÜSÜ
+// Otomatik Ürün Kodu Önizleme Güncelleyici
+function updateProductCodePreview() {
+  const shortCodeElem = document.getElementById('shortCode');
+  const sizeElem = document.getElementById('sizeInput');
+  const codeElem = document.getElementById('productCode');
+  if (shortCodeElem && sizeElem && codeElem) {
+    const sc = shortCodeElem.value.trim().toUpperCase();
+    const sz = sizeElem.value.trim().toUpperCase();
+    if (sc && sz) {
+      codeElem.value = `${sc}-${sz}`;
+    } else if (sc) {
+      codeElem.value = `${sc}-...`;
+    } else {
+      codeElem.value = '';
+    }
+  }
+}
+
+// YENİ ÜRÜN VE STOK GİRİŞİ FORMU SÜRÜCÜSÜ (API via apiFetch with JWT)
 async function handleNewProductSubmit(e) {
   if (e) e.preventDefault();
   const shortCodeElem = document.getElementById('shortCode');
@@ -2310,17 +2276,32 @@ async function handleNewProductSubmit(e) {
   const priceElem = document.getElementById('priceInput');
   const catElem = document.getElementById('categoryInput');
 
-  if (!shortCodeElem || !nameElem) return;
+  if (!shortCodeElem || !nameElem || !sizeElem) {
+    showToast('Lütfen zorunlu alanları doldurun.', 'error');
+    return;
+  }
 
   const sc = shortCodeElem.value.toUpperCase().trim();
-  const size = sizeElem ? sizeElem.value.toUpperCase().trim() : 'M';
+  const size = sizeElem.value.toUpperCase().trim();
   const code = (codeElem && codeElem.value.trim()) ? codeElem.value.trim().toUpperCase() : `${sc}-${size}`;
   const name = nameElem.value.trim();
   const color = colorElem ? colorElem.value.trim() : 'Standart';
   const stock = Number(stockElem?.value) || 0;
   const price = Number(priceElem?.value) || 299;
   const category = catElem ? catElem.value.trim() : 'Genel';
-  const storeName = getActiveStoreName();
+
+  if (!sc || !size || !name) {
+    showToast('Kısa kod, beden ve ürün ismi alanları zorunludur.', 'error');
+    return;
+  }
+  if (isNaN(stock) || stock < 0) {
+    showToast('Geçersiz stok miktarı girdiniz.', 'error');
+    return;
+  }
+  if (isNaN(price) || price < 0) {
+    showToast('Geçersiz fiyat girdiniz.', 'error');
+    return;
+  }
 
   const newProduct = {
     shortCode: sc,
@@ -2330,34 +2311,34 @@ async function handleNewProductSubmit(e) {
     size: size,
     stock: stock,
     price: price,
-    category: category,
-    storeName: storeName
+    category: category
   };
 
-  // 1. Mağaza özel yerel depolamaya anında kaydet
-  const currentProducts = getStoreProducts();
-  currentProducts.unshift(newProduct);
-  saveStoreProducts(currentProducts);
+  const submitBtn = document.getElementById('newProductForm')?.querySelector('button[type="submit"]');
+  if (submitBtn) submitBtn.disabled = true;
 
-  // 2. Sunucu veritabanına kaydet
   try {
-    await fetch('/api/products', {
+    const data = await apiFetch('/api/products', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(newProduct)
     });
+
+    if (data && data.success) {
+      showToast(`🎉 "${name}" (${data.productCode || code}) mağazanıza başarıyla eklendi!`, 'success');
+      const form = document.getElementById('newProductForm');
+      if (form) form.reset();
+      updateProductCodePreview();
+      setTimeout(() => {
+        window.location.href = 'index.html';
+      }, 800);
+    } else {
+      showToast(`❌ Hata: ${data?.error || 'Ürün kaydedilemedi.'}`, 'error');
+    }
   } catch (err) {
-    console.warn('[New Product Server Save Warning]:', err);
+    showToast(`❌ Hata: ${err.message || 'Sunucu hatası oluştu.'}`, 'error');
+  } finally {
+    if (submitBtn) submitBtn.disabled = false;
   }
-
-  showToast(`🎉 "${name}" (${code}) mağazanıza başarıyla eklendi!`, 'success');
-  
-  const form = document.getElementById('newProductForm');
-  if (form) form.reset();
-
-  setTimeout(() => {
-    window.location.href = 'index.html';
-  }, 600);
 }
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -2366,6 +2347,10 @@ document.addEventListener('DOMContentLoaded', () => {
   if (npForm) {
     npForm.addEventListener('submit', handleNewProductSubmit);
   }
+  const shortCodeElem = document.getElementById('shortCode');
+  const sizeElem = document.getElementById('sizeInput');
+  if (shortCodeElem) shortCodeElem.addEventListener('input', updateProductCodePreview);
+  if (sizeElem) sizeElem.addEventListener('input', updateProductCodePreview);
 });
 
 // Master Admin Merchant Application Approval Tools

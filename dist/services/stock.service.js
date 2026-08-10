@@ -249,31 +249,31 @@ class StockService {
             const price = Number(data.price) || 299;
             const category = (data.category || 'Genel').trim();
             const storeName = (data.storeName || '').trim();
-            const existing = db_1.db.prepare('SELECT id FROM products WHERE store_id = ? AND (product_code = ? OR (short_code = ? AND size = ?))').get(storeId, productCode, shortCode, size);
-            if (existing) {
-                db_1.db.prepare(`
-          UPDATE products 
-          SET name = ?, color = ?, size = ?, stock = ?, price = ?, category = ?, store_name = ?, updated_at = CURRENT_TIMESTAMP
-          WHERE store_id = ? AND id = ?
-        `).run(name, color, size, stock, price, category, storeName, storeId, existing.id);
-            }
-            else {
-                db_1.db.prepare(`
-          INSERT INTO products (short_code, product_code, name, color, size, stock, price, category, store_name, store_id, updated_at)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-        `).run(shortCode, productCode, name, color, size, stock, price, category, storeName, storeId);
-            }
-            // Synchronize inventory table
-            try {
-                let inv = db_1.db.prepare('SELECT id FROM inventory WHERE store_id = ? AND product_code = ?').get(storeId, productCode);
+            const addProductTx = db_1.db.transaction(() => {
+                const existing = db_1.db.prepare('SELECT id FROM products WHERE store_id = ? AND (product_code = ? OR (short_code = ? AND size = ?))').get(storeId, productCode, shortCode, size);
+                if (existing) {
+                    db_1.db.prepare(`
+            UPDATE products 
+            SET name = ?, color = ?, size = ?, stock = ?, price = ?, category = ?, store_name = ?, updated_at = CURRENT_TIMESTAMP
+            WHERE store_id = ? AND id = ?
+          `).run(name, color, size, stock, price, category, storeName, storeId, existing.id);
+                }
+                else {
+                    db_1.db.prepare(`
+            INSERT INTO products (short_code, product_code, name, color, size, stock, price, category, store_name, store_id, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+          `).run(shortCode, productCode, name, color, size, stock, price, category, storeName, storeId);
+                }
+                // Synchronize inventory table atomically
+                let inv = db_1.db.prepare('SELECT id FROM inventory WHERE store_id = ? AND UPPER(product_code) = ?').get(storeId, productCode);
                 if (inv) {
                     db_1.db.prepare('UPDATE inventory SET stock = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(stock, inv.id);
                 }
                 else {
                     db_1.db.prepare('INSERT INTO inventory (store_id, product_code, stock, reserved_stock, updated_at) VALUES (?, ?, ?, 0, CURRENT_TIMESTAMP)').run(storeId, productCode, stock);
                 }
-            }
-            catch (e) { }
+            });
+            addProductTx();
             console.log(`[StockService SQLite] ✅ Ürün eklendi/güncellendi (Store: ${storeId}): ${productCode} (Stok: ${stock}, Fiyat: ${price} TL)`);
             return { success: true, productCode };
         }
